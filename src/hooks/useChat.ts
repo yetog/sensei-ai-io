@@ -83,37 +83,19 @@ export const useChat = () => {
       timestamp: new Date()
     };
 
+    const assistantMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: 'Image generation coming soon! This feature is currently being developed and will be available in a future update.',
+      timestamp: new Date()
+    };
+
     setChatState(prev => ({
       ...prev,
-      messages: [...prev.messages, userMessage],
-      isLoading: true
+      messages: [...prev.messages, userMessage, assistantMessage]
     }));
 
-    try {
-      const prompt = ionosAI.generateImagePromptFromScript(scriptContext);
-      const imageUrl = await ionosAI.generateImage(prompt);
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'I generated an image based on your script content:',
-        timestamp: new Date(),
-        imageUrl: imageUrl,
-        imagePrompt: prompt
-      };
-
-      setChatState(prev => ({
-        ...prev,
-        messages: [...prev.messages, assistantMessage],
-        isLoading: false
-      }));
-
-      toast.success('Image generated successfully!');
-    } catch (error) {
-      console.error('Image generation error:', error);
-      toast.error('Failed to generate image. Please check your API token.');
-      setChatState(prev => ({ ...prev, isLoading: false }));
-    }
+    toast.info('Image generation coming soon!');
   }, []);
 
   const toggleChat = useCallback(() => {

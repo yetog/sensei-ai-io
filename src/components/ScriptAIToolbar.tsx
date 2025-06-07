@@ -39,6 +39,20 @@ export const ScriptAIToolbar: React.FC<ScriptAIToolbarProps> = ({
   const wordCount = script.trim().split(/\s+/).filter(word => word.length > 0).length;
   const hasScript = script.trim().length > 0;
 
+  const handleQuickAction = (action: string) => {
+    onToggleChat(); // Open chat first
+    setTimeout(() => {
+      onQuickAction(action); // Then send the quick action
+    }, 100);
+  };
+
+  const handleGenerateImage = () => {
+    onToggleChat(); // Open chat first
+    setTimeout(() => {
+      onGenerateImage(); // Then trigger image generation (which will show "coming soon")
+    }, 100);
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-2 p-3 bg-secondary/50 border border-border rounded-lg">
       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -52,7 +66,7 @@ export const ScriptAIToolbar: React.FC<ScriptAIToolbarProps> = ({
             key={index}
             variant="outline"
             size="sm"
-            onClick={() => onQuickAction(item.action)}
+            onClick={() => handleQuickAction(item.action)}
             disabled={disabled || !hasScript}
             className="text-xs"
           >
@@ -64,7 +78,7 @@ export const ScriptAIToolbar: React.FC<ScriptAIToolbarProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={onGenerateImage}
+          onClick={handleGenerateImage}
           disabled={disabled || !hasScript}
           className="text-xs"
         >

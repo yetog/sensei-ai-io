@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Settings, Send, FileText, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,13 +38,10 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
   };
 
   const handleGenerateImage = async () => {
-    console.log('Generating image for script...');
-    try {
-      await generateImage(script);
-    } catch (error) {
-      console.error('Image generation failed:', error);
-      toast.error('Image generation failed. Please check your API token and try again.');
-    }
+    console.log('Image generation triggered - showing coming soon message');
+    toast.info('Image generation coming soon!');
+    // Add a message to the chat as well
+    generateImage(script);
   };
 
   const handleSaveToken = () => {
