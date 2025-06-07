@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Square, Settings, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { ChatBot } from '@/components/ChatBot';
 
 const Index = () => {
   const [script, setScript] = useState('');
@@ -259,6 +259,9 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* Add the ChatBot component */}
+      <ChatBot />
     </div>
   );
 };
