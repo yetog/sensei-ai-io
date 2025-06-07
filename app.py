@@ -39,9 +39,12 @@ session_data = {
         "voice": "en",
         "speed": 1.0,
         "volume": 80,
-        "engine": "gtts"
+        "engine": "gtts",
+        "pitch": 0,
+        "tone": "normal"
     },
-    "last_audio_file": None
+    "last_audio_file": None,
+    "audio_history": []
 }
 
 # Initialize TTS engines
@@ -63,10 +66,11 @@ def initialize_project(project_name: str = "default") -> Dict:
         "character_count": 0
     }
 
-def update_word_count(text: str) -> Tuple[str, str]:
-    """Update word and character count display"""
+def update_word_count(text: str) -> Tuple[str, str, str]:
+    """Update word and character count display with reading time"""
     words = len(text.split()) if text.strip() else 0
     chars = len(text)
+    reading_time = max(1, words // 200)
     
     # Update session data
     if session_data["current_project"] in session_data["projects"]:
@@ -75,11 +79,21 @@ def update_word_count(text: str) -> Tuple[str, str]:
     
     return (
         f"**Words:** {words} | **Characters:** {chars}",
-        f"**Estimated reading time:** {max(1, words // 200)} min"
+        f"**Estimated reading time:** {reading_time} min",
+        f"**TTS Duration:** ~{max(1, words // 150)} min"
     )
 
-def generate_tts_gtts(text: str, speed: float = 1.0) -> Optional[str]:
-    """Generate TTS using Google Text-to-Speech"""
+def get_audio_file_info(filepath: str) -> str:
+    """Get audio file information"""
+    if not filepath or not os.path.exists(filepath):
+        return ""
+    
+    file_size = os.path.getsize(filepath) / 1024  # KB
+    filename = os.path.basename(filepath)
+    return f"📁 **{filename}** ({file_size:.1f} KB)"
+
+def generate_tts_gtts(text: str, speed: float = 1.0, voice: str = "en") -> Optional[str]:
+    """Generate TTS using Google Text-to-Speech with voice options"""
     if not GTTS_AVAILABLE or not text.strip():
         return None
     
@@ -88,16 +102,27 @@ def generate_tts_gtts(text: str, speed: float = 1.0) -> Optional[str]:
         filename = f"script_audio_{timestamp}.mp3"
         filepath = os.path.join(AUDIO_DIR, filename)
         
-        tts = gTTS(text=text, lang='en', slow=(speed < 0.8))
+        # Support different languages/voices for gTTS
+        lang_map = {
+            "en": "en",
+            "en-us": "en",
+            "en-uk": "en-uk", 
+            "es": "es",
+            "fr": "fr",
+            "de": "de"
+        }
+        
+        tts_lang = lang_map.get(voice.lower(), "en")
+        tts = gTTS(text=text, lang=tts_lang, slow=(speed < 0.8))
         tts.save(filepath)
         
         return filepath
     except Exception as e:
-        print(f"TTS Error: {e}")
+        print(f"gTTS Error: {e}")
         return None
 
-def generate_tts_pyttsx3(text: str, speed: float = 1.0) -> Optional[str]:
-    """Generate TTS using pyttsx3"""
+def generate_tts_pyttsx3(text: str, speed: float = 1.0, voice: str = "default", pitch: int = 0) -> Optional[str]:
+    """Generate TTS using pyttsx3 with voice and pitch options"""
     if not PYTTSX3_AVAILABLE or not tts_engine or not text.strip():
         return None
     
@@ -106,43 +131,132 @@ def generate_tts_pyttsx3(text: str, speed: float = 1.0) -> Optional[str]:
         filename = f"script_audio_{timestamp}.wav"
         filepath = os.path.join(AUDIO_DIR, filename)
         
+        # Get available voices
+        voices = tts_engine.getProperty('voices')
+        
+        # Set voice if available
+        if voice != "default" and voices:
+            for v in voices:
+                if voice.lower() in v.name.lower():
+                    tts_engine.setProperty('voice', v.id)
+                    break
+        
         # Set properties
         tts_engine.setProperty('rate', int(200 * speed))
+        
+        # Set pitch if supported (some engines support this)
+        try:
+            current_voice = tts_engine.getProperty('voice')
+            if hasattr(tts_engine, 'setProperty'):
+                tts_engine.setProperty('pitch', pitch)
+        except:
+            pass  # Pitch not supported on this system
+        
         tts_engine.save_to_file(text, filepath)
         tts_engine.runAndWait()
         
         return filepath
     except Exception as e:
-        print(f"TTS Error: {e}")
+        print(f"pyttsx3 Error: {e}")
         return None
 
-def play_script(script_text: str, speed: float, volume: float, engine: str) -> Tuple[Optional[str], str, Optional[str], str]:
-    """Generate and return audio for the script with download option"""
+def get_available_voices() -> List[str]:
+    """Get list of available voices for the current engine"""
+    voices = ["default"]
+    
+    if PYTTSX3_AVAILABLE and tts_engine:
+        try:
+            system_voices = tts_engine.getProperty('voices')
+            if system_voices:
+                voices.extend([voice.name for voice in system_voices[:5]])  # Limit to 5 voices
+        except:
+            pass
+    
+    # Add gTTS language options
+    if GTTS_AVAILABLE:
+        voices.extend(["en-us", "en-uk", "es", "fr", "de"])
+    
+    return list(set(voices))  # Remove duplicates
+
+def play_script(script_text: str, speed: float, volume: float, engine: str, voice: str, pitch: int) -> Tuple[Optional[str], str, Optional[str], str, str]:
+    """Generate and return audio for the script with enhanced options"""
     if not script_text.strip():
-        return None, "⚠️ No script text to convert to speech", None, ""
+        return None, "⚠️ No script text to convert to speech", None, "", ""
+    
+    # Update session settings
+    session_data["settings"].update({
+        "speed": speed,
+        "volume": volume,
+        "engine": engine,
+        "voice": voice,
+        "pitch": pitch
+    })
     
     status_msg = f"🔄 Generating audio with {engine.upper()}..."
     
     if engine == "gtts" and GTTS_AVAILABLE:
-        audio_file = generate_tts_gtts(script_text, speed)
+        audio_file = generate_tts_gtts(script_text, speed, voice)
     elif engine == "pyttsx3" and PYTTSX3_AVAILABLE:
-        audio_file = generate_tts_pyttsx3(script_text, speed)
+        audio_file = generate_tts_pyttsx3(script_text, speed, voice, pitch)
     else:
-        return None, "❌ Selected TTS engine not available", None, ""
+        return None, "❌ Selected TTS engine not available", None, "", ""
     
     if audio_file and os.path.exists(audio_file):
         session_data["last_audio_file"] = audio_file
-        file_size = os.path.getsize(audio_file) / 1024  # KB
-        download_info = f"📁 **Audio File:** {os.path.basename(audio_file)} ({file_size:.1f} KB)"
-        return audio_file, "✅ Audio generated successfully!", audio_file, download_info
+        session_data["audio_history"].append({
+            "file": audio_file,
+            "timestamp": datetime.now().isoformat(),
+            "settings": session_data["settings"].copy()
+        })
+        
+        file_info = get_audio_file_info(audio_file)
+        success_msg = "✅ Audio generated successfully! Use the download button below to save the file."
+        
+        return audio_file, success_msg, audio_file, file_info, f"🎵 Ready to play • Volume: {volume}%"
     else:
-        return None, "❌ Failed to generate audio", None, ""
+        return None, "❌ Failed to generate audio", None, "", ""
 
 def get_audio_download() -> Optional[str]:
     """Get the last generated audio file for download"""
     if session_data["last_audio_file"] and os.path.exists(session_data["last_audio_file"]):
         return session_data["last_audio_file"]
     return None
+
+def cleanup_old_audio_files():
+    """Clean up audio files older than 1 hour"""
+    try:
+        current_time = time.time()
+        for filename in os.listdir(AUDIO_DIR):
+            file_path = os.path.join(AUDIO_DIR, filename)
+            if os.path.isfile(file_path):
+                file_age = current_time - os.path.getmtime(file_path)
+                if file_age > 3600:  # 1 hour
+                    os.remove(file_path)
+    except Exception as e:
+        print(f"Cleanup error: {e}")
+
+def auto_save_script(script: str, notes: str) -> str:
+    """Auto-save script changes"""
+    if not script.strip() and not notes.strip():
+        return ""
+    
+    project_name = session_data["current_project"]
+    if project_name not in session_data["projects"]:
+        session_data["projects"][project_name] = initialize_project(project_name)
+    
+    session_data["projects"][project_name].update({
+        "script": script,
+        "notes": notes,
+        "last_modified": datetime.now().isoformat()
+    })
+    
+    # Save to file periodically
+    try:
+        with open("projects.json", "w") as f:
+            json.dump(session_data["projects"], f, indent=2)
+        return "💾 Auto-saved"
+    except:
+        return ""
 
 def save_project(project_name: str, script: str, notes: str) -> str:
     """Save current project"""
@@ -180,6 +294,7 @@ def get_project_list() -> List[str]:
     """Get list of available projects"""
     return list(session_data["projects"].keys())
 
+# AI functions remain the same
 def chat_with_ai(message: str, history: List, script_context: str) -> Tuple[List, str]:
     """Handle AI chat interactions"""
     if not AI_AVAILABLE:
@@ -223,6 +338,9 @@ try:
 except:
     pass
 
+# Clean up old files on startup
+cleanup_old_audio_files()
+
 # Create Gradio interface
 def create_interface():
     with gr.Blocks(title="ScriptVoice - AI-Powered Script Editor", theme=gr.themes.Soft()) as app:
@@ -244,6 +362,7 @@ def create_interface():
                     load_btn = gr.Button("📂 Load")
                 
                 project_status = gr.Markdown("Ready to create your script!")
+                auto_save_status = gr.Markdown("")
                 
                 # Project List
                 project_dropdown = gr.Dropdown(
@@ -262,33 +381,54 @@ def create_interface():
                         value="gtts"
                     )
                     
-                    speed_slider = gr.Slider(
-                        minimum=0.5,
-                        maximum=2.0,
-                        value=1.0,
-                        step=0.1,
-                        label="Speech Speed"
+                    voice_dropdown = gr.Dropdown(
+                        label="Voice/Language",
+                        choices=get_available_voices(),
+                        value="default"
                     )
                     
-                    volume_slider = gr.Slider(
-                        minimum=0,
-                        maximum=100,
-                        value=80,
+                    with gr.Row():
+                        speed_slider = gr.Slider(
+                            minimum=0.5,
+                            maximum=2.0,
+                            value=1.0,
+                            step=0.1,
+                            label="Speech Speed"
+                        )
+                        
+                        volume_slider = gr.Slider(
+                            minimum=0,
+                            maximum=100,
+                            value=80,
+                            step=5,
+                            label="Volume (%)"
+                        )
+                    
+                    pitch_slider = gr.Slider(
+                        minimum=-50,
+                        maximum=50,
+                        value=0,
                         step=5,
-                        label="Volume (%)"
+                        label="Pitch Adjustment",
+                        visible=False
                     )
                 
                 with gr.Row():
-                    play_btn = gr.Button("🎵 Generate Audio", variant="secondary", scale=2)
-                    download_btn = gr.Button("⬇️ Download", variant="outline", scale=1)
+                    play_btn = gr.Button("🎵 Generate Audio", variant="primary", scale=2)
+                    download_btn = gr.Button("⬇️ Download", variant="secondary", scale=1)
                 
                 # Audio Player and Status
-                audio_output = gr.Audio(label="Generated Audio", show_download_button=True)
+                audio_output = gr.Audio(
+                    label="Generated Audio", 
+                    show_download_button=True,
+                    interactive=True
+                )
                 audio_status = gr.Markdown("Click 'Generate Audio' to create speech from your script")
                 
                 # Download Information
                 download_info = gr.Markdown("")
                 download_file = gr.File(label="Download Audio", visible=False)
+                playback_status = gr.Markdown("")
                 
             with gr.Column(scale=2):
                 # Main Script Editor
@@ -304,6 +444,7 @@ def create_interface():
                 with gr.Row():
                     word_count_display = gr.Markdown("**Words:** 0 | **Characters:** 0")
                     reading_time_display = gr.Markdown("**Estimated reading time:** 0 min")
+                    tts_duration_display = gr.Markdown("**TTS Duration:** ~0 min")
                 
                 # Notes Section
                 gr.Markdown("### 📝 Project Notes")
@@ -340,16 +481,31 @@ def create_interface():
                     continue_btn = gr.Button("📖 Continue Story")
         
         # Event handlers
+        def update_interface_on_text_change(text):
+            word_info, reading_info, tts_info = update_word_count(text)
+            auto_save_info = auto_save_script(text, "")
+            return word_info, reading_info, tts_info, auto_save_info
+        
         script_editor.change(
-            fn=update_word_count,
+            fn=update_interface_on_text_change,
             inputs=[script_editor],
-            outputs=[word_count_display, reading_time_display]
+            outputs=[word_count_display, reading_time_display, tts_duration_display, auto_save_status]
+        )
+        
+        # Show/hide pitch control based on engine
+        def update_engine_controls(engine):
+            return gr.update(visible=(engine == "pyttsx3"))
+        
+        engine_dropdown.change(
+            fn=update_engine_controls,
+            inputs=[engine_dropdown],
+            outputs=[pitch_slider]
         )
         
         play_btn.click(
             fn=play_script,
-            inputs=[script_editor, speed_slider, volume_slider, engine_dropdown],
-            outputs=[audio_output, audio_status, download_file, download_info]
+            inputs=[script_editor, speed_slider, volume_slider, engine_dropdown, voice_dropdown, pitch_slider],
+            outputs=[audio_output, audio_status, download_file, download_info, playback_status]
         )
         
         download_btn.click(
