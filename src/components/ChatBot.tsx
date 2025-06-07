@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Settings, Send, FileText } from 'lucide-react';
+import { MessageCircle, X, Settings, Send, FileText, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [apiToken, setApiToken] = useState(ionosAI.getApiToken() || '');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -36,8 +38,14 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
     sendQuickAction(action, script);
   };
 
-  const handleGenerateImage = () => {
-    generateImage(script);
+  const handleGenerateImage = async () => {
+    console.log('Generating image for script...');
+    try {
+      await generateImage(script);
+    } catch (error) {
+      console.error('Image generation failed:', error);
+      toast.error('Image generation failed. Please check your API token and try again.');
+    }
   };
 
   const handleSaveToken = () => {
@@ -48,6 +56,10 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
     } else {
       toast.error('Please enter a valid API token');
     }
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
   };
 
   const scriptWordCount = script.trim().split(/\s+/).filter(word => word.length > 0).length;
@@ -72,8 +84,12 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
     );
   }
 
+  const chatClasses = isFullscreen 
+    ? "fixed inset-4 w-auto h-auto max-w-none max-h-none z-50" 
+    : "fixed bottom-6 right-6 w-96 h-[500px]";
+
   return (
-    <Card className="fixed bottom-6 right-6 w-96 h-[500px] flex flex-col shadow-xl border-primary/20">
+    <Card className={`${chatClasses} flex flex-col shadow-xl border-primary/20`}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center space-x-2">
@@ -87,6 +103,14 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
           )}
         </div>
         <div className="flex items-center space-x-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleFullscreen}
+            className="h-8 w-8"
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -191,7 +215,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
       </ScrollArea>
 
       {/* Input */}
-      <form onSubmit={handleSendMessage} className="p-4 border-t border-border">
+      <form onSubmit={handleSendMessage} className={`p-4 border-t border-border ${isFullscreen ? 'pb-6' : ''}`}>
         <div className="flex space-x-2">
           <Input
             value={inputValue}
@@ -204,12 +228,13 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
                   : "Add script text first..."
             }
             disabled={!ionosAI.getApiToken() || isLoading}
-            className="flex-1"
+            className={`flex-1 ${isFullscreen ? 'h-12 text-base' : ''}`}
           />
           <Button
             type="submit"
             size="icon"
             disabled={!inputValue.trim() || !ionosAI.getApiToken() || isLoading}
+            className={isFullscreen ? 'h-12 w-12' : ''}
           >
             <Send className="w-4 h-4" />
           </Button>
