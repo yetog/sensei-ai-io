@@ -17,7 +17,7 @@ from services.project_service import (
 from services.ai_service import (
     chat_with_ai, set_api_key, quick_action_improve, quick_action_professional,
     quick_action_dramatic, quick_action_romantic, quick_action_continue, 
-    quick_action_summarize
+    quick_action_summarize, quick_action_enhance, quick_action_translate
 )
 
 def play_script(script_text: str, speed: float, volume: float, engine: str, voice: str, pitch: int) -> Tuple[Optional[str], str, Optional[str], str, str]:
@@ -52,7 +52,7 @@ def play_script(script_text: str, speed: float, volume: float, engine: str, voic
         })
         
         file_info = get_audio_file_info(audio_file)
-        success_msg = "✅ Audio generated successfully!"
+        success_msg = "✅ Audio generated successfully! You can now download or play it."
         
         return audio_file, success_msg, audio_file, file_info, f"🎵 Ready to play"
     else:
@@ -66,7 +66,7 @@ def get_audio_download() -> Optional[str]:
 
 def create_interface():
     """Create the main Gradio interface for Wolf AI"""
-    # Custom CSS for modern, dark theme
+    # Custom CSS for modern, dark theme with improved collapsibles
     custom_css = """
     .gradio-container {
         background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
@@ -106,6 +106,14 @@ def create_interface():
         padding: 15px;
     }
     
+    .audio-controls {
+        background: #1a1a1a;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
     button {
         border-radius: 6px;
         font-weight: 500;
@@ -131,6 +139,18 @@ def create_interface():
     
     .secondary-btn:hover {
         background: #444;
+        border-color: #666;
+    }
+    
+    .quick-action-btn {
+        background: #2a2a2a;
+        color: #fff;
+        border: 1px solid #444;
+        margin: 2px;
+    }
+    
+    .quick-action-btn:hover {
+        background: #3a3a3a;
         border-color: #666;
     }
     """
@@ -167,67 +187,67 @@ def create_interface():
             # Left Sidebar - Controls & Settings
             with gr.Column(scale=1, elem_classes="sidebar-panel"):
                 
-                # Quick Audio Controls - Prominent
-                gr.Markdown("### 🎵 Audio Controls")
-                with gr.Group(elem_classes="control-panel"):
-                    with gr.Row():
-                        engine_dropdown = gr.Dropdown(
-                            label="Engine",
-                            choices=["gtts", "pyttsx3"],
-                            value="gtts",
-                            scale=1
-                        )
+                # Audio Controls - Now Collapsible
+                with gr.Accordion("🎵 Audio Controls", open=True):
+                    with gr.Group(elem_classes="control-panel"):
+                        with gr.Row():
+                            engine_dropdown = gr.Dropdown(
+                                label="Engine",
+                                choices=["gtts", "pyttsx3"],
+                                value="gtts",
+                                scale=1
+                            )
+                            
+                            voice_dropdown = gr.Dropdown(
+                                label="Voice",
+                                choices=get_available_voices(),
+                                value="en",
+                                scale=2
+                            )
                         
-                        voice_dropdown = gr.Dropdown(
-                            label="Voice",
-                            choices=get_available_voices(),
-                            value="en",
-                            scale=2
-                        )
-                    
-                    with gr.Row():
-                        speed_slider = gr.Slider(
-                            minimum=0.5,
-                            maximum=2.0,
-                            value=1.0,
-                            step=0.1,
-                            label="Speed",
-                            scale=1
-                        )
+                        with gr.Row():
+                            speed_slider = gr.Slider(
+                                minimum=0.5,
+                                maximum=2.0,
+                                value=1.0,
+                                step=0.1,
+                                label="Speed",
+                                scale=1
+                            )
+                            
+                            volume_slider = gr.Slider(
+                                minimum=0,
+                                maximum=100,
+                                value=80,
+                                step=5,
+                                label="Volume",
+                                scale=1
+                            )
                         
-                        volume_slider = gr.Slider(
-                            minimum=0,
-                            maximum=100,
-                            value=80,
+                        pitch_slider = gr.Slider(
+                            minimum=-50,
+                            maximum=50,
+                            value=0,
                             step=5,
-                            label="Volume",
-                            scale=1
+                            label="Pitch",
+                            visible=False
                         )
                     
-                    pitch_slider = gr.Slider(
-                        minimum=-50,
-                        maximum=50,
-                        value=0,
-                        step=5,
-                        label="Pitch",
-                        visible=False
+                    # Primary Action Buttons
+                    with gr.Row():
+                        play_btn = gr.Button("🎵 Generate", variant="primary", scale=2, elem_classes="primary-btn")
+                        preview_btn = gr.Button("👂 Preview", scale=1, elem_classes="secondary-btn")
+                    
+                    with gr.Row():
+                        download_btn = gr.Button("⬇️ Download", scale=1, elem_classes="secondary-btn")
+                    
+                    # Audio Player
+                    audio_output = gr.Audio(
+                        label="Generated Audio", 
+                        show_download_button=True,
+                        interactive=True
                     )
-                
-                # Primary Action Buttons
-                with gr.Row():
-                    play_btn = gr.Button("🎵 Generate", variant="primary", scale=2, elem_classes="primary-btn")
-                    preview_btn = gr.Button("👂 Preview", scale=1, elem_classes="secondary-btn")
-                
-                with gr.Row():
-                    download_btn = gr.Button("⬇️ Download", scale=1, elem_classes="secondary-btn")
-                
-                # Audio Player
-                audio_output = gr.Audio(
-                    label="Generated Audio", 
-                    show_download_button=False,
-                    interactive=False
-                )
-                audio_status = gr.Markdown("Ready to generate audio")
+                    audio_status = gr.Markdown("Ready to generate audio")
                 
                 # Collapsible Project Management
                 with gr.Accordion("📁 Project Management", open=False):
@@ -259,7 +279,7 @@ def create_interface():
                     )
                     
                     live_preview_toggle = gr.Checkbox(
-                        label="Live preview",
+                        label="Live preview (Note: May not work for long scripts)",
                         value=session_data["settings"]["live_preview"]
                     )
                     
@@ -282,7 +302,7 @@ def create_interface():
                         <h3 style="margin: 0 0 10px 0; color: #FFD700;">🚀 Quick Start</h3>
                         <div style="color: #ccc; font-size: 0.9rem;">
                             1. Load a sample script or start writing<br>
-                            2. Select voice and adjust settings<br>
+                            2. Select voice and adjust settings in Audio Controls<br>
                             3. Click 'Generate' to create audio<br>
                             4. Use AI assistant for improvements
                         </div>
@@ -319,14 +339,15 @@ def create_interface():
                 
                 # API Key Setup (collapsible)
                 with gr.Accordion("🔑 API Setup", open=False):
+                    gr.Markdown("✅ **IONOS API Key is pre-configured and ready!**")
                     ionos_api_input = gr.Textbox(
-                        label="IONOS AI API Key",
-                        placeholder="Enter your API key...",
+                        label="Custom IONOS AI API Key (Optional)",
+                        placeholder="Leave blank to use default...",
                         type="password",
-                        value=session_data["api_keys"]["ionos_api_key"]
+                        value=""
                     )
-                    set_ionos_btn = gr.Button("Set Key", size="sm")
-                    api_status = gr.Markdown("")
+                    set_ionos_btn = gr.Button("Set Custom Key", size="sm")
+                    api_status = gr.Markdown("**Status:** Using default API key")
                 
                 # Chat Interface
                 chat_history = gr.Chatbot(
@@ -346,14 +367,31 @@ def create_interface():
                     chat_btn = gr.Button("Send", variant="primary", scale=2)
                     clear_chat_btn = gr.Button("Clear", scale=1)
                 
-                # Quick Actions
+                # Enhanced Quick Actions with Dropdown Options
                 gr.Markdown("### ⚡ Quick Actions")
                 with gr.Column():
-                    improve_btn = gr.Button("✨ Improve Script", size="sm")
-                    professional_btn = gr.Button("💼 Make Professional", size="sm")
-                    dramatic_btn = gr.Button("🎭 Add Drama", size="sm")
-                    continue_btn = gr.Button("📖 Continue Story", size="sm")
-                    summarize_btn = gr.Button("📋 Summarize", size="sm")
+                    # Primary quick actions
+                    with gr.Row():
+                        improve_btn = gr.Button("✨ Improve", size="sm", elem_classes="quick-action-btn")
+                        enhance_btn = gr.Button("🔧 Enhance", size="sm", elem_classes="quick-action-btn")
+                    
+                    with gr.Row():
+                        professional_btn = gr.Button("💼 Professional", size="sm", elem_classes="quick-action-btn")
+                        dramatic_btn = gr.Button("🎭 Add Drama", size="sm", elem_classes="quick-action-btn")
+                    
+                    with gr.Row():
+                        continue_btn = gr.Button("📖 Continue", size="sm", elem_classes="quick-action-btn")
+                        summarize_btn = gr.Button("📋 Summarize", size="sm", elem_classes="quick-action-btn")
+                    
+                    # Translation dropdown
+                    with gr.Row():
+                        translate_lang = gr.Dropdown(
+                            label="Translate to:",
+                            choices=["Spanish", "French", "German", "Italian", "Portuguese", "Chinese", "Japanese"],
+                            value="Spanish",
+                            scale=2
+                        )
+                        translate_btn = gr.Button("🌐 Translate", size="sm", scale=1, elem_classes="quick-action-btn")
                 
                 # Batch Operations (collapsible)
                 with gr.Accordion("🔄 Batch Operations", open=False):
@@ -379,7 +417,7 @@ def create_interface():
             ionos_api_input, set_ionos_btn, api_status, auto_save_toggle, live_preview_toggle,
             chat_input, chat_history, chat_btn, clear_chat_btn, improve_btn, professional_btn,
             dramatic_btn, romantic_btn, continue_btn, summarize_btn, batch_input, batch_btn,
-            batch_status, stats_display
+            batch_status, stats_display, enhance_btn, translate_btn, translate_lang
         )
     
     return app
@@ -396,7 +434,7 @@ def setup_event_handlers(*components):
      ionos_api_input, set_ionos_btn, api_status, auto_save_toggle, live_preview_toggle,
      chat_input, chat_history, chat_btn, clear_chat_btn, improve_btn, professional_btn,
      dramatic_btn, romantic_btn, continue_btn, summarize_btn, batch_input, batch_btn,
-     batch_status, stats_display) = components
+     batch_status, stats_display, enhance_btn, translate_btn, translate_lang) = components
     
     # Enhanced interface update function
     def update_interface_on_text_change(text):
@@ -441,19 +479,25 @@ def setup_event_handlers(*components):
         clean_name = project_name.replace("📘 ", "") if project_name and project_name.startswith("📘") else project_name
         return load_project(clean_name)
     
-    # Main TTS generation
+    # Main TTS generation with better feedback
     play_btn.click(
         fn=play_script,
         inputs=[script_editor, speed_slider, volume_slider, engine_dropdown, voice_dropdown, pitch_slider],
         outputs=[audio_output, audio_status, download_file, download_info, playback_status]
     )
     
-    # Preview functionality
+    # Preview functionality with error handling
     def generate_preview(text, engine, voice, speed):
-        preview_file = generate_live_preview(text, engine, voice, speed)
+        if not text.strip():
+            return None, "❌ No text to preview"
+        
+        # Get first 50 characters for a meaningful preview
+        preview_text = text[:50] + "..." if len(text) > 50 else text
+        preview_file = generate_live_preview(preview_text, engine, voice, speed)
+        
         if preview_file:
-            return preview_file, "🔊 Preview ready (first 10 words)"
-        return None, "❌ Preview generation failed"
+            return preview_file, "🔊 Preview ready (first 50 characters)"
+        return None, "❌ Preview generation failed or disabled for long scripts"
     
     preview_btn.click(
         fn=generate_preview,
@@ -516,9 +560,15 @@ def setup_event_handlers(*components):
         outputs=[chat_history]
     )
     
-    # Quick action handlers
+    # Enhanced quick action handlers
     improve_btn.click(
         fn=quick_action_improve,
+        inputs=[script_editor, chat_history],
+        outputs=[chat_history, chat_input]
+    )
+    
+    enhance_btn.click(
+        fn=quick_action_enhance,
         inputs=[script_editor, chat_history],
         outputs=[chat_history, chat_input]
     )
@@ -544,6 +594,16 @@ def setup_event_handlers(*components):
     summarize_btn.click(
         fn=quick_action_summarize,
         inputs=[script_editor, chat_history],
+        outputs=[chat_history, chat_input]
+    )
+    
+    # Translation functionality
+    def handle_translate(script, lang, history):
+        return quick_action_translate(script, lang, history)
+    
+    translate_btn.click(
+        fn=handle_translate,
+        inputs=[script_editor, translate_lang, chat_history],
         outputs=[chat_history, chat_input]
     )
     
