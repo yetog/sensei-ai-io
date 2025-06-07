@@ -1,73 +1,155 @@
-# Welcome to your Lovable project
 
-## Project info
+# 🎭 ScriptVoice - AI-Powered Script Editor
 
-**URL**: https://lovable.dev/projects/f6330339-6c14-4c10-aea1-8e7c86928e1f
+A Gradio-based web application that lets users write, edit, and bring their scripts to life with text-to-speech and AI assistance. Perfect for storytellers, content creators, and anyone who wants to hear their words come alive!
 
-## How can I edit this code?
+## 🚀 Features
 
-There are several ways of editing your application.
+### Core Functionality
+- **📝 Script Editor**: Full-featured text editor with word count and reading time estimation
+- **🔊 Text-to-Speech**: Convert your scripts to audio using Google TTS or pyttsx3
+- **💾 Project Management**: Save and load multiple script projects
+- **📝 Notes System**: Add project-specific notes and ideas
 
-**Use Lovable**
+### AI-Powered Assistance
+- **🤖 AI Chat**: Get suggestions and feedback on your scripts
+- **⚡ Quick Actions**: 
+  - ✨ Improve script flow and readability
+  - 💕 Rewrite in romantic tone
+  - 🎭 Add dramatic pauses for better TTS
+  - 📖 Continue your story
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f6330339-6c14-4c10-aea1-8e7c86928e1f) and start prompting.
+### Voice Controls
+- **🎵 Multiple TTS Engines**: Choose between Google TTS and pyttsx3
+- **⚙️ Speed Control**: Adjust playback speed (0.5x to 2.0x)
+- **📊 Real-time Stats**: Live word count, character count, and reading time
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Setup & Installation
 
-**Use your preferred IDE**
+### Local Development
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. **Clone or download the project files**
+   ```bash
+   # Make sure you have Python 3.8+
+   python --version
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Follow these steps:
+3. **Set up environment variables (optional)**
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your OpenAI API key for AI features
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+4. **Run the application**
+   ```bash
+   python app.py
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+5. **Open your browser**
+   - Local: `http://localhost:7860`
+   - Public link will be displayed in terminal
 
-# Step 3: Install the necessary dependencies.
-npm i
+### HuggingFace Spaces Deployment
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. **Create a new Space on HuggingFace**
+   - Go to [HuggingFace Spaces](https://huggingface.co/spaces)
+   - Click "Create new Space"
+   - Choose "Gradio" as the SDK
+
+2. **Upload files**
+   - `app.py` (main application)
+   - `requirements.txt` (dependencies)
+   - `README.md` (this file)
+
+3. **Set environment variables (optional)**
+   - In Space settings, add `OPENAI_API_KEY` for AI features
+
+4. **Deploy**
+   - Space will automatically build and deploy
+   - Share the public URL!
+
+## 📖 Usage Guide
+
+### Getting Started
+1. **Write Your Script**: Use the main text editor to write your script or story
+2. **Add Notes**: Use the notes section for ideas, character details, or plot points
+3. **Generate Audio**: Click "Generate & Play Audio" to hear your script
+4. **Save Your Work**: Enter a project name and click "Save" to preserve your work
+
+### AI Assistance
+1. **Chat with AI**: Ask questions about your script in the chat interface
+2. **Quick Actions**: Use the preset buttons for common improvements:
+   - "Improve Script" - Get general writing suggestions
+   - "Make Romantic" - Rewrite with romantic tone
+   - "Add Drama" - Insert dramatic pauses and emphasis
+   - "Continue Story" - Generate story continuation
+
+### Voice Settings
+- **Speed Control**: Adjust how fast the TTS reads your script
+- **Engine Selection**: Choose between Google TTS (online) and pyttsx3 (offline)
+
+## 🏗️ Technical Details
+
+### Architecture
+- **Frontend**: Gradio Blocks for responsive web interface
+- **TTS Engines**: gTTS (Google) and pyttsx3 (offline)
+- **AI Integration**: OpenAI GPT models via API
+- **Data Storage**: JSON file storage for projects
+- **Deployment**: HuggingFace Spaces compatible
+
+### File Structure
+```
+├── app.py              # Main Gradio application
+├── requirements.txt    # Python dependencies  
+├── README.md          # Documentation
+├── .env.example       # Environment template
+└── projects.json      # Saved projects (auto-generated)
 ```
 
-**Edit a file directly in GitHub**
+## 🚀 Hackathon Demo
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+**Track**: Agent Demo Track (#agent-demo-track)
 
-**Use GitHub Codespaces**
+This project demonstrates:
+- **AI-Human Collaboration**: Writers work alongside AI for script improvement
+- **Multi-Modal Output**: Text → Speech conversion for accessibility
+- **Real-time Interaction**: Live word counting, instant TTS generation
+- **Persistent Workflows**: Save/load projects for continued work
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Demo Flow
+1. Open the app and write a short story or script
+2. Use AI quick actions to improve the content
+3. Generate audio to hear how it sounds
+4. Save the project and load it later
+5. Continue iterating with AI assistance
 
-## What technologies are used for this project?
+## 🔧 Development
 
-This project is built with:
+### Adding New Features
+- **New TTS Engine**: Add to the engine dropdown and create generation function
+- **AI Prompts**: Add new quick action buttons and corresponding functions
+- **Export Options**: Extend save functionality to support different formats
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Customization
+- **Themes**: Modify the Gradio theme in `create_interface()`
+- **Layout**: Adjust column scales and component arrangements
+- **Styling**: Add custom CSS for branding
 
-## How can I deploy this project?
+## 📝 License
 
-Simply open [Lovable](https://lovable.dev/projects/f6330339-6c14-4c10-aea1-8e7c86928e1f) and click on Share -> Publish.
+Open source - feel free to fork, modify, and share!
 
-## Can I connect a custom domain to my Lovable project?
+## 🤝 Contributing
 
-Yes, you can!
+This is a hackathon demo project, but contributions and improvements are welcome!
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+**Made with ❤️ for storytellers and content creators**
+
+*Transform your words into voice, your ideas into stories*
