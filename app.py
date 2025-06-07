@@ -6,6 +6,7 @@ import tempfile
 from typing import Dict, List, Tuple, Optional
 import time
 from datetime import datetime
+import shutil
 
 # TTS imports
 try:
@@ -26,6 +27,10 @@ try:
 except ImportError:
     AI_AVAILABLE = False
 
+# Create audio output directory
+AUDIO_DIR = "generated_audio"
+os.makedirs(AUDIO_DIR, exist_ok=True)
+
 # Global state for session management
 session_data = {
     "projects": {},
@@ -33,8 +38,10 @@ session_data = {
     "settings": {
         "voice": "en",
         "speed": 1.0,
+        "volume": 80,
         "engine": "gtts"
-    }
+    },
+    "last_audio_file": None
 }
 
 # Initialize TTS engines
@@ -77,11 +84,14 @@ def generate_tts_gtts(text: str, speed: float = 1.0) -> Optional[str]:
         return None
     
     try:
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
-            tts = gTTS(text=text, lang='en', slow=(speed < 0.8))
-            tts.save(tmp_file.name)
-            return tmp_file.name
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"script_audio_{timestamp}.mp3"
+        filepath = os.path.join(AUDIO_DIR, filename)
+        
+        tts = gTTS(text=text, lang='en', slow=(speed < 0.8))
+        tts.save(filepath)
+        
+        return filepath
     except Exception as e:
         print(f"TTS Error: {e}")
         return None
@@ -92,21 +102,24 @@ def generate_tts_pyttsx3(text: str, speed: float = 1.0) -> Optional[str]:
         return None
     
     try:
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
-            # Set properties
-            tts_engine.setProperty('rate', int(200 * speed))
-            tts_engine.save_to_file(text, tmp_file.name)
-            tts_engine.runAndWait()
-            return tmp_file.name
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"script_audio_{timestamp}.wav"
+        filepath = os.path.join(AUDIO_DIR, filename)
+        
+        # Set properties
+        tts_engine.setProperty('rate', int(200 * speed))
+        tts_engine.save_to_file(text, filepath)
+        tts_engine.runAndWait()
+        
+        return filepath
     except Exception as e:
         print(f"TTS Error: {e}")
         return None
 
-def play_script(script_text: str, speed: float, engine: str) -> Tuple[Optional[str], str]:
-    """Generate and return audio for the script"""
+def play_script(script_text: str, speed: float, volume: float, engine: str) -> Tuple[Optional[str], str, Optional[str], str]:
+    """Generate and return audio for the script with download option"""
     if not script_text.strip():
-        return None, "⚠️ No script text to convert to speech"
+        return None, "⚠️ No script text to convert to speech", None, ""
     
     status_msg = f"🔄 Generating audio with {engine.upper()}..."
     
@@ -115,12 +128,21 @@ def play_script(script_text: str, speed: float, engine: str) -> Tuple[Optional[s
     elif engine == "pyttsx3" and PYTTSX3_AVAILABLE:
         audio_file = generate_tts_pyttsx3(script_text, speed)
     else:
-        return None, "❌ Selected TTS engine not available"
+        return None, "❌ Selected TTS engine not available", None, ""
     
-    if audio_file:
-        return audio_file, "✅ Audio generated successfully!"
+    if audio_file and os.path.exists(audio_file):
+        session_data["last_audio_file"] = audio_file
+        file_size = os.path.getsize(audio_file) / 1024  # KB
+        download_info = f"📁 **Audio File:** {os.path.basename(audio_file)} ({file_size:.1f} KB)"
+        return audio_file, "✅ Audio generated successfully!", audio_file, download_info
     else:
-        return None, "❌ Failed to generate audio"
+        return None, "❌ Failed to generate audio", None, ""
+
+def get_audio_download() -> Optional[str]:
+    """Get the last generated audio file for download"""
+    if session_data["last_audio_file"] and os.path.exists(session_data["last_audio_file"]):
+        return session_data["last_audio_file"]
+    return None
 
 def save_project(project_name: str, script: str, notes: str) -> str:
     """Save current project"""
@@ -230,25 +252,43 @@ def create_interface():
                     interactive=True
                 )
                 
-                # TTS Settings
-                gr.Markdown("### 🔊 Voice Settings")
-                speed_slider = gr.Slider(
-                    minimum=0.5,
-                    maximum=2.0,
-                    value=1.0,
-                    step=0.1,
-                    label="Speech Speed"
-                )
+                # Enhanced Audio Controls
+                gr.Markdown("### 🔊 Audio Controls")
                 
-                engine_dropdown = gr.Dropdown(
-                    label="TTS Engine",
-                    choices=["gtts", "pyttsx3"],
-                    value="gtts"
-                )
+                with gr.Group():
+                    engine_dropdown = gr.Dropdown(
+                        label="TTS Engine",
+                        choices=["gtts", "pyttsx3"],
+                        value="gtts"
+                    )
+                    
+                    speed_slider = gr.Slider(
+                        minimum=0.5,
+                        maximum=2.0,
+                        value=1.0,
+                        step=0.1,
+                        label="Speech Speed"
+                    )
+                    
+                    volume_slider = gr.Slider(
+                        minimum=0,
+                        maximum=100,
+                        value=80,
+                        step=5,
+                        label="Volume (%)"
+                    )
                 
-                play_btn = gr.Button("🎵 Generate & Play Audio", variant="secondary")
-                audio_output = gr.Audio(label="Generated Audio")
-                audio_status = gr.Markdown("Click 'Generate & Play Audio' to create speech from your script")
+                with gr.Row():
+                    play_btn = gr.Button("🎵 Generate Audio", variant="secondary", scale=2)
+                    download_btn = gr.Button("⬇️ Download", variant="outline", scale=1)
+                
+                # Audio Player and Status
+                audio_output = gr.Audio(label="Generated Audio", show_download_button=True)
+                audio_status = gr.Markdown("Click 'Generate Audio' to create speech from your script")
+                
+                # Download Information
+                download_info = gr.Markdown("")
+                download_file = gr.File(label="Download Audio", visible=False)
                 
             with gr.Column(scale=2):
                 # Main Script Editor
@@ -261,8 +301,9 @@ def create_interface():
                 )
                 
                 # Word Count Display
-                word_count_display = gr.Markdown("**Words:** 0 | **Characters:** 0")
-                reading_time_display = gr.Markdown("**Estimated reading time:** 0 min")
+                with gr.Row():
+                    word_count_display = gr.Markdown("**Words:** 0 | **Characters:** 0")
+                    reading_time_display = gr.Markdown("**Estimated reading time:** 0 min")
                 
                 # Notes Section
                 gr.Markdown("### 📝 Project Notes")
@@ -307,8 +348,13 @@ def create_interface():
         
         play_btn.click(
             fn=play_script,
-            inputs=[script_editor, speed_slider, engine_dropdown],
-            outputs=[audio_output, audio_status]
+            inputs=[script_editor, speed_slider, volume_slider, engine_dropdown],
+            outputs=[audio_output, audio_status, download_file, download_info]
+        )
+        
+        download_btn.click(
+            fn=get_audio_download,
+            outputs=[download_file]
         )
         
         save_btn.click(
