@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Settings, Send } from 'lucide-react';
+import { MessageCircle, X, Settings, Send, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,12 @@ import { ChatMessage } from '@/components/ChatMessage';
 import { ionosAI } from '@/services/ionosAI';
 import { toast } from 'sonner';
 
-export const ChatBot: React.FC = () => {
-  const { messages, isLoading, isOpen, sendMessage, toggleChat, clearChat } = useChat();
+interface ChatBotProps {
+  script?: string;
+}
+
+export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
+  const { messages, isLoading, isOpen, sendMessage, sendQuickAction, toggleChat, clearChat } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [apiToken, setApiToken] = useState(ionosAI.getApiToken() || '');
@@ -24,9 +28,13 @@ export const ChatBot: React.FC = () => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim() && !isLoading) {
-      sendMessage(inputValue);
+      sendMessage(inputValue, script);
       setInputValue('');
     }
+  };
+
+  const handleQuickAction = (action: string) => {
+    sendQuickAction(action, script);
   };
 
   const handleSaveToken = () => {
@@ -39,9 +47,12 @@ export const ChatBot: React.FC = () => {
     }
   };
 
+  const scriptWordCount = script.trim().split(/\s+/).filter(word => word.length > 0).length;
+  const hasScript = script.trim().length > 0;
+
   const quickPrompts = [
     "Improve this script for better TTS",
-    "Make this more engaging",
+    "Make this more engaging", 
     "Check pronunciation and flow",
     "Suggest creative ideas"
   ];
@@ -65,6 +76,12 @@ export const ChatBot: React.FC = () => {
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 bg-primary rounded-full pulse-gold"></div>
           <h3 className="font-semibold">AI Assistant</h3>
+          {hasScript && (
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+              <FileText className="w-3 h-3" />
+              <span>{scriptWordCount}w</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-1">
           <Button
@@ -85,6 +102,16 @@ export const ChatBot: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Script Context Indicator */}
+      {hasScript && (
+        <div className="px-4 py-2 bg-primary/10 border-b border-primary/20">
+          <div className="flex items-center space-x-2 text-xs text-primary">
+            <FileText className="w-3 h-3" />
+            <span>Script context active ({scriptWordCount} words)</span>
+          </div>
+        </div>
+      )}
 
       {/* Settings Panel */}
       {showSettings && (
@@ -115,7 +142,9 @@ export const ChatBot: React.FC = () => {
         {messages.length === 0 && (
           <div className="text-center text-muted-foreground py-8">
             <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-sm mb-4">Ask me anything about your script!</p>
+            <p className="text-sm mb-4">
+              {hasScript ? 'Ask me about your script!' : 'Add text to your script to get AI assistance!'}
+            </p>
             <div className="space-y-2">
               {quickPrompts.map((prompt, index) => (
                 <Button
@@ -123,8 +152,8 @@ export const ChatBot: React.FC = () => {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
-                  onClick={() => sendMessage(prompt)}
-                  disabled={!ionosAI.getApiToken()}
+                  onClick={() => handleQuickAction(prompt)}
+                  disabled={!ionosAI.getApiToken() || !hasScript}
                 >
                   {prompt}
                 </Button>
@@ -158,7 +187,13 @@ export const ChatBot: React.FC = () => {
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={ionosAI.getApiToken() ? "Ask about your script..." : "Set API token in settings"}
+            placeholder={
+              !ionosAI.getApiToken() 
+                ? "Set API token in settings" 
+                : hasScript 
+                  ? "Ask about your script..." 
+                  : "Add script text first..."
+            }
             disabled={!ionosAI.getApiToken() || isLoading}
             className="flex-1"
           />

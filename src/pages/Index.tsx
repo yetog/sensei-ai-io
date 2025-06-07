@@ -7,6 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { ChatBot } from '@/components/ChatBot';
+import { ScriptAIToolbar } from '@/components/ScriptAIToolbar';
+import { useChat } from '@/hooks/useChat';
+import { ionosAI } from '@/services/ionosAI';
 
 const Index = () => {
   const [script, setScript] = useState('');
@@ -18,6 +21,8 @@ const Index = () => {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  
+  const { sendQuickAction, toggleChat } = useChat();
 
   // Load saved data from localStorage
   useEffect(() => {
@@ -209,6 +214,14 @@ const Index = () => {
               )}
             </Card>
 
+            {/* AI Toolbar */}
+            <ScriptAIToolbar
+              script={script}
+              onQuickAction={(action) => sendQuickAction(action, script)}
+              onToggleChat={toggleChat}
+              disabled={!ionosAI.getApiToken()}
+            />
+
             {/* Script Editor */}
             <Card className="flex-1 p-6">
               <div className="h-full flex flex-col">
@@ -260,8 +273,8 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Add the ChatBot component */}
-      <ChatBot />
+      {/* Add the ChatBot component with script context */}
+      <ChatBot script={script} />
     </div>
   );
 };

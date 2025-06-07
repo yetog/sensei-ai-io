@@ -11,7 +11,7 @@ export const useChat = () => {
     isOpen: false
   });
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, scriptContext?: string) => {
     if (!content.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -33,7 +33,13 @@ export const useChat = () => {
         content: msg.content
       }));
       
-      apiMessages.push({ role: 'user', content });
+      // Include script context if provided
+      let messageContent = content;
+      if (scriptContext && scriptContext.trim()) {
+        messageContent = `Current script (${scriptContext.trim().split(/\s+/).length} words):\n\n"${scriptContext}"\n\nUser question: ${content}`;
+      }
+      
+      apiMessages.push({ role: 'user', content: messageContent });
 
       const response = await ionosAI.sendMessage(apiMessages);
 
@@ -56,6 +62,14 @@ export const useChat = () => {
     }
   }, [chatState.messages]);
 
+  const sendQuickAction = useCallback(async (action: string, scriptContext: string) => {
+    if (!scriptContext.trim()) {
+      toast.error('Please add some text to your script first');
+      return;
+    }
+    await sendMessage(action, scriptContext);
+  }, [sendMessage]);
+
   const toggleChat = useCallback(() => {
     setChatState(prev => ({ ...prev, isOpen: !prev.isOpen }));
   }, []);
@@ -67,6 +81,7 @@ export const useChat = () => {
   return {
     ...chatState,
     sendMessage,
+    sendQuickAction,
     toggleChat,
     clearChat
   };
