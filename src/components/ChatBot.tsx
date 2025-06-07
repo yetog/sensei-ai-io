@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Settings, Send, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ interface ChatBotProps {
 }
 
 export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
-  const { messages, isLoading, isOpen, sendMessage, sendQuickAction, toggleChat, clearChat } = useChat();
+  const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [apiToken, setApiToken] = useState(ionosAI.getApiToken() || '');
@@ -37,6 +36,10 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
     sendQuickAction(action, script);
   };
 
+  const handleGenerateImage = () => {
+    generateImage(script);
+  };
+
   const handleSaveToken = () => {
     if (apiToken.trim()) {
       ionosAI.setApiToken(apiToken);
@@ -54,7 +57,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
     "Improve this script for better TTS",
     "Make this more engaging", 
     "Check pronunciation and flow",
-    "Suggest creative ideas"
+    "Generate image for this script"
   ];
 
   if (!isOpen) {
@@ -152,7 +155,13 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
-                  onClick={() => handleQuickAction(prompt)}
+                  onClick={() => {
+                    if (prompt === "Generate image for this script") {
+                      handleGenerateImage();
+                    } else {
+                      handleQuickAction(prompt);
+                    }
+                  }}
                   disabled={!ionosAI.getApiToken() || !hasScript}
                 >
                   {prompt}

@@ -1,11 +1,12 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Sparkles, CheckCircle, MessageSquare, Zap } from 'lucide-react';
+import { Sparkles, CheckCircle, MessageSquare, Zap, Image } from 'lucide-react';
 
 interface ScriptAIToolbarProps {
   script: string;
   onQuickAction: (action: string) => void;
+  onGenerateImage: () => void;
   onToggleChat: () => void;
   disabled?: boolean;
 }
@@ -13,6 +14,7 @@ interface ScriptAIToolbarProps {
 export const ScriptAIToolbar: React.FC<ScriptAIToolbarProps> = ({
   script,
   onQuickAction,
+  onGenerateImage,
   onToggleChat,
   disabled = false
 }) => {
@@ -58,6 +60,17 @@ export const ScriptAIToolbar: React.FC<ScriptAIToolbarProps> = ({
             {item.label}
           </Button>
         ))}
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onGenerateImage}
+          disabled={disabled || !hasScript}
+          className="text-xs"
+        >
+          <Image className="w-3 h-3 mr-1" />
+          Generate Image
+        </Button>
         
         <Button
           variant="outline"

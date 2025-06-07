@@ -22,7 +22,7 @@ const Index = () => {
   
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   
-  const { sendQuickAction, toggleChat } = useChat();
+  const { sendQuickAction, generateImage, toggleChat } = useChat();
 
   // Load saved data from localStorage
   useEffect(() => {
@@ -218,6 +218,7 @@ const Index = () => {
             <ScriptAIToolbar
               script={script}
               onQuickAction={(action) => sendQuickAction(action, script)}
+              onGenerateImage={() => generateImage(script)}
               onToggleChat={toggleChat}
               disabled={!ionosAI.getApiToken()}
             />

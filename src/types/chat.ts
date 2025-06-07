@@ -4,6 +4,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  imageUrl?: string;
+  imagePrompt?: string;
 }
 
 export interface ChatState {
@@ -29,4 +31,20 @@ export interface IONOSAIResponse {
       role: string;
     };
   }>;
+}
+
+export interface IONOSImageRequest {
+  model: string;
+  prompt: string;
+  size: string;
+}
+
+export interface IONOSImageResponse {
+  data: Array<{
+    b64_json: string;
+  }>;
+  usage: {
+    prompt_tokens: number;
+    total_tokens: number;
+  };
 }
