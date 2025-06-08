@@ -64,9 +64,22 @@ def get_audio_download() -> Optional[str]:
         return session_data["last_audio_file"]
     return None
 
+def save_project_enhanced(project_name: str, script: str, notes: str) -> Tuple[str, list]:
+    """Enhanced project save with proper feedback and list update"""
+    result = save_project(project_name, script, notes)
+    updated_list = [f"📘 {name}" if session_data["projects"].get(name, {}).get("is_sample") else name 
+                   for name in get_project_list()]
+    return result, gr.update(choices=updated_list, value=project_name)
+
+def load_project_enhanced(project_name: str) -> Tuple[str, str, str, str]:
+    """Enhanced project load with proper feedback"""
+    clean_name = project_name.replace("📘 ", "") if project_name and project_name.startswith("📘") else project_name
+    script, notes, status = load_project(clean_name)
+    return script, notes, status, clean_name
+
 def create_interface():
     """Create the main Gradio interface for Wolf AI"""
-    # Custom CSS for modern, dark theme with improved collapsibles
+    # Custom CSS for modern, dark theme with improved collapsibles and fullscreen chat
     custom_css = """
     .gradio-container {
         background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
@@ -112,6 +125,30 @@ def create_interface():
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 15px;
+    }
+    
+    .fullscreen-chat {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 9999 !important;
+        background: #0c0c0c !important;
+        padding: 20px !important;
+    }
+    
+    .resizable-editor {
+        resize: vertical !important;
+        min-height: 200px !important;
+        max-height: 800px !important;
+    }
+    
+    .highlighted-text {
+        background-color: #FFD700 !important;
+        color: #000 !important;
+        padding: 2px 4px !important;
+        border-radius: 3px !important;
     }
     
     button {
@@ -187,7 +224,7 @@ def create_interface():
             # Left Sidebar - Controls & Settings
             with gr.Column(scale=1, elem_classes="sidebar-panel"):
                 
-                # Audio Controls - Now Collapsible
+                # Audio Controls - Collapsible
                 with gr.Accordion("🎵 Audio Controls", open=True):
                     with gr.Group(elem_classes="control-panel"):
                         with gr.Row():
@@ -236,12 +273,11 @@ def create_interface():
                     # Primary Action Buttons
                     with gr.Row():
                         play_btn = gr.Button("🎵 Generate", variant="primary", scale=2, elem_classes="primary-btn")
-                        preview_btn = gr.Button("👂 Preview", scale=1, elem_classes="secondary-btn")
                     
                     with gr.Row():
-                        download_btn = gr.Button("⬇️ Download", scale=1, elem_classes="secondary-btn")
+                        download_btn = gr.Button("⬇️ Download Audio", scale=1, elem_classes="secondary-btn")
                     
-                    # Audio Player
+                    # Audio Player with follow-along
                     audio_output = gr.Audio(
                         label="Generated Audio", 
                         show_download_button=True,
@@ -249,12 +285,12 @@ def create_interface():
                     )
                     audio_status = gr.Markdown("Ready to generate audio")
                 
-                # Collapsible Project Management
+                # Project Management - Enhanced
                 with gr.Accordion("📁 Project Management", open=False):
                     project_name_input = gr.Textbox(
                         label="Project Name",
                         placeholder="Enter project name...",
-                        value="default"
+                        value=""
                     )
                     
                     project_dropdown = gr.Dropdown(
@@ -265,13 +301,13 @@ def create_interface():
                     )
                     
                     with gr.Row():
-                        save_btn = gr.Button("💾 Save", size="sm")
-                        load_btn = gr.Button("📂 Load", size="sm")
+                        save_btn = gr.Button("💾 Save Project", size="sm")
+                        load_btn = gr.Button("📂 Load Project", size="sm")
                         export_btn = gr.Button("📤 Export", size="sm")
                     
                     project_status = gr.Markdown("Ready")
                 
-                # Collapsible Settings
+                # Settings
                 with gr.Accordion("⚙️ Settings", open=False):
                     auto_save_toggle = gr.Checkbox(
                         label="Auto-save changes",
@@ -281,6 +317,15 @@ def create_interface():
                     live_preview_toggle = gr.Checkbox(
                         label="Live preview (Note: May not work for long scripts)",
                         value=session_data["settings"]["live_preview"]
+                    )
+                    
+                    # Script Editor Size Controls
+                    editor_height = gr.Slider(
+                        minimum=200,
+                        maximum=800,
+                        value=400,
+                        step=50,
+                        label="Script Editor Height (px)"
                     )
                     
                     auto_save_status = gr.Markdown("")
@@ -309,13 +354,21 @@ def create_interface():
                     </div>
                     """)
                 
-                # Main Script Editor
+                # Main Script Editor with resizable controls
                 script_editor = gr.Textbox(
                     label="Script Editor",
                     placeholder="Start writing your script or load a sample...",
                     lines=20,
-                    max_lines=30,
-                    show_label=False
+                    max_lines=40,
+                    show_label=False,
+                    elem_classes="resizable-editor"
+                )
+                
+                # Audio Follow-Along Display
+                highlighted_script = gr.HTML(
+                    value="",
+                    label="Audio Follow-Along",
+                    visible=False
                 )
                 
                 # Notes Section
@@ -331,11 +384,13 @@ def create_interface():
                 tts_duration_display = gr.Markdown("", visible=False)
                 word_count_display = gr.Markdown("", visible=False)
                 
-            # Right Sidebar - AI Assistant
+            # Right Sidebar - AI Assistant with Fullscreen
             with gr.Column(scale=1, elem_classes="sidebar-panel"):
                 
                 # AI Chat Interface
-                gr.Markdown("### 🤖 AI Assistant")
+                with gr.Row():
+                    gr.Markdown("### 🤖 AI Assistant")
+                    fullscreen_btn = gr.Button("⛶", size="sm", elem_classes="secondary-btn")
                 
                 # API Key Setup (collapsible)
                 with gr.Accordion("🔑 API Setup", open=False):
@@ -367,7 +422,7 @@ def create_interface():
                     chat_btn = gr.Button("Send", variant="primary", scale=2)
                     clear_chat_btn = gr.Button("Clear", scale=1)
                 
-                # Enhanced Quick Actions with Dropdown Options
+                # Enhanced Quick Actions
                 gr.Markdown("### ⚡ Quick Actions")
                 with gr.Column():
                     # Primary quick actions
@@ -406,18 +461,44 @@ def create_interface():
                 # Additional quick actions
                 romantic_btn = gr.Button("💕 Make Romantic", size="sm", visible=False)
         
+        # Fullscreen Chat Modal (initially hidden)
+        with gr.Column(visible=False, elem_classes="fullscreen-chat") as fullscreen_chat:
+            with gr.Row():
+                gr.Markdown("# 🤖 AI Assistant - Fullscreen Mode")
+                close_fullscreen_btn = gr.Button("✕ Close", size="sm", elem_classes="secondary-btn")
+            
+            fullscreen_chat_history = gr.Chatbot(
+                label="Chat",
+                height=600,
+                show_copy_button=True
+            )
+            
+            fullscreen_chat_input = gr.Textbox(
+                label="Message",
+                placeholder="Ask AI for help...",
+                lines=3,
+                show_label=False
+            )
+            
+            with gr.Row():
+                fullscreen_chat_btn = gr.Button("Send", variant="primary", scale=2)
+                fullscreen_clear_btn = gr.Button("Clear", scale=1)
+        
         # Setup event handlers
         setup_event_handlers(
             script_editor, notes_editor, word_count_display, reading_time_display, 
             tts_duration_display, auto_save_status, cache_status, generation_status,
-            engine_dropdown, pitch_slider, play_btn, preview_btn, download_btn,
+            engine_dropdown, pitch_slider, play_btn, download_btn,
             speed_slider, volume_slider, voice_dropdown, audio_output, audio_status,
             download_file, download_info, playback_status, project_name_input,
             save_btn, load_btn, gr.Button("🗑️ Delete", visible=False), export_btn, project_status, project_dropdown,
             ionos_api_input, set_ionos_btn, api_status, auto_save_toggle, live_preview_toggle,
             chat_input, chat_history, chat_btn, clear_chat_btn, improve_btn, professional_btn,
             dramatic_btn, romantic_btn, continue_btn, summarize_btn, batch_input, batch_btn,
-            batch_status, stats_display, enhance_btn, translate_btn, translate_lang
+            batch_status, stats_display, enhance_btn, translate_btn, translate_lang,
+            editor_height, highlighted_script, fullscreen_btn, fullscreen_chat,
+            fullscreen_chat_history, fullscreen_chat_input, fullscreen_chat_btn,
+            fullscreen_clear_btn, close_fullscreen_btn
         )
     
     return app
@@ -427,14 +508,17 @@ def setup_event_handlers(*components):
     # Unpack all components
     (script_editor, notes_editor, word_count_display, reading_time_display, 
      tts_duration_display, auto_save_status, cache_status, generation_status,
-     engine_dropdown, pitch_slider, play_btn, preview_btn, download_btn,
+     engine_dropdown, pitch_slider, play_btn, download_btn,
      speed_slider, volume_slider, voice_dropdown, audio_output, audio_status,
      download_file, download_info, playback_status, project_name_input,
      save_btn, load_btn, delete_btn, export_btn, project_status, project_dropdown,
      ionos_api_input, set_ionos_btn, api_status, auto_save_toggle, live_preview_toggle,
      chat_input, chat_history, chat_btn, clear_chat_btn, improve_btn, professional_btn,
      dramatic_btn, romantic_btn, continue_btn, summarize_btn, batch_input, batch_btn,
-     batch_status, stats_display, enhance_btn, translate_btn, translate_lang) = components
+     batch_status, stats_display, enhance_btn, translate_btn, translate_lang,
+     editor_height, highlighted_script, fullscreen_btn, fullscreen_chat,
+     fullscreen_chat_history, fullscreen_chat_input, fullscreen_chat_btn,
+     fullscreen_clear_btn, close_fullscreen_btn) = components
     
     # Enhanced interface update function
     def update_interface_on_text_change(text):
@@ -464,6 +548,16 @@ def setup_event_handlers(*components):
                 auto_save_status, cache_status, stats_display]
     )
     
+    # Editor height control
+    def update_editor_height(height):
+        return gr.update(lines=int(height/20))
+    
+    editor_height.change(
+        fn=update_editor_height,
+        inputs=[editor_height],
+        outputs=[script_editor]
+    )
+    
     # Show/hide pitch control based on engine
     def update_engine_controls(engine):
         return gr.update(visible=(engine == "pyttsx3"))
@@ -474,11 +568,6 @@ def setup_event_handlers(*components):
         outputs=[pitch_slider]
     )
     
-    # Enhanced project loading
-    def load_project_enhanced(project_name):
-        clean_name = project_name.replace("📘 ", "") if project_name and project_name.startswith("📘") else project_name
-        return load_project(clean_name)
-    
     # Main TTS generation with better feedback
     play_btn.click(
         fn=play_script,
@@ -486,41 +575,29 @@ def setup_event_handlers(*components):
         outputs=[audio_output, audio_status, download_file, download_info, playback_status]
     )
     
-    # Preview functionality with error handling
-    def generate_preview(text, engine, voice, speed):
-        if not text.strip():
-            return None, "❌ No text to preview"
-        
-        # Get first 50 characters for a meaningful preview
-        preview_text = text[:50] + "..." if len(text) > 50 else text
-        preview_file = generate_live_preview(preview_text, engine, voice, speed)
-        
-        if preview_file:
-            return preview_file, "🔊 Preview ready (first 50 characters)"
-        return None, "❌ Preview generation failed or disabled for long scripts"
-    
-    preview_btn.click(
-        fn=generate_preview,
-        inputs=[script_editor, engine_dropdown, voice_dropdown, speed_slider],
-        outputs=[audio_output, audio_status]
-    )
+    # Fixed download functionality
+    def handle_download():
+        audio_file = get_audio_download()
+        if audio_file:
+            return audio_file, "✅ Audio file ready for download!"
+        return None, "❌ No audio file available. Please generate audio first."
     
     download_btn.click(
-        fn=get_audio_download,
-        outputs=[download_file]
+        fn=handle_download,
+        outputs=[download_file, audio_status]
     )
     
-    # Project management
+    # Enhanced project management
     save_btn.click(
-        fn=save_project,
+        fn=save_project_enhanced,
         inputs=[project_name_input, script_editor, notes_editor],
-        outputs=[project_status]
+        outputs=[project_status, project_dropdown]
     )
     
     load_btn.click(
         fn=load_project_enhanced,
         inputs=[project_dropdown],
-        outputs=[script_editor, notes_editor, project_status]
+        outputs=[script_editor, notes_editor, project_status, project_name_input]
     )
     
     export_btn.click(
@@ -558,6 +635,36 @@ def setup_event_handlers(*components):
     clear_chat_btn.click(
         fn=lambda: [],
         outputs=[chat_history]
+    )
+    
+    # Fullscreen chat functionality
+    def toggle_fullscreen_chat(chat_hist):
+        return gr.update(visible=True), chat_hist
+    
+    def close_fullscreen_chat():
+        return gr.update(visible=False)
+    
+    fullscreen_btn.click(
+        fn=toggle_fullscreen_chat,
+        inputs=[chat_history],
+        outputs=[fullscreen_chat, fullscreen_chat_history]
+    )
+    
+    close_fullscreen_btn.click(
+        fn=close_fullscreen_chat,
+        outputs=[fullscreen_chat]
+    )
+    
+    # Fullscreen chat controls
+    fullscreen_chat_btn.click(
+        fn=chat_with_ai,
+        inputs=[fullscreen_chat_input, fullscreen_chat_history, script_editor],
+        outputs=[fullscreen_chat_history, fullscreen_chat_input]
+    )
+    
+    fullscreen_clear_btn.click(
+        fn=lambda: [],
+        outputs=[fullscreen_chat_history]
     )
     
     # Enhanced quick action handlers
@@ -626,4 +733,31 @@ def setup_event_handlers(*components):
         fn=batch_process_scripts,
         inputs=[batch_input],
         outputs=[batch_status]
+    )
+
+    # Audio follow-along functionality
+    def create_highlighted_text(script_text, current_word_index=0):
+        """Create highlighted version of script for audio follow-along"""
+        if not script_text.strip():
+            return ""
+        
+        words = script_text.split()
+        highlighted_words = []
+        
+        for i, word in enumerate(words):
+            if i == current_word_index:
+                highlighted_words.append(f'<span class="highlighted-text">{word}</span>')
+            else:
+                highlighted_words.append(word)
+        
+        return " ".join(highlighted_words)
+    
+    # Update highlighted text when audio plays (simplified version)
+    def start_audio_followalong(script_text):
+        return gr.update(value=create_highlighted_text(script_text, 0), visible=True)
+    
+    audio_output.play(
+        fn=start_audio_followalong,
+        inputs=[script_editor],
+        outputs=[highlighted_script]
     )
