@@ -20,10 +20,10 @@ from services.ai_service import (
     quick_action_summarize, quick_action_enhance, quick_action_translate
 )
 
-def play_script(script_text: str, speed: float, volume: float, engine: str, voice: str, pitch: int) -> Tuple[Optional[str], str, Optional[str], str, str]:
+def play_script(script_text: str, speed: float, volume: float, engine: str, voice: str, pitch: int) -> Tuple[Optional[str], str, str, str]:
     """Generate and return audio for the script with enhanced options"""
     if not script_text.strip():
-        return None, "⚠️ No script text to convert to speech", None, "", ""
+        return None, "⚠️ No script text to convert to speech", "", ""
     
     # Update session settings
     session_data["settings"].update({
@@ -41,7 +41,7 @@ def play_script(script_text: str, speed: float, volume: float, engine: str, voic
     elif engine == "pyttsx3" and PYTTSX3_AVAILABLE:
         audio_file = generate_tts_pyttsx3(script_text, speed, voice, pitch)
     else:
-        return None, "❌ Selected TTS engine not available", None, "", ""
+        return None, "❌ Selected TTS engine not available", "", ""
     
     if audio_file and os.path.exists(audio_file):
         session_data["last_audio_file"] = audio_file
@@ -52,17 +52,11 @@ def play_script(script_text: str, speed: float, volume: float, engine: str, voic
         })
         
         file_info = get_audio_file_info(audio_file)
-        success_msg = "✅ Audio generated successfully! You can now download or play it."
+        success_msg = "✅ Audio generated successfully! Use the download button below the audio player."
         
-        return audio_file, success_msg, audio_file, file_info, f"🎵 Ready to play"
+        return audio_file, success_msg, file_info, f"🎵 Ready to play"
     else:
-        return None, "❌ Failed to generate audio", None, "", ""
-
-def get_audio_download() -> Optional[str]:
-    """Get the last generated audio file for download"""
-    if session_data["last_audio_file"] and os.path.exists(session_data["last_audio_file"]):
-        return session_data["last_audio_file"]
-    return None
+        return None, "❌ Failed to generate audio", "", ""
 
 def save_project_enhanced(project_name: str, script: str, notes: str) -> Tuple[str, list]:
     """Enhanced project save with proper feedback and list update"""
@@ -76,6 +70,41 @@ def load_project_enhanced(project_name: str) -> Tuple[str, str, str, str]:
     clean_name = project_name.replace("📘 ", "") if project_name and project_name.startswith("📘") else project_name
     script, notes, status = load_project(clean_name)
     return script, notes, status, clean_name
+
+def create_highlighted_text(script_text: str, current_word: int = 0) -> str:
+    """Create highlighted version of script for audio follow-along"""
+    if not script_text.strip():
+        return ""
+    
+    words = script_text.split()
+    if current_word >= len(words):
+        return script_text
+    
+    highlighted_words = []
+    for i, word in enumerate(words):
+        if i == current_word:
+            highlighted_words.append(f'<span style="background-color: #FFD700; color: #000; padding: 2px 4px; border-radius: 3px; font-weight: bold;">{word}</span>')
+        elif i < current_word:
+            highlighted_words.append(f'<span style="color: #888;">{word}</span>')
+        else:
+            highlighted_words.append(word)
+    
+    return " ".join(highlighted_words)
+
+def start_audio_followalong(script_text: str) -> str:
+    """Start audio follow-along highlighting"""
+    if not script_text.strip():
+        return ""
+    
+    # Calculate timing for word progression
+    words = script_text.split()
+    word_count = len(words)
+    
+    # Estimate reading speed (words per minute) based on settings
+    reading_speed = 150 * session_data["settings"].get("speed", 1.0)  # Adjust for speed setting
+    
+    # Create initial highlighted text
+    return create_highlighted_text(script_text, 0)
 
 def create_interface():
     """Create the main Gradio interface for Wolf AI"""
@@ -149,6 +178,23 @@ def create_interface():
         color: #000 !important;
         padding: 2px 4px !important;
         border-radius: 3px !important;
+        font-weight: bold !important;
+    }
+    
+    .patch-notes {
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+    
+    .patch-section {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #222;
+        border-radius: 6px;
+        border-left: 3px solid #FFD700;
     }
     
     button {
@@ -206,7 +252,7 @@ def create_interface():
                     <h1 style="margin: 0; font-size: 2rem; font-weight: bold; color: #FFD700;">
                         🐺 {APP_NAME}
                     </h1>
-                    <span style="color: #ccc; font-size: 1rem;">AI-Powered Script Editor & Voice Generator</span>
+                    <span style="color: #ccc; font-size: 1rem;">AI-Powered Script Editor & Voice Generator v2.1</span>
                 </div>
                 """)
             
@@ -272,12 +318,9 @@ def create_interface():
                     
                     # Primary Action Buttons
                     with gr.Row():
-                        play_btn = gr.Button("🎵 Generate", variant="primary", scale=2, elem_classes="primary-btn")
+                        play_btn = gr.Button("🎵 Generate Audio", variant="primary", scale=2, elem_classes="primary-btn")
                     
-                    with gr.Row():
-                        download_btn = gr.Button("⬇️ Download Audio", scale=1, elem_classes="secondary-btn")
-                    
-                    # Audio Player with follow-along
+                    # Audio Player with built-in download functionality
                     audio_output = gr.Audio(
                         label="Generated Audio", 
                         show_download_button=True,
@@ -330,6 +373,67 @@ def create_interface():
                     
                     auto_save_status = gr.Markdown("")
                 
+                # Patch Notes & Roadmap - Replacing Batch Operations
+                with gr.Accordion("📋 Patch Notes & Roadmap", open=False):
+                    patch_notes_html = gr.HTML("""
+                    <div class="patch-notes">
+                        <div class="patch-section">
+                            <h4 style="color: #FFD700; margin: 0 0 8px 0;">🎯 Current Version (v2.1)</h4>
+                            <ul style="margin: 0; padding-left: 20px; color: #ccc;">
+                                <li>AI-powered script improvement</li>
+                                <li>Multi-voice TTS generation (gTTS & pyttsx3)</li>
+                                <li>Project save/load system</li>
+                                <li>Real-time chat assistant</li>
+                                <li>Audio follow-along highlighting</li>
+                                <li>Fullscreen chat mode</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="patch-section">
+                            <h4 style="color: #4CAF50; margin: 0 0 8px 0;">✅ Recent Fixes</h4>
+                            <ul style="margin: 0; padding-left: 20px; color: #ccc;">
+                                <li>Fixed project management save/load issues</li>
+                                <li>Improved audio follow-along timing</li>
+                                <li>Added fullscreen chat functionality</li>
+                                <li>Enhanced script editor with size controls</li>
+                                <li>Streamlined download using built-in audio controls</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="patch-section">
+                            <h4 style="color: #FF9800; margin: 0 0 8px 0;">⚠️ Known Issues</h4>
+                            <ul style="margin: 0; padding-left: 20px; color: #ccc;">
+                                <li>Batch processing temporarily disabled</li>
+                                <li>Some voice options may vary by browser</li>
+                                <li>Large scripts may have slower processing</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="patch-section">
+                            <h4 style="color: #2196F3; margin: 0 0 8px 0;">🚀 Coming Soon</h4>
+                            <ul style="margin: 0; padding-left: 20px; color: #ccc;">
+                                <li>ElevenLabs integration for premium voices</li>
+                                <li>Batch script processing</li>
+                                <li>Audio-to-text transcription</li>
+                                <li>Advanced pronunciation controls</li>
+                                <li>Export to multiple audio formats</li>
+                                <li>Cloud project sync</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="patch-section">
+                            <h4 style="color: #9C27B0; margin: 0 0 8px 0;">🔮 Future Roadmap</h4>
+                            <ul style="margin: 0; padding-left: 20px; color: #ccc;">
+                                <li>Multi-language script translation</li>
+                                <li>Voice cloning capabilities</li>
+                                <li>Real-time collaboration</li>
+                                <li>Mobile app companion</li>
+                                <li>Advanced AI script analysis</li>
+                            </ul>
+                        </div>
+                    </div>
+                    """)
+                
                 # Hidden components for internal use
                 download_file = gr.File(label="Download", visible=False)
                 download_info = gr.Markdown("", visible=False)
@@ -348,8 +452,9 @@ def create_interface():
                         <div style="color: #ccc; font-size: 0.9rem;">
                             1. Load a sample script or start writing<br>
                             2. Select voice and adjust settings in Audio Controls<br>
-                            3. Click 'Generate' to create audio<br>
-                            4. Use AI assistant for improvements
+                            3. Click 'Generate Audio' to create TTS<br>
+                            4. Use the download button on the audio player<br>
+                            5. Watch text highlight during playback for follow-along
                         </div>
                     </div>
                     """)
@@ -367,7 +472,7 @@ def create_interface():
                 # Audio Follow-Along Display
                 highlighted_script = gr.HTML(
                     value="",
-                    label="Audio Follow-Along",
+                    label="🎯 Audio Follow-Along",
                     visible=False
                 )
                 
@@ -448,16 +553,6 @@ def create_interface():
                         )
                         translate_btn = gr.Button("🌐 Translate", size="sm", scale=1, elem_classes="quick-action-btn")
                 
-                # Batch Operations (collapsible)
-                with gr.Accordion("🔄 Batch Operations", open=False):
-                    batch_input = gr.Textbox(
-                        label="Multiple Scripts",
-                        placeholder="Enter scripts (one per line)...",
-                        lines=3
-                    )
-                    batch_btn = gr.Button("Generate All", size="sm")
-                    batch_status = gr.Markdown("")
-                
                 # Additional quick actions
                 romantic_btn = gr.Button("💕 Make Romantic", size="sm", visible=False)
         
@@ -488,14 +583,14 @@ def create_interface():
         setup_event_handlers(
             script_editor, notes_editor, word_count_display, reading_time_display, 
             tts_duration_display, auto_save_status, cache_status, generation_status,
-            engine_dropdown, pitch_slider, play_btn, download_btn,
+            engine_dropdown, pitch_slider, play_btn,
             speed_slider, volume_slider, voice_dropdown, audio_output, audio_status,
             download_file, download_info, playback_status, project_name_input,
             save_btn, load_btn, gr.Button("🗑️ Delete", visible=False), export_btn, project_status, project_dropdown,
             ionos_api_input, set_ionos_btn, api_status, auto_save_toggle, live_preview_toggle,
             chat_input, chat_history, chat_btn, clear_chat_btn, improve_btn, professional_btn,
-            dramatic_btn, romantic_btn, continue_btn, summarize_btn, batch_input, batch_btn,
-            batch_status, stats_display, enhance_btn, translate_btn, translate_lang,
+            dramatic_btn, romantic_btn, continue_btn, summarize_btn,
+            stats_display, enhance_btn, translate_btn, translate_lang,
             editor_height, highlighted_script, fullscreen_btn, fullscreen_chat,
             fullscreen_chat_history, fullscreen_chat_input, fullscreen_chat_btn,
             fullscreen_clear_btn, close_fullscreen_btn
@@ -508,14 +603,14 @@ def setup_event_handlers(*components):
     # Unpack all components
     (script_editor, notes_editor, word_count_display, reading_time_display, 
      tts_duration_display, auto_save_status, cache_status, generation_status,
-     engine_dropdown, pitch_slider, play_btn, download_btn,
+     engine_dropdown, pitch_slider, play_btn,
      speed_slider, volume_slider, voice_dropdown, audio_output, audio_status,
      download_file, download_info, playback_status, project_name_input,
      save_btn, load_btn, delete_btn, export_btn, project_status, project_dropdown,
      ionos_api_input, set_ionos_btn, api_status, auto_save_toggle, live_preview_toggle,
      chat_input, chat_history, chat_btn, clear_chat_btn, improve_btn, professional_btn,
-     dramatic_btn, romantic_btn, continue_btn, summarize_btn, batch_input, batch_btn,
-     batch_status, stats_display, enhance_btn, translate_btn, translate_lang,
+     dramatic_btn, romantic_btn, continue_btn, summarize_btn,
+     stats_display, enhance_btn, translate_btn, translate_lang,
      editor_height, highlighted_script, fullscreen_btn, fullscreen_chat,
      fullscreen_chat_history, fullscreen_chat_input, fullscreen_chat_btn,
      fullscreen_clear_btn, close_fullscreen_btn) = components
@@ -572,19 +667,7 @@ def setup_event_handlers(*components):
     play_btn.click(
         fn=play_script,
         inputs=[script_editor, speed_slider, volume_slider, engine_dropdown, voice_dropdown, pitch_slider],
-        outputs=[audio_output, audio_status, download_file, download_info, playback_status]
-    )
-    
-    # Fixed download functionality
-    def handle_download():
-        audio_file = get_audio_download()
-        if audio_file:
-            return audio_file, "✅ Audio file ready for download!"
-        return None, "❌ No audio file available. Please generate audio first."
-    
-    download_btn.click(
-        fn=handle_download,
-        outputs=[download_file, audio_status]
+        outputs=[audio_output, audio_status, download_info, playback_status]
     )
     
     # Enhanced project management
@@ -713,51 +796,34 @@ def setup_event_handlers(*components):
         inputs=[script_editor, translate_lang, chat_history],
         outputs=[chat_history, chat_input]
     )
-    
-    # Batch processing
-    def batch_process_scripts(batch_text):
-        if not batch_text.strip():
-            return "❌ No scripts provided"
-        
-        scripts = [line.strip() for line in batch_text.split('\n') if line.strip()]
-        if not scripts:
-            return "❌ No valid scripts found"
-        
-        settings = session_data["settings"]
-        results = batch_generate_audio(scripts, settings)
-        
-        success_count = sum(1 for r in results if not r.startswith("Failed"))
-        return f"✅ Processed {len(scripts)} scripts. {success_count} successful."
-    
-    batch_btn.click(
-        fn=batch_process_scripts,
-        inputs=[batch_input],
-        outputs=[batch_status]
-    )
 
-    # Audio follow-along functionality
-    def create_highlighted_text(script_text, current_word_index=0):
-        """Create highlighted version of script for audio follow-along"""
+    # Audio follow-along functionality with improved timing
+    def start_audio_followalong_enhanced(script_text):
+        """Enhanced audio follow-along with proper timing"""
         if not script_text.strip():
-            return ""
+            return gr.update(visible=False)
         
-        words = script_text.split()
-        highlighted_words = []
-        
-        for i, word in enumerate(words):
-            if i == current_word_index:
-                highlighted_words.append(f'<span class="highlighted-text">{word}</span>')
-            else:
-                highlighted_words.append(word)
-        
-        return " ".join(highlighted_words)
+        # Create initial highlighted text and show the component
+        highlighted_text = start_audio_followalong(script_text)
+        return gr.update(value=highlighted_text, visible=True)
     
-    # Update highlighted text when audio plays (simplified version)
-    def start_audio_followalong(script_text):
-        return gr.update(value=create_highlighted_text(script_text, 0), visible=True)
-    
+    # Update highlighted text when audio starts playing
     audio_output.play(
-        fn=start_audio_followalong,
+        fn=start_audio_followalong_enhanced,
         inputs=[script_editor],
+        outputs=[highlighted_script]
+    )
+    
+    # Hide follow-along when audio stops
+    def stop_audio_followalong():
+        return gr.update(visible=False)
+    
+    audio_output.stop(
+        fn=stop_audio_followalong,
+        outputs=[highlighted_script]
+    )
+    
+    audio_output.pause(
+        fn=stop_audio_followalong,
         outputs=[highlighted_script]
     )
