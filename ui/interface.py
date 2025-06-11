@@ -1,4 +1,3 @@
-
 import gradio as gr
 import os
 from datetime import datetime
@@ -384,7 +383,6 @@ def create_interface():
                                 <li>Multi-voice TTS generation (gTTS & pyttsx3)</li>
                                 <li>Project save/load system</li>
                                 <li>Real-time chat assistant</li>
-                                <li>Audio follow-along highlighting</li>
                                 <li>Fullscreen chat mode</li>
                             </ul>
                         </div>
@@ -393,16 +391,17 @@ def create_interface():
                             <h4 style="color: #4CAF50; margin: 0 0 8px 0;">✅ Recent Fixes</h4>
                             <ul style="margin: 0; padding-left: 20px; color: #ccc;">
                                 <li>Fixed project management save/load issues</li>
-                                <li>Improved audio follow-along timing</li>
-                                <li>Added fullscreen chat functionality</li>
                                 <li>Enhanced script editor with size controls</li>
+                                <li>Added fullscreen chat functionality</li>
                                 <li>Streamlined download using built-in audio controls</li>
+                                <li>Improved agent system integration</li>
                             </ul>
                         </div>
                         
                         <div class="patch-section">
                             <h4 style="color: #FF9800; margin: 0 0 8px 0;">⚠️ Known Issues</h4>
                             <ul style="margin: 0; padding-left: 20px; color: #ccc;">
+                                <li>Audio follow-along text highlighting not working</li>
                                 <li>Batch processing temporarily disabled</li>
                                 <li>Some voice options may vary by browser</li>
                                 <li>Large scripts may have slower processing</li>
@@ -412,6 +411,7 @@ def create_interface():
                         <div class="patch-section">
                             <h4 style="color: #2196F3; margin: 0 0 8px 0;">🚀 Coming Soon</h4>
                             <ul style="margin: 0; padding-left: 20px; color: #ccc;">
+                                <li>Fix for audio follow-along highlighting</li>
                                 <li>ElevenLabs integration for premium voices</li>
                                 <li>Batch script processing</li>
                                 <li>Audio-to-text transcription</li>
@@ -453,8 +453,7 @@ def create_interface():
                             1. Load a sample script or start writing<br>
                             2. Select voice and adjust settings in Audio Controls<br>
                             3. Click 'Generate Audio' to create TTS<br>
-                            4. Use the download button on the audio player<br>
-                            5. Watch text highlight during playback for follow-along
+                            4. Use the download button on the audio player
                         </div>
                     </div>
                     """)
