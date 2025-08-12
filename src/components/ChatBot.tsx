@@ -5,16 +5,19 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChat } from '@/hooks/useChat';
+import { useFileManager } from '@/hooks/useFileManager';
 import { ChatMessage } from '@/components/ChatMessage';
 import { ionosAI } from '@/services/ionosAI';
 import { toast } from 'sonner';
 
 interface ChatBotProps {
   script?: string;
+  projectId?: string;
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
+  const { files, getRelevantFileContext } = useFileManager(projectId);
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -28,13 +31,15 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim() && !isLoading) {
-      sendMessage(inputValue, script);
+      const fileContext = getRelevantFileContext(inputValue);
+      sendMessage(inputValue, script, fileContext);
       setInputValue('');
     }
   };
 
   const handleQuickAction = (action: string) => {
-    sendQuickAction(action, script);
+    const fileContext = getRelevantFileContext(action);
+    sendQuickAction(action, script, fileContext);
   };
 
   const handleGenerateImage = async () => {
@@ -91,10 +96,20 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 bg-primary rounded-full pulse-gold"></div>
           <h3 className="font-semibold">AI Assistant</h3>
-          {hasScript && (
-            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-              <FileText className="w-3 h-3" />
-              <span>{scriptWordCount}w</span>
+          {(hasScript || files.length > 0) && (
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              {hasScript && (
+                <>
+                  <FileText className="w-3 h-3" />
+                  <span>{scriptWordCount}w</span>
+                </>
+              )}
+              {files.length > 0 && (
+                <>
+                  <span>•</span>
+                  <span>{files.length} files</span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -126,12 +141,15 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
         </div>
       </div>
 
-      {/* Script Context Indicator */}
-      {hasScript && (
+      {/* Context Indicators */}
+      {(hasScript || files.length > 0) && (
         <div className="px-4 py-2 bg-primary/10 border-b border-primary/20">
           <div className="flex items-center space-x-2 text-xs text-primary">
             <FileText className="w-3 h-3" />
-            <span>Script context active ({scriptWordCount} words)</span>
+            <div className="flex items-center space-x-3">
+              {hasScript && <span>Script: {scriptWordCount} words</span>}
+              {files.length > 0 && <span>Files: {files.length} uploaded</span>}
+            </div>
           </div>
         </div>
       )}
@@ -166,7 +184,10 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
           <div className="text-center text-muted-foreground py-8">
             <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm mb-4">
-              {hasScript ? 'Ask me about your script!' : 'Add text to your script to get AI assistance!'}
+              {hasScript || files.length > 0 
+                ? 'Ask me about your script or uploaded files!' 
+                : 'Add text to your script or upload files to get AI assistance!'
+              }
             </p>
             <div className="space-y-2">
               {quickPrompts.map((prompt, index) => (
@@ -182,7 +203,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
                       handleQuickAction(prompt);
                     }
                   }}
-                  disabled={!ionosAI.getApiToken() || !hasScript}
+                  disabled={!ionosAI.getApiToken() || (!hasScript && files.length === 0)}
                 >
                   {prompt}
                 </Button>
@@ -219,9 +240,9 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '' }) => {
             placeholder={
               !ionosAI.getApiToken() 
                 ? "Set API token in settings" 
-                : hasScript 
-                  ? "Ask about your script..." 
-                  : "Add script text first..."
+                : hasScript || files.length > 0
+                  ? "Ask about your script or files..." 
+                  : "Add script text or upload files first..."
             }
             disabled={!ionosAI.getApiToken() || isLoading}
             className={`flex-1 ${isFullscreen ? 'h-12 text-base' : ''}`}

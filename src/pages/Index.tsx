@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { ChatBot } from '@/components/ChatBot';
+import { FileUpload } from '@/components/FileUpload';
 import { useChat } from '@/hooks/useChat';
+import { useFileManager } from '@/hooks/useFileManager';
 
 const Index = () => {
   const [script, setScript] = useState('');
@@ -18,6 +20,9 @@ const Index = () => {
   const [voice, setVoice] = useState('');
   const [wordCount, setWordCount] = useState(0);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  
+  const { files, handleFilesUploaded, getStats } = useFileManager();
   
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
@@ -118,16 +123,42 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground">AI-Powered TTS Script Editor</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <span>Word Count:</span>
-              <span className="text-primary font-semibold">{wordCount}</span>
+            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+              <div className="flex items-center space-x-2">
+                <span>Words:</span>
+                <span className="text-primary font-semibold">{wordCount}</span>
+              </div>
+              {files.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <span>Files:</span>
+                  <span className="text-primary font-semibold">{files.length}</span>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFileUpload(!showFileUpload)}
+                className="text-xs"
+              >
+                {showFileUpload ? 'Hide Files' : 'Upload Files'}
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
+        <div className="space-y-6">
+          {/* File Upload Section */}
+          {showFileUpload && (
+            <FileUpload 
+              onFilesUploaded={handleFilesUploaded}
+              projectId="default"
+              maxFiles={5}
+            />
+          )}
+          
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
           
           {/* Main Script Editor */}
           <div className="lg:col-span-3 space-y-6">
@@ -259,11 +290,12 @@ const Index = () => {
               </div>
             </Card>
           </div>
+          </div>
         </div>
       </div>
 
-      {/* Add the ChatBot component with script context */}
-      <ChatBot script={script} />
+      {/* Add the ChatBot component with script and file context */}
+      <ChatBot script={script} projectId="default" />
     </div>
   );
 };

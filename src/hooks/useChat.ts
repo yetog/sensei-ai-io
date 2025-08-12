@@ -11,7 +11,7 @@ export const useChat = () => {
     isOpen: false
   });
 
-  const sendMessage = useCallback(async (content: string, scriptContext?: string) => {
+  const sendMessage = useCallback(async (content: string, scriptContext?: string, fileContext?: string) => {
     if (!content.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -33,10 +33,22 @@ export const useChat = () => {
         content: msg.content
       }));
       
-      // Include script context if provided
+      // Build enhanced message with contexts
       let messageContent = content;
+      let contextParts: string[] = [];
+      
+      // Include script context if provided
       if (scriptContext && scriptContext.trim()) {
-        messageContent = `Current script (${scriptContext.trim().split(/\s+/).length} words):\n\n"${scriptContext}"\n\nUser question: ${content}`;
+        contextParts.push(`Current script (${scriptContext.trim().split(/\s+/).length} words):\n"${scriptContext}"`);
+      }
+      
+      // Include file context if provided
+      if (fileContext && fileContext.trim()) {
+        contextParts.push(`Relevant file content:\n${fileContext}`);
+      }
+      
+      if (contextParts.length > 0) {
+        messageContent = `${contextParts.join('\n\n')}\n\nUser question: ${content}`;
       }
       
       apiMessages.push({ role: 'user', content: messageContent });
@@ -62,12 +74,12 @@ export const useChat = () => {
     }
   }, [chatState.messages]);
 
-  const sendQuickAction = useCallback(async (action: string, scriptContext: string) => {
+  const sendQuickAction = useCallback(async (action: string, scriptContext: string, fileContext?: string) => {
     if (!scriptContext.trim()) {
       toast.error('Please add some text to your script first');
       return;
     }
-    await sendMessage(action, scriptContext);
+    await sendMessage(action, scriptContext, fileContext);
   }, [sendMessage]);
 
   const generateImage = useCallback(async (scriptContext: string) => {
