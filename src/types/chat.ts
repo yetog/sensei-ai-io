@@ -6,6 +6,8 @@ export interface ChatMessage {
   timestamp: Date;
   imageUrl?: string;
   imagePrompt?: string;
+  usedFiles?: string[]; // filenames used as context
+  suggestions?: string[]; // suggested filenames when none matched
 }
 
 export interface ChatState {

@@ -17,7 +17,7 @@ interface ChatBotProps {
 
 export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
-  const { files, getRelevantFileContext } = useFileContext();
+  const { files, getRelevantFileContext, getRelevantFileContextDetailed } = useFileContext();
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -31,15 +31,17 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId }) => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim() && !isLoading) {
-      const fileContext = getRelevantFileContext(inputValue);
-      sendMessage(inputValue, script, fileContext);
+      const detail = getRelevantFileContextDetailed(inputValue);
+      const usedFiles = detail.files.map(f => f.name);
+      sendMessage(inputValue, script, detail.context, usedFiles, detail.suggestions);
       setInputValue('');
     }
   };
 
   const handleQuickAction = (action: string) => {
-    const fileContext = getRelevantFileContext(action);
-    sendQuickAction(action, script, fileContext);
+    const detail = getRelevantFileContextDetailed(action);
+    const usedFiles = detail.files.map(f => f.name);
+    sendQuickAction(action, script, detail.context, usedFiles, detail.suggestions);
   };
 
   const handleGenerateImage = async () => {

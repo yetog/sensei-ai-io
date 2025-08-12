@@ -11,14 +11,16 @@ export const useChat = () => {
     isOpen: false
   });
 
-  const sendMessage = useCallback(async (content: string, scriptContext?: string, fileContext?: string) => {
+  const sendMessage = useCallback(async (content: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[]) => {
     if (!content.trim()) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       content,
-      timestamp: new Date()
+      timestamp: new Date(),
+      usedFiles,
+      suggestions
     };
 
     setChatState(prev => ({
@@ -61,7 +63,8 @@ IMPORTANT: When referencing information from uploaded files, cite them using the
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response,
-        timestamp: new Date()
+        timestamp: new Date(),
+        usedFiles
       };
 
       setChatState(prev => ({
@@ -76,12 +79,12 @@ IMPORTANT: When referencing information from uploaded files, cite them using the
     }
   }, [chatState.messages]);
 
-  const sendQuickAction = useCallback(async (action: string, scriptContext: string, fileContext?: string) => {
+  const sendQuickAction = useCallback(async (action: string, scriptContext: string, fileContext?: string, usedFiles?: string[], suggestions?: string[]) => {
     if (!scriptContext.trim()) {
       toast.error('Please add some text to your script first');
       return;
     }
-    await sendMessage(action, scriptContext, fileContext);
+    await sendMessage(action, scriptContext, fileContext, usedFiles, suggestions);
   }, [sendMessage]);
 
   const generateImage = useCallback(async (scriptContext: string) => {

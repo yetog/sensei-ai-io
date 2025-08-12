@@ -29,6 +29,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   
   const { cleanContent, citations } = !isUser ? extractCitations(message.content) : { cleanContent: message.content, citations: [] };
 
+  const combinedSources = Array.from(new Set([...(message.usedFiles || []), ...(!isUser ? citations : [])]));
   const downloadImage = () => {
     if (message.imageUrl) {
       const link = document.createElement('a');
@@ -59,18 +60,33 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               {cleanContent}
             </div>
             
-            {/* File Citations */}
-            {citations.length > 0 && (
+            {/* Sources from metadata or inline citations */}
+            {combinedSources.length > 0 && (
               <div className="mt-3 pt-3 border-t border-border/30">
                 <div className="flex items-center space-x-1 mb-2">
                   <FileText className="w-3 h-3 opacity-60" />
                   <span className="text-xs opacity-60 font-medium">Sources:</span>
                 </div>
                 <div className="space-y-1">
-                  {citations.map((citation, index) => (
+                  {combinedSources.map((src, index) => (
                     <div key={index} className="text-xs opacity-80 bg-background/20 rounded px-2 py-1">
-                      📄 {citation}
+                      📄 {src}
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Suggestions when no files matched */}
+            {isUser && (!message.usedFiles || message.usedFiles.length === 0) && message.suggestions && message.suggestions.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <div className="flex items-center space-x-1 mb-2">
+                  <FileText className="w-3 h-3 opacity-60" />
+                  <span className="text-xs opacity-60 font-medium">Did you mean:</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {message.suggestions.map((s, i) => (
+                    <span key={i} className="text-xs opacity-80 bg-background/20 rounded px-2 py-1">{s}</span>
                   ))}
                 </div>
               </div>
