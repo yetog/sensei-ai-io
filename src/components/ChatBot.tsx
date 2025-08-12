@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChat } from '@/hooks/useChat';
-import { useFileManager } from '@/hooks/useFileManager';
+import { useFileContext } from '@/contexts/FileContext';
 import { ChatMessage } from '@/components/ChatMessage';
 import { ionosAI } from '@/services/ionosAI';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ interface ChatBotProps {
 
 export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
-  const { files, getRelevantFileContext } = useFileManager(projectId);
+  const { files, getRelevantFileContext } = useFileContext();
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);

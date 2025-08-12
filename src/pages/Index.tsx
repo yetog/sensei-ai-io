@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { ChatBot } from '@/components/ChatBot';
 import { FileUpload } from '@/components/FileUpload';
 import { useChat } from '@/hooks/useChat';
-import { useFileManager } from '@/hooks/useFileManager';
+import { useFileContext } from '@/contexts/FileContext';
+import { FilesPanel } from '@/components/FilesPanel';
 
 const Index = () => {
   const [script, setScript] = useState('');
@@ -22,7 +23,7 @@ const Index = () => {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showFileUpload, setShowFileUpload] = useState(false);
   
-  const { files, handleFilesUploaded, getStats } = useFileManager();
+  const { files, addFiles } = useFileContext();
   
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
@@ -151,11 +152,14 @@ const Index = () => {
         <div className="space-y-6">
           {/* File Upload Section */}
           {showFileUpload && (
-            <FileUpload 
-              onFilesUploaded={handleFilesUploaded}
-              projectId="default"
-              maxFiles={5}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <FileUpload 
+                onFilesUploaded={addFiles}
+                projectId="default"
+                maxFiles={5}
+              />
+              <FilesPanel />
+            </div>
           )}
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">

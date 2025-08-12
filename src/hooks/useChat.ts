@@ -48,7 +48,9 @@ export const useChat = () => {
       }
       
       if (contextParts.length > 0) {
-        messageContent = `${contextParts.join('\n\n')}\n\nUser question: ${content}`;
+        messageContent = `${contextParts.join('\n\n')}\n\nUser question: ${content}
+
+IMPORTANT: When referencing information from uploaded files, cite them using the format [📄filename.ext] in your response.`;
       }
       
       apiMessages.push({ role: 'user', content: messageContent });
