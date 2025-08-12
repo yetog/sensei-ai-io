@@ -50,16 +50,18 @@
   }
 }
 
-/* Custom animations for ScriptVoice */
+/* Custom animations for Sensei AI */
 @keyframes pulse-gold {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
-  }
-  50% {
-    box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7); }
+  50% { box-shadow: 0 0 0 10px hsl(var(--primary) / 0); }
 }
+.pulse-gold { animation: pulse-gold 2s infinite; }
 
-.pulse-gold {
-  animation: pulse-gold 2s infinite;
+/* Samurai sword animation */
+@keyframes katana-swing {
+  0% { transform: rotate(-30deg) translateX(-20px); opacity: 0; }
+  40% { opacity: 1; }
+  100% { transform: rotate(10deg) translateX(140px); opacity: 0; }
 }
+.katana-sword { animation: katana-swing 0.9s ease-out both; }
+

@@ -13,11 +13,13 @@ import { toast } from 'sonner';
 interface ChatBotProps {
   script?: string;
   projectId?: string;
+  selectedFileIds?: string[];
+  activeAgentPrompt?: string;
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, selectedFileIds, activeAgentPrompt }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
-  const { files, getRelevantFileContext, getRelevantFileContextDetailed } = useFileContext();
+  const { files, getRelevantFileContext, getRelevantFileContextDetailed, getContextForFiles } = useFileContext();
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -28,21 +30,45 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (inputValue.trim() && !isLoading) {
-      const detail = getRelevantFileContextDetailed(inputValue);
-      const usedFiles = detail.files.map(f => f.name);
-      sendMessage(inputValue, script, detail.context, usedFiles, detail.suggestions);
-      setInputValue('');
-    }
-  };
+const handleSendMessage = (e: React.FormEvent) => {
+  e.preventDefault();
+  if (inputValue.trim() && !isLoading) {
+    let context = '';
+    let usedFiles: string[] = [];
 
-  const handleQuickAction = (action: string) => {
+    if (selectedFileIds && selectedFileIds.length > 0) {
+      const res = getContextForFiles(selectedFileIds);
+      context = res.context;
+      usedFiles = res.files.map(f => f.name);
+    } else {
+      const detail = getRelevantFileContextDetailed(inputValue);
+      context = detail.context;
+      usedFiles = detail.files.map(f => f.name);
+    }
+
+    const agentPrefix = activeAgentPrompt ? `Agent system prompt:\n${activeAgentPrompt}\n` : '';
+    sendMessage(inputValue, agentPrefix + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions);
+    setInputValue('');
+  }
+};
+
+const handleQuickAction = (action: string) => {
+  let context = '';
+  let usedFiles: string[] = [];
+
+  if (selectedFileIds && selectedFileIds.length > 0) {
+    const res = getContextForFiles(selectedFileIds);
+    context = res.context;
+    usedFiles = res.files.map(f => f.name);
+  } else {
     const detail = getRelevantFileContextDetailed(action);
-    const usedFiles = detail.files.map(f => f.name);
-    sendQuickAction(action, script, detail.context, usedFiles, detail.suggestions);
-  };
+    context = detail.context;
+    usedFiles = detail.files.map(f => f.name);
+  }
+
+  const agentPrefix = activeAgentPrompt ? `Agent system prompt:\n${activeAgentPrompt}\n` : '';
+  sendQuickAction(action, agentPrefix + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions);
+};
 
   const handleGenerateImage = async () => {
     console.log('Image generation triggered - showing coming soon message');

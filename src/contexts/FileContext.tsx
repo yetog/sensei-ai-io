@@ -13,6 +13,8 @@ interface FileContextType {
   getRelevantFileContext: (query: string, maxChars?: number) => string;
   getRelevantFileContextDetailed: (query: string, maxChars?: number) => { context: string; files: UploadedFile[]; suggestions: string[] };
   getAllFilesContext: (maxChars?: number) => string;
+  listAllFiles: () => UploadedFile[];
+  getContextForFiles: (fileIds: string[], maxChars?: number) => { context: string; files: UploadedFile[] };
   getStats: () => { totalFiles: number; totalSize: number; totalWords: number; fileTypes: string[] };
 }
 
@@ -137,90 +139,124 @@ export const FileProvider: React.FC<FileProviderProps> = ({ children, projectId 
     return results;
   };
 
-  const getRelevantFileContext = (query: string, maxChars: number = 2000): string => {
-    return getRelevantFileContextDetailed(query, maxChars).context;
-  };
+const getRelevantFileContext = (query: string, maxChars: number = 2000): string => {
+  return getRelevantFileContextDetailed(query, maxChars).context;
+};
 
-  const getRelevantFileContextDetailed = (query: string, maxChars: number = 2000) => {
-    const relevantFiles = searchFiles(query).slice(0, 3);
+const getRelevantFileContextDetailed = (query: string, maxChars: number = 2000) => {
+  const relevantFiles = searchFiles(query).slice(0, 3);
 
-    // Build suggestions if no results
-    const suggestions: string[] = [];
-    if (relevantFiles.length === 0) {
-      const all = [...files, ...getProjectFiles()];
-      const q = query.toLowerCase();
-      const uniqueNames = Array.from(new Set(all.map(f => f.name)));
-      const scored = uniqueNames.map(name => {
-        const n = name.toLowerCase();
-        const common = ['readme.md', 'readme', 'readthis.md', 'readthis'];
-        let s = 0;
-        if (common.some(c => n.includes(c) || q.includes(c))) s += 10;
-        const starts = n.startsWith(q) ? 8 : 0;
-        const incl = n.includes(q) ? 6 : 0;
-        return { name, score: s + starts + incl };
-      }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
-
-      suggestions.push(...scored.map(x => x.name));
-    }
-
-    if (relevantFiles.length === 0) {
-      console.debug('[FileContext] No relevant files found for query:', query, 'suggestions:', suggestions);
-      return { context: '', files: [], suggestions };
-    }
-
-    let context = 'Relevant files:\n\n';
-    let remainingChars = maxChars - context.length;
-
-    for (const file of relevantFiles) {
-      const content = file.extractedText || file.content;
-      const fileHeader = `📄 ${file.name} (${file.type || 'text'}):\n`;
-
-      if (remainingChars <= fileHeader.length + 50) break;
-
-      context += fileHeader;
-      remainingChars -= fileHeader.length;
-
-      const truncatedContent = content.length > remainingChars - 10
-        ? content.substring(0, remainingChars - 10) + '...'
-        : content;
-
-      context += truncatedContent + '\n\n';
-      remainingChars -= truncatedContent.length + 2;
-
-      if (remainingChars <= 100) break;
-    }
-
-    return { context, files: relevantFiles, suggestions };
-  };
-
-  const getAllFilesContext = (maxChars: number = 3000): string => {
+  // Build suggestions if no results
+  const suggestions: string[] = [];
+  if (relevantFiles.length === 0) {
     const all = [...files, ...getProjectFiles()];
-    if (all.length === 0) return '';
+    const q = query.toLowerCase();
+    const uniqueNames = Array.from(new Set(all.map(f => f.name)));
+    const scored = uniqueNames.map(name => {
+      const n = name.toLowerCase();
+      const common = ['readme.md', 'readme', 'readthis.md', 'readthis'];
+      let s = 0;
+      if (common.some(c => n.includes(c) || q.includes(c))) s += 10;
+      const starts = n.startsWith(q) ? 8 : 0;
+      const incl = n.includes(q) ? 6 : 0;
+      return { name, score: s + starts + incl };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
 
-    let context = `File Collection (${all.length} files):\n\n`;
-    let remainingChars = maxChars - context.length;
+    suggestions.push(...scored.map(x => x.name));
+  }
 
-    for (const file of all) {
-      const content = file.extractedText || file.content;
-      const fileHeader = `📄 ${file.name}:\n`;
+  if (relevantFiles.length === 0) {
+    console.debug('[FileContext] No relevant files found for query:', query, 'suggestions:', suggestions);
+    return { context: '', files: [], suggestions };
+  }
 
-      if (remainingChars <= fileHeader.length + 50) break;
+  let context = 'Relevant files:\n\n';
+  let remainingChars = maxChars - context.length;
 
-      context += fileHeader;
-      remainingChars -= fileHeader.length;
+  for (const file of relevantFiles) {
+    const content = file.extractedText || file.content;
+    const fileHeader = `📄 ${file.name} (${file.type || 'text'}):\n`;
 
-      const truncatedContent = content.length > remainingChars - 10
-        ? content.substring(0, remainingChars - 10) + '...'
-        : content;
+    if (remainingChars <= fileHeader.length + 50) break;
 
-      context += truncatedContent + '\n\n';
-      remainingChars -= truncatedContent.length + 2;
+    context += fileHeader;
+    remainingChars -= fileHeader.length;
 
-      if (remainingChars <= 100) break;
-    }
+    const truncatedContent = content.length > remainingChars - 10
+      ? content.substring(0, remainingChars - 10) + '...'
+      : content;
 
-    return context;
-  };
+    context += truncatedContent + '\n\n';
+    remainingChars -= truncatedContent.length + 2;
+
+    if (remainingChars <= 100) break;
+  }
+
+  return { context, files: relevantFiles, suggestions };
+};
+
+const getAllFilesContext = (maxChars: number = 3000): string => {
+  const all = [...files, ...getProjectFiles()];
+  if (all.length === 0) return '';
+
+  let context = `File Collection (${all.length} files):\n\n`;
+  let remainingChars = maxChars - context.length;
+
+  for (const file of all) {
+    const content = file.extractedText || file.content;
+    const fileHeader = `📄 ${file.name}:\n`;
+
+    if (remainingChars <= fileHeader.length + 50) break;
+
+    context += fileHeader;
+    remainingChars -= fileHeader.length;
+
+    const truncatedContent = content.length > remainingChars - 10
+      ? content.substring(0, remainingChars - 10) + '...'
+      : content;
+
+    context += truncatedContent + '\n\n';
+    remainingChars -= truncatedContent.length + 2;
+
+    if (remainingChars <= 100) break;
+  }
+
+  return context;
+};
+
+const listAllFiles = (): UploadedFile[] => {
+  return [...files, ...getProjectFiles()];
+};
+
+const getContextForFiles = (fileIds: string[], maxChars: number = 2000): { context: string; files: UploadedFile[] } => {
+  const all = listAllFiles();
+  const selected = all.filter(f => fileIds.includes(f.id));
+  if (selected.length === 0) return { context: '', files: [] };
+
+  let context = 'Selected files:\n\n';
+  let remainingChars = maxChars - context.length;
+
+  for (const file of selected) {
+    const content = file.extractedText || file.content;
+    const fileHeader = `📄 ${file.name} (${file.type || 'text'}):\n`;
+
+    if (remainingChars <= fileHeader.length + 50) break;
+
+    context += fileHeader;
+    remainingChars -= fileHeader.length;
+
+    const truncatedContent = content.length > remainingChars - 10
+      ? content.substring(0, remainingChars - 10) + '...'
+      : content;
+
+    context += truncatedContent + '\n\n';
+    remainingChars -= truncatedContent.length + 2;
+
+    if (remainingChars <= 100) break;
+  }
+
+  return { context, files: selected };
+};
 
   const getStats = () => {
     const totalSize = files.reduce((sum, file) => sum + file.size, 0);
@@ -249,6 +285,8 @@ export const FileProvider: React.FC<FileProviderProps> = ({ children, projectId 
       getRelevantFileContext,
       getRelevantFileContextDetailed,
       getAllFilesContext,
+      listAllFiles,
+      getContextForFiles,
       getStats
     }}>
       {children}
