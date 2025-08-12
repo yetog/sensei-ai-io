@@ -9,7 +9,7 @@ import { getProjectFiles } from "@/services/projectFiles";
 import { ChatBot } from "@/components/ChatBot";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Play, Pause, Square } from "lucide-react";
 import { agentService } from "@/services/agentService";
@@ -156,16 +156,22 @@ export default function Workspace() {
               <h3 className="font-semibold">Chat</h3>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Agent</span>
-                <Select value={activeAgentId} onValueChange={setActiveAgentId}>
+                <Select
+                  value={activeAgentId || undefined}
+                  onValueChange={(v) => setActiveAgentId(v === "__clear__" ? "" : v)}
+                >
                   <SelectTrigger className="h-8 w-[200px]"><SelectValue placeholder="No agent"/></SelectTrigger>
                   <SelectContent>
-                    {agents.length === 0 && (
-                      <SelectItem value="" disabled>No agents yet</SelectItem>
+                    {agents.length === 0 ? (
+                      <SelectLabel>No agents yet</SelectLabel>
+                    ) : (
+                      <>
+                        <SelectItem value="__clear__">No agent</SelectItem>
+                        {agents.map(a => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </>
                     )}
-                    <SelectItem value="">No agent</SelectItem>
-                    {agents.map(a => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
