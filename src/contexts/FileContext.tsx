@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UploadedFile } from '@/types/file';
 import { fileService } from '@/services/fileService';
+import { getProjectFiles } from '@/services/projectFiles';
 
 interface FileContextType {
   files: UploadedFile[];
@@ -68,27 +69,87 @@ export const FileProvider: React.FC<FileProviderProps> = ({ children, projectId 
   };
 
   const searchFiles = (query: string): UploadedFile[] => {
-    if (!query.trim()) return files;
-    
-    const lowerQuery = query.toLowerCase();
-    return files.filter(file => 
-      file.name.toLowerCase().includes(lowerQuery) ||
-      file.content.toLowerCase().includes(lowerQuery) ||
-      (file.extractedText && file.extractedText.toLowerCase().includes(lowerQuery))
-    );
+    if (!query.trim()) return files; // preserve original behavior for empty queries
+
+    const q = query.toLowerCase().trim();
+    const projectFiles = getProjectFiles();
+    const combined = [...files, ...projectFiles];
+
+    // Simple aliases to help match common intents like "readme"
+    const aliases = ['readme', 'read me', 'read-me', 'read_this', 'readthis'];
+    const hasReadmeIntent = aliases.some(a => q.includes(a));
+
+    const levenshtein = (a: string, b: string) => {
+      const m = a.length, n = b.length;
+      const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+      for (let i = 0; i <= m; i++) dp[i][0] = i;
+      for (let j = 0; j <= n; j++) dp[0][j] = j;
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + cost
+          );
+        }
+      }
+      return dp[m][n];
+    };
+
+    const score = (file: UploadedFile) => {
+      const name = file.name.toLowerCase();
+      const content = (file.extractedText || file.content || '').toLowerCase();
+      let s = 0;
+
+      if (name === q) s += 100;
+      if (name.startsWith(q)) s += 60;
+      if (name.includes(q)) s += 50;
+      if (hasReadmeIntent && (name.includes('readme') || name.includes('readthis'))) s += 40;
+
+      const words = q.split(/\s+/).filter(Boolean);
+      const hits = words.reduce((acc, w) => acc + (content.includes(w) ? 1 : 0), 0);
+      s += hits * 5;
+
+      // Edit distance bonus on filename
+      const dist = levenshtein(q, name);
+      s += Math.max(0, 30 - Math.min(30, dist));
+
+      return s;
+    };
+
+    const results = combined
+      .map((f) => ({ f, s: score(f) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 5)
+      .map((x) => x.f);
+
+    if (results.length === 0) {
+      return combined.filter(file => {
+        const name = file.name.toLowerCase();
+        const content = (file.extractedText || file.content || '').toLowerCase();
+        return name.includes(q) || content.includes(q);
+      }).slice(0, 5);
+    }
+
+    return results;
   };
 
   const getRelevantFileContext = (query: string, maxChars: number = 2000): string => {
     const relevantFiles = searchFiles(query).slice(0, 3);
     
-    if (relevantFiles.length === 0) return '';
+    if (relevantFiles.length === 0) {
+      console.debug('[FileContext] No relevant files found for query:', query);
+      return '';
+    }
     
-    let context = 'Relevant uploaded files:\n\n';
+    let context = 'Relevant files:\n\n';
     let remainingChars = maxChars - context.length;
     
     for (const file of relevantFiles) {
       const content = file.extractedText || file.content;
-      const fileHeader = `📄 ${file.name} (${file.type}):\n`;
+      const fileHeader = `📄 ${file.name} (${file.type || 'text'}):\n`;
       
       if (remainingChars <= fileHeader.length + 50) break;
       
