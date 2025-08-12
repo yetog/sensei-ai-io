@@ -10,16 +10,43 @@ import { ChatBot } from "@/components/ChatBot";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Play, Pause, Square } from "lucide-react";
+import { agentService } from "@/services/agentService";
+import { datasetService } from "@/services/datasetService";
 
 export default function Workspace() {
   const { files, addFiles } = useFileContext();
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [activeAgentId, setActiveAgentId] = useState<string>("");
+  const agents = useMemo(() => agentService.list(), []);
+  const activeAgent = useMemo(() => agents.find(a => a.id === activeAgentId), [agents, activeAgentId]);
 
   // Combine uploaded + project files
   const allFiles = useMemo(() => {
     return [...files, ...getProjectFiles()];
   }, [files]);
+
+  const filteredFiles = useMemo(() =>
+    allFiles.filter((f) => f.name.toLowerCase().includes(search.toLowerCase())),
+  [allFiles, search]);
+
+  // Persist selected sources
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('sensei:selectedFileIds');
+      if (raw) {
+        const ids = JSON.parse(raw) as string[];
+        const existing = new Set(allFiles.map(f => f.id));
+        setSelectedFileIds(ids.filter(id => existing.has(id)));
+      }
+    } catch {}
+  }, [allFiles.length]);
+
+  useEffect(() => {
+    localStorage.setItem('sensei:selectedFileIds', JSON.stringify(selectedFileIds));
+  }, [selectedFileIds]);
 
   const toggleSelect = (id: string) => {
     setSelectedFileIds((prev) =>
@@ -29,6 +56,12 @@ export default function Workspace() {
 
   const selectAll = () => setSelectedFileIds(allFiles.map((f) => f.id));
   const clearAll = () => setSelectedFileIds([]);
+  const createDatasetFromSelection = () => {
+    if (selectedFileIds.length === 0) return;
+    const name = window.prompt('Dataset name');
+    if (!name) return;
+    datasetService.create({ name, fileIds: selectedFileIds });
+  };
 
   // TTS panel state (moved here per request)
   const [ttsText, setTtsText] = useState("");
@@ -78,15 +111,24 @@ export default function Workspace() {
           <Card className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Sources</h3>
-              <Badge variant="secondary">{allFiles.length} files</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{filteredFiles.length}/{allFiles.length} files</Badge>
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search files..."
+                  className="h-8 w-36"
+                />
+              </div>
             </div>
             <div className="flex gap-2 mb-3">
               <Button size="sm" variant="outline" onClick={selectAll}>Select all</Button>
               <Button size="sm" variant="outline" onClick={clearAll}>Clear</Button>
+              <Button size="sm" onClick={createDatasetFromSelection}>Create dataset</Button>
             </div>
             <ScrollArea className="h-64 pr-2">
               <div className="space-y-2">
-                {allFiles.map((f) => (
+                {filteredFiles.map((f) => (
                   <label key={f.id} className="flex items-start gap-2 text-sm">
                     <Checkbox
                       checked={selectedFileIds.includes(f.id)}
@@ -110,11 +152,28 @@ export default function Workspace() {
         {/* Chat (center) */}
         <div className="md:col-span-5 space-y-3">
           <Card className="p-4">
-            <h3 className="font-semibold mb-2">Chat</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold">Chat</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Agent</span>
+                <Select value={activeAgentId} onValueChange={setActiveAgentId}>
+                  <SelectTrigger className="h-8 w-[200px]"><SelectValue placeholder="No agent"/></SelectTrigger>
+                  <SelectContent>
+                    {agents.length === 0 && (
+                      <SelectItem value="" disabled>No agents yet</SelectItem>
+                    )}
+                    <SelectItem value="">No agent</SelectItem>
+                    {agents.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground mb-2">
               Use the floating assistant button to start chatting. Selected sources will be used for context.
             </p>
-            <p className="text-xs text-muted-foreground">Sources selected: {selectedFileIds.length}</p>
+            <p className="text-xs text-muted-foreground">Sources selected: {selectedFileIds.length}{activeAgent ? ` • Agent: ${activeAgent.name}` : ''}</p>
           </Card>
         </div>
 
