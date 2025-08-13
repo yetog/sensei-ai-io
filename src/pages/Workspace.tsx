@@ -9,7 +9,7 @@ import { getProjectFiles } from "@/services/projectFiles";
 import { ChatBot } from "@/components/ChatBot";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Play, Pause, Square } from "lucide-react";
 import { agentService } from "@/services/agentService";
@@ -162,16 +162,18 @@ export default function Workspace() {
                 >
                   <SelectTrigger className="h-8 w-[200px]"><SelectValue placeholder="No agent"/></SelectTrigger>
                   <SelectContent>
-                    {agents.length === 0 ? (
-                      <SelectLabel>No agents yet</SelectLabel>
-                    ) : (
-                      <>
-                        <SelectItem value="__clear__">No agent</SelectItem>
-                        {agents.map(a => (
-                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                        ))}
-                      </>
-                    )}
+            {agents.length === 0 ? (
+              <SelectGroup>
+                <SelectLabel>No agents yet</SelectLabel>
+              </SelectGroup>
+            ) : (
+              <>
+                <SelectItem value="__clear__">No agent</SelectItem>
+                {agents.map(a => (
+                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                ))}
+              </>
+            )}
                   </SelectContent>
                 </Select>
               </div>
