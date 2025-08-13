@@ -7,13 +7,14 @@ import { FileUpload } from "@/components/FileUpload";
 import { useFileContext } from "@/contexts/FileContext";
 import { getProjectFiles } from "@/services/projectFiles";
 import { ChatBot } from "@/components/ChatBot";
+import { MindMap } from "@/components/MindMap";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Play, Pause, Square } from "lucide-react";
 import { agentService } from "@/services/agentService";
-import { datasetService } from "@/services/datasetService";
+
 
 export default function Workspace() {
   const { files, addFiles } = useFileContext();
@@ -56,12 +57,6 @@ export default function Workspace() {
 
   const selectAll = () => setSelectedFileIds(allFiles.map((f) => f.id));
   const clearAll = () => setSelectedFileIds([]);
-  const createDatasetFromSelection = () => {
-    if (selectedFileIds.length === 0) return;
-    const name = window.prompt('Dataset name');
-    if (!name) return;
-    datasetService.create({ name, fileIds: selectedFileIds });
-  };
 
   // TTS panel state (moved here per request)
   const [ttsText, setTtsText] = useState("");
@@ -149,8 +144,11 @@ export default function Workspace() {
             <div className="flex gap-2 mb-3">
               <Button size="sm" variant="outline" onClick={selectAll}>Select all</Button>
               <Button size="sm" variant="outline" onClick={clearAll}>Clear</Button>
-              <Button size="sm" onClick={createDatasetFromSelection}>Create dataset</Button>
             </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Tip: Organize sources into datasets on the Datasets page.
+              <a href="/datasets" className="ml-2 underline">Open Datasets</a>
+            </p>
             <ScrollArea className="h-64 pr-2">
               <div className="space-y-2">
                 {filteredFiles.map((f) => (
@@ -222,8 +220,8 @@ export default function Workspace() {
           </Card>
 
           <Card className="p-4">
-            <h3 className="font-semibold mb-3">Mind Map (coming soon)</h3>
-            <p className="text-sm text-muted-foreground">Key concepts and relationships will appear here.</p>
+            <h3 className="font-semibold mb-3">Mind Map</h3>
+            <MindMap root="Selected Sources" childrenLabels={selectedFileIds.map(id => allFiles.find(f => f.id === id)?.name || id)} />
           </Card>
 
           {/* TTS Panel */}

@@ -9,6 +9,7 @@ import { useFileContext } from '@/contexts/FileContext';
 import { ChatMessage } from '@/components/ChatMessage';
 import { ionosAI } from '@/services/ionosAI';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface ChatBotProps {
   script?: string;
@@ -255,6 +256,12 @@ const handleQuickAction = (action: string) => {
                   {prompt}
                 </Button>
               ))}
+              <div className="pt-2">
+                <p className="text-xs text-muted-foreground mb-2">Tip: Organize sources into datasets to reuse across chats.</p>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/datasets">Open Datasets</Link>
+                </Button>
+              </div>
             </div>
           </div>
         )}

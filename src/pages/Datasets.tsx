@@ -45,7 +45,7 @@ export default function Datasets() {
             <h3 className="text-sm font-medium mb-2">Your datasets</h3>
             <div className="space-y-2">
               {datasets.length === 0 && (
-                <div className="text-sm text-muted-foreground">No datasets yet. Create one on the left or from Workspace selection.</div>
+                <div className="text-sm text-muted-foreground">No datasets yet. Create one on the left.</div>
               )}
               {datasets.map((ds) => (
                 <div key={ds.id} className="flex items-center justify-between rounded border p-3">
