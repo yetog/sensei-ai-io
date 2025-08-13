@@ -70,6 +70,24 @@ export default function Workspace() {
   const [voice, setVoice] = useState("");
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
+  // Load saved TTS preferences
+  useEffect(() => {
+    try {
+      const savedSpeed = localStorage.getItem('sensei:ttsSpeed');
+      const savedVoice = localStorage.getItem('sensei:ttsVoice');
+      if (savedSpeed) setSpeed([parseFloat(savedSpeed)]);
+      if (savedVoice) setVoice(savedVoice);
+    } catch {}
+  }, []);
+
+  // Persist TTS preferences
+  useEffect(() => {
+    try { localStorage.setItem('sensei:ttsSpeed', String(speed[0])); } catch {}
+  }, [speed]);
+  useEffect(() => {
+    try { localStorage.setItem('sensei:ttsVoice', voice); } catch {}
+  }, [voice]);
+
   useEffect(() => {
     const loadVoices = () => {
       const voices = speechSynthesis.getVoices();
@@ -80,10 +98,11 @@ export default function Workspace() {
     speechSynthesis.onvoiceschanged = loadVoices;
   }, [voice]);
 
-  const handlePlay = () => {
-    if (!ttsText.trim()) return;
+  const handlePlay = (textOverride?: string) => {
+    const text = textOverride ?? ttsText;
+    if (!text.trim()) return;
     if (speechSynthesis.speaking) speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(ttsText);
+    const utt = new SpeechSynthesisUtterance(text);
     const v = availableVoices.find((x) => x.name === voice);
     if (v) utt.voice = v;
     utt.rate = speed[0];
@@ -101,6 +120,12 @@ export default function Workspace() {
   const handleStop = () => {
     speechSynthesis.cancel();
     setIsPlaying(false);
+  };
+
+  // Allow ChatBot to send content to TTS panel
+  const handleSpeakFromChat = (text: string) => {
+    setTtsText(text);
+    handlePlay(text);
   };
 
   return (
@@ -191,7 +216,8 @@ export default function Workspace() {
             <h3 className="font-semibold mb-3">Summary</h3>
             <p className="text-sm text-muted-foreground mb-3">Generate a quick summary of selected sources in chat.</p>
             <Button size="sm" variant="outline" onClick={() => {
-              // noop placeholder; users can trigger via chat
+              window.dispatchEvent(new CustomEvent('chatbot:open'));
+              window.dispatchEvent(new CustomEvent('chatbot:action', { detail: { action: 'Summarize the selected sources concisely. Use bullet points and cite files as [📄filename].' } }));
             }}>Ask assistant to summarize</Button>
           </Card>
 
@@ -210,7 +236,7 @@ export default function Workspace() {
               className="w-full h-24 rounded-md bg-input border border-border p-2 text-sm"
             />
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <Button onClick={handlePlay} disabled={isPlaying}> <Play className="w-4 h-4 mr-2"/> Play</Button>
+              <Button onClick={() => handlePlay()} disabled={isPlaying}> <Play className="w-4 h-4 mr-2"/> Play</Button>
               <Button onClick={handlePause} variant="outline" disabled={!isPlaying}><Pause className="w-4 h-4"/></Button>
               <Button onClick={handleStop} variant="outline"><Square className="w-4 h-4"/></Button>
               <div className="flex items-center gap-2 ml-auto">
@@ -232,7 +258,7 @@ export default function Workspace() {
       </div>
 
       {/* Floating assistant (uses selected sources) */}
-      <ChatBot selectedFileIds={selectedFileIds} />
+      <ChatBot selectedFileIds={selectedFileIds} activeAgentPrompt={activeAgent?.systemPrompt} onSpeak={(text) => { setTtsText(text); handlePlay(text); }} />
     </div>
   );
 }

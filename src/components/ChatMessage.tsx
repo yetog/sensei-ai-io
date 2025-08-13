@@ -6,9 +6,10 @@ import { Download, FileText, Bot, User } from 'lucide-react';
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  onSpeak?: (text: string) => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak }) => {
   const isUser = message.role === 'user';
   
   // Extract file citations from assistant messages
@@ -59,6 +60,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
               {cleanContent}
             </div>
+            {!isUser && onSpeak && (
+              <div className="mt-2">
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => onSpeak(cleanContent)}>
+                  Send to TTS
+                </Button>
+              </div>
+            )}
             
             {/* Sources from metadata or inline citations */}
             {combinedSources.length > 0 && (

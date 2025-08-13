@@ -15,9 +15,10 @@ interface ChatBotProps {
   projectId?: string;
   selectedFileIds?: string[];
   activeAgentPrompt?: string;
+  onSpeak?: (text: string) => void;
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, selectedFileIds, activeAgentPrompt }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, selectedFileIds, activeAgentPrompt, onSpeak }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
   const { files, getRelevantFileContext, getRelevantFileContextDetailed, getContextForFiles } = useFileContext();
   const [inputValue, setInputValue] = useState('');
@@ -100,6 +101,24 @@ const handleQuickAction = (action: string) => {
     "Check pronunciation and flow",
     "Generate image for this script"
   ];
+
+  // Listen for external quick actions and open requests
+  useEffect(() => {
+    const openHandler = () => { if (!isOpen) toggleChat(); };
+    const actionHandler = (e: Event) => {
+      const detail = (e as CustomEvent<{ action: string }>).detail;
+      if (detail?.action) {
+        if (!isOpen) toggleChat();
+        handleQuickAction(detail.action);
+      }
+    };
+    window.addEventListener('chatbot:open', openHandler);
+    window.addEventListener('chatbot:action', actionHandler as EventListener);
+    return () => {
+      window.removeEventListener('chatbot:open', openHandler);
+      window.removeEventListener('chatbot:action', actionHandler as EventListener);
+    };
+  }, [isOpen, toggleChat, handleQuickAction]);
 
   if (!isOpen) {
     return (
@@ -241,7 +260,7 @@ const handleQuickAction = (action: string) => {
         )}
         
         {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+          <ChatMessage key={message.id} message={message} onSpeak={onSpeak} />
         ))}
         
         {isLoading && (
