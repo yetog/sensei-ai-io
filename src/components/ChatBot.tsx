@@ -16,10 +16,12 @@ interface ChatBotProps {
   projectId?: string;
   selectedFileIds?: string[];
   activeAgentPrompt?: string;
+  activeAgentName?: string;
+  activeAgentDatasets?: string[];
   onSpeak?: (text: string) => void;
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, selectedFileIds, activeAgentPrompt, onSpeak }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, selectedFileIds, activeAgentPrompt, activeAgentName = "AI Assistant", activeAgentDatasets = [], onSpeak }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
   const { files, getRelevantFileContext, getRelevantFileContextDetailed, getContextForFiles } = useFileContext();
   const [inputValue, setInputValue] = useState('');
@@ -48,8 +50,8 @@ const handleSendMessage = (e: React.FormEvent) => {
       usedFiles = detail.files.map(f => f.name);
     }
 
-    const agentPrefix = activeAgentPrompt ? `Agent system prompt:\n${activeAgentPrompt}\n` : '';
-    sendMessage(inputValue, agentPrefix + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions);
+    const agentContext = activeAgentPrompt ? `${activeAgentPrompt}\n\n` : '';
+    sendMessage(inputValue, agentContext + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, activeAgentName);
     setInputValue('');
   }
 };
@@ -68,8 +70,8 @@ const handleQuickAction = (action: string) => {
     usedFiles = detail.files.map(f => f.name);
   }
 
-  const agentPrefix = activeAgentPrompt ? `Agent system prompt:\n${activeAgentPrompt}\n` : '';
-  sendQuickAction(action, agentPrefix + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions);
+  const agentContext = activeAgentPrompt ? `${activeAgentPrompt}\n\n` : '';
+  sendQuickAction(action, agentContext + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, activeAgentName);
 };
 
   const handleGenerateImage = async () => {
@@ -143,7 +145,12 @@ const handleQuickAction = (action: string) => {
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 bg-primary rounded-full pulse-gold"></div>
-          <h3 className="font-semibold">AI Assistant</h3>
+          <h3 className="font-semibold">{activeAgentName}</h3>
+          {activeAgentDatasets.length > 0 && (
+            <div className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">
+              {activeAgentDatasets.length} dataset{activeAgentDatasets.length > 1 ? 's' : ''}
+            </div>
+          )}
           {(hasScript || files.length > 0) && (
             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
               {hasScript && (
@@ -232,9 +239,11 @@ const handleQuickAction = (action: string) => {
           <div className="text-center text-muted-foreground py-8">
             <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm mb-4">
-              {hasScript || files.length > 0 
-                ? 'Ask me about your script or uploaded files!' 
-                : 'Add text to your script or upload files to get AI assistance!'
+              {activeAgentPrompt ? 
+                `Hi! I'm ${activeAgentName}. ${hasScript || files.length > 0 ? 'How can I help with your content?' : 'Upload files or add script content to get started!'}` :
+                hasScript || files.length > 0 
+                  ? 'Ask me about your script or uploaded files!' 
+                  : 'Add text to your script or upload files to get AI assistance!'
               }
             </p>
             <div className="space-y-2">

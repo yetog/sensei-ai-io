@@ -59,17 +59,21 @@ export class IONOSAIService {
     }
   }
 
-  async sendMessage(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>): Promise<string> {
+  async sendMessage(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, agentName?: string): Promise<string> {
     if (!this.apiToken) {
       throw new Error('API token not set');
     }
+
+    const systemPrompt = agentName && agentName !== "AI Assistant" 
+      ? `You are ${agentName}, a specialized AI assistant. Maintain your role identity throughout the conversation and respond in a way that's consistent with your expertise. Provide concise, actionable advice based on your specialization.`
+      : 'You are a helpful AI assistant specialized in helping with script writing, text-to-speech optimization, and creative writing. You provide concise, actionable advice for improving scripts and content.';
 
     const request: IONOSAIRequest = {
       model: TEXT_MODEL,
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful AI assistant specialized in helping with script writing, text-to-speech optimization, and creative writing. You provide concise, actionable advice for improving scripts and content.'
+          content: systemPrompt
         },
         ...messages
       ],

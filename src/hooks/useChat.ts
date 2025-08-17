@@ -11,7 +11,7 @@ export const useChat = () => {
     isOpen: false
   });
 
-  const sendMessage = useCallback(async (content: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[]) => {
+  const sendMessage = useCallback(async (content: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string) => {
     if (!content.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -57,7 +57,7 @@ IMPORTANT: When referencing information from uploaded files, cite them using the
       
       apiMessages.push({ role: 'user', content: messageContent });
 
-      const response = await ionosAI.sendMessage(apiMessages);
+      const response = await ionosAI.sendMessage(apiMessages, agentName);
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -79,12 +79,12 @@ IMPORTANT: When referencing information from uploaded files, cite them using the
     }
   }, [chatState.messages]);
 
-  const sendQuickAction = useCallback(async (action: string, scriptContext: string, fileContext?: string, usedFiles?: string[], suggestions?: string[]) => {
+  const sendQuickAction = useCallback(async (action: string, scriptContext: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string) => {
     if (!scriptContext.trim()) {
       toast.error('Please add some text to your script first');
       return;
     }
-    await sendMessage(action, scriptContext, fileContext, usedFiles, suggestions);
+    await sendMessage(action, scriptContext, fileContext, usedFiles, suggestions, agentName);
   }, [sendMessage]);
 
   const generateImage = useCallback(async (scriptContext: string) => {

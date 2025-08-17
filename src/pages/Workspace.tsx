@@ -31,6 +31,16 @@ export default function Workspace() {
   const agents = useMemo(() => agentService.list(), []);
   const datasets = useMemo(() => datasetService.list(), [refresh]);
   const activeAgent = useMemo(() => agents.find(a => a.id === activeAgentId), [agents, activeAgentId]);
+
+  // Auto-introduce agent when selected
+  useEffect(() => {
+    if (activeAgent && messages.length === 0) {
+      setTimeout(() => {
+        const introAction = `Introduce yourself as ${activeAgent.name} and briefly explain how you can help based on your specialization.`;
+        handleQuickAction(introAction);
+      }, 500);
+    }
+  }, [activeAgent?.id]);
   const activeDataset = useMemo(() => datasets.find(d => d.id === activeDatasetId), [datasets, activeDatasetId]);
 
   // Chat functionality
@@ -185,8 +195,8 @@ export default function Workspace() {
         usedFiles = detail.files.map(f => f.name);
       }
 
-      const agentPrefix = activeAgent?.systemPrompt ? `Agent system prompt:\n${activeAgent.systemPrompt}\n` : '';
-      sendMessage(inputValue, agentPrefix, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions);
+      const agentContext = activeAgent?.systemPrompt || '';
+      sendMessage(inputValue, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, activeAgent?.name);
       setInputValue('');
     }
   };
@@ -205,8 +215,8 @@ export default function Workspace() {
       usedFiles = detail.files.map(f => f.name);
     }
 
-    const agentPrefix = activeAgent?.systemPrompt ? `Agent system prompt:\n${activeAgent.systemPrompt}\n` : '';
-    sendQuickAction(action, agentPrefix, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions);
+    const agentContext = activeAgent?.systemPrompt || '';
+    sendQuickAction(action, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, activeAgent?.name);
   };
 
   // Allow TTS to be triggered from chat
@@ -368,7 +378,7 @@ export default function Workspace() {
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-primary rounded-full pulse-purple"></div>
-                  <h3 className="font-semibold">AI Assistant</h3>
+                  <h3 className="font-semibold">{activeAgent?.name || "AI Assistant"}</h3>
                   <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
                     {selectedFileIds.length} sources
                   </Badge>
