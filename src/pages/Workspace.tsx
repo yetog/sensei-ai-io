@@ -124,46 +124,57 @@ export default function Workspace() {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4">
-        {/* Sources */}
-        <div className="md:col-span-3 space-y-3">
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold">Sources</h3>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{filteredFiles.length}/{allFiles.length} files</Badge>
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search files..."
-                  className="h-8 w-36"
-                />
-              </div>
+    <div className="min-h-screen bg-background">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 max-w-7xl mx-auto">
+        {/* Sources Panel */}
+        <div className="lg:col-span-3 space-y-4">
+          <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">Sources</h3>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                {filteredFiles.length}/{allFiles.length} files
+              </Badge>
             </div>
-            <div className="flex gap-2 mb-3">
-              <Button size="sm" variant="outline" onClick={selectAll}>Select all</Button>
-              <Button size="sm" variant="outline" onClick={clearAll}>Clear</Button>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search files..."
+              className="mb-4 bg-input/50 border-border/50 focus:border-primary/50"
+            />
+            <div className="flex gap-2 mb-4">
+              <Button size="sm" variant="outline" onClick={selectAll} className="hover:bg-primary/10 hover:border-primary/50">
+                Select all
+              </Button>
+              <Button size="sm" variant="outline" onClick={clearAll} className="hover:bg-destructive/10 hover:border-destructive/50">
+                Clear
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Tip: Organize sources into datasets on the Datasets page.
-              <a href="/datasets" className="ml-2 underline">Open Datasets</a>
-            </p>
-            <ScrollArea className="h-64 pr-2">
-              <div className="space-y-2">
+            <div className="text-xs text-muted-foreground mb-4 p-3 bg-muted/30 rounded-md border border-border/30">
+              💡 <strong>Tip:</strong> Organize sources into datasets for better management.
+              <a href="/datasets" className="ml-2 text-primary hover:text-accent underline transition-colors">
+                Open Datasets →
+              </a>
+            </div>
+            <ScrollArea className="h-72 pr-2">
+              <div className="space-y-3">
                 {filteredFiles.map((f) => (
-                  <label key={f.id} className="flex items-start gap-2 text-sm">
-                    <Checkbox
-                      checked={selectedFileIds.includes(f.id)}
-                      onCheckedChange={() => toggleSelect(f.id)}
-                    />
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{f.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {(f.extractedText || f.content).slice(0, 80)}
+                  <div key={f.id} className="group">
+                    <label className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/20 transition-colors cursor-pointer border border-transparent hover:border-border/50">
+                      <Checkbox
+                        checked={selectedFileIds.includes(f.id)}
+                        onCheckedChange={() => toggleSelect(f.id)}
+                        className="mt-1 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-foreground group-hover:text-primary transition-colors">
+                          {f.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate mt-1">
+                          {(f.extractedText || f.content).slice(0, 90)}...
+                        </div>
                       </div>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
                 ))}
               </div>
             </ScrollArea>
@@ -172,18 +183,20 @@ export default function Workspace() {
           <FileUpload onFilesUploaded={addFiles} projectId="default" />
         </div>
 
-        {/* Chat (center) */}
-        <div className="md:col-span-5 space-y-3">
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold">Chat</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Agent</span>
+        {/* Chat Panel */}
+        <div className="lg:col-span-5 space-y-4">
+          <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">AI Assistant</h3>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Agent:</span>
                 <Select
                   value={activeAgentId || undefined}
                   onValueChange={(v) => setActiveAgentId(v === "__clear__" ? "" : v)}
                 >
-                  <SelectTrigger className="h-8 w-[200px]"><SelectValue placeholder="No agent"/></SelectTrigger>
+                  <SelectTrigger className="h-9 w-[180px] bg-input/50 border-border/50 hover:border-primary/50 transition-colors">
+                    <SelectValue placeholder="No agent"/>
+                  </SelectTrigger>
                   <SelectContent>
             {agents.length === 0 ? (
               <SelectGroup>
@@ -201,55 +214,138 @@ export default function Workspace() {
                 </Select>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-2">
-              Use the floating assistant button to start chatting. Selected sources will be used for context.
-            </p>
-            <p className="text-xs text-muted-foreground">Sources selected: {selectedFileIds.length}{activeAgent ? ` • Agent: ${activeAgent.name}` : ''}</p>
+            <div className="bg-muted/20 rounded-lg p-4 border border-border/30">
+              <p className="text-sm text-muted-foreground mb-3">
+                💬 Click the floating assistant button to start chatting. Your selected sources will provide context for the conversation.
+              </p>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-muted-foreground">
+                  📁 <strong>{selectedFileIds.length}</strong> sources selected
+                </span>
+                {activeAgent && (
+                  <span className="text-primary">
+                    🤖 Agent: <strong>{activeAgent.name}</strong>
+                  </span>
+                )}
+              </div>
+            </div>
           </Card>
         </div>
 
-        {/* Studio (right) */}
-        <div className="md:col-span-4 space-y-3">
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3">Summary</h3>
-            <p className="text-sm text-muted-foreground mb-3">Generate a quick summary of selected sources in chat.</p>
-            <Button size="sm" variant="outline" onClick={() => {
-              window.dispatchEvent(new CustomEvent('chatbot:open'));
-              window.dispatchEvent(new CustomEvent('chatbot:action', { detail: { action: 'Summarize the selected sources concisely. Use bullet points and cite files as [📄filename].' } }));
-            }}>Ask assistant to summarize</Button>
-          </Card>
-
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3">Mind Map</h3>
-            <MindMap root="Selected Sources" childrenLabels={selectedFileIds.map(id => allFiles.find(f => f.id === id)?.name || id)} />
-          </Card>
-
-          {/* TTS Panel */}
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3">TTS Preview</h3>
-            <textarea
-              value={ttsText}
-              onChange={(e) => setTtsText(e.target.value)}
-              placeholder="Type text to preview speech..."
-              className="w-full h-24 rounded-md bg-input border border-border p-2 text-sm"
-            />
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <Button onClick={() => handlePlay()} disabled={isPlaying}> <Play className="w-4 h-4 mr-2"/> Play</Button>
-              <Button onClick={handlePause} variant="outline" disabled={!isPlaying}><Pause className="w-4 h-4"/></Button>
-              <Button onClick={handleStop} variant="outline"><Square className="w-4 h-4"/></Button>
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs text-muted-foreground">Speed</span>
-                <div className="w-24"><Slider value={speed} onValueChange={setSpeed} max={2} min={0.5} step={0.1} /></div>
-                <span className="text-xs text-primary">{speed[0]}x</span>
-                <Select value={voice} onValueChange={setVoice}>
-                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Voice"/></SelectTrigger>
-                  <SelectContent>
-                    {availableVoices.map((v) => (
-                      <SelectItem key={v.name} value={v.name}>{v.name} ({v.lang})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        {/* Studio Panel */}
+        <div className="lg:col-span-4 space-y-4">
+          <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-2">📋 Summary</h4>
+                <p className="text-xs text-muted-foreground mb-3">Generate an AI summary of your selected sources.</p>
+                <Button 
+                  size="sm" 
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('chatbot:open'));
+                    window.dispatchEvent(new CustomEvent('chatbot:action', { detail: { action: 'Summarize the selected sources concisely. Use bullet points and cite files as [📄filename].' } }));
+                  }}
+                >
+                  Generate Summary
+                </Button>
               </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+            <h3 className="text-lg font-semibold text-foreground mb-4">🧠 Mind Map</h3>
+            <div className="bg-muted/10 rounded-lg p-4 border border-border/30">
+              <MindMap root="Selected Sources" childrenLabels={selectedFileIds.map(id => allFiles.find(f => f.id === id)?.name || id)} />
+            </div>
+          </Card>
+
+          {/* Enhanced TTS Panel */}
+          <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+            <h3 className="text-lg font-semibold text-foreground mb-4">🎵 Text-to-Speech</h3>
+            <div className="space-y-4">
+              <textarea
+                value={ttsText}
+                onChange={(e) => setTtsText(e.target.value)}
+                placeholder="Type or paste text to preview speech..."
+                className="w-full h-28 rounded-lg bg-input/50 border border-border/50 p-3 text-sm resize-none focus:border-primary/50 transition-colors"
+              />
+              
+              {/* Playback Controls */}
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={() => handlePlay()} 
+                  disabled={isPlaying || !ttsText.trim()}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  size="sm"
+                >
+                  <Play className="w-4 h-4 mr-2"/> Play
+                </Button>
+                <Button 
+                  onClick={handlePause} 
+                  variant="outline" 
+                  disabled={!isPlaying}
+                  size="sm"
+                  className="hover:bg-muted/50"
+                >
+                  <Pause className="w-4 h-4"/>
+                </Button>
+                <Button 
+                  onClick={handleStop} 
+                  variant="outline"
+                  size="sm"
+                  className="hover:bg-destructive/10 hover:border-destructive/50"
+                >
+                  <Square className="w-4 h-4"/>
+                </Button>
+                {isPlaying && <div className="ml-2 w-2 h-2 bg-primary rounded-full pulse-purple"></div>}
+              </div>
+
+              {/* Voice Settings */}
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground min-w-[45px]">Speed:</span>
+                  <div className="flex-1">
+                    <Slider 
+                      value={speed} 
+                      onValueChange={setSpeed} 
+                      max={2} 
+                      min={0.5} 
+                      step={0.1}
+                      className="w-full" 
+                    />
+                  </div>
+                  <span className="text-xs text-primary font-medium min-w-[35px]">{speed[0]}x</span>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground min-w-[45px]">Voice:</span>
+                  <Select value={voice} onValueChange={setVoice}>
+                    <SelectTrigger className="flex-1 bg-input/50 border-border/50 hover:border-primary/50 transition-colors">
+                      <SelectValue placeholder="Select voice..."/>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableVoices.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading voices...</SelectItem>
+                      ) : (
+                        availableVoices.map((v) => (
+                          <SelectItem key={v.name} value={v.name}>
+                            {v.name} ({v.lang})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Status indicator */}
+              {availableVoices.length === 0 && (
+                <div className="text-xs text-muted-foreground bg-muted/20 p-2 rounded-md">
+                  ⚠️ Loading speech synthesis voices...
+                </div>
+              )}
             </div>
           </Card>
         </div>

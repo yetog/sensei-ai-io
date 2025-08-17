@@ -3,7 +3,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ScriptVoice Design System - Black + Gold Theme */
+/* ScriptVoice Design System - Black + Purple + White Theme */
 
 @layer base {
   :root {
@@ -16,8 +16,8 @@
     --popover: 15 15% 8%;
     --popover-foreground: 0 0% 100%;
 
-    --primary: 51 100% 50%;
-    --primary-foreground: 13 13% 5%;
+    --primary: 270 91% 65%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 100%;
@@ -25,17 +25,22 @@
     --muted: 0 0% 20%;
     --muted-foreground: 0 0% 70%;
 
-    --accent: 51 100% 50%;
-    --accent-foreground: 13 13% 5%;
+    --accent: 280 100% 70%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 0 0% 25%;
     --input: 0 0% 15%;
-    --ring: 51 100% 50%;
+    --ring: 270 91% 65%;
 
     --radius: 0.5rem;
+
+    /* Purple gradient colors */
+    --primary-gradient: linear-gradient(135deg, hsl(270 91% 65%), hsl(280 100% 70%));
+    --card-gradient: linear-gradient(145deg, hsl(15 15% 8%), hsl(270 20% 10%));
+    --shadow-purple: 0 10px 30px -10px hsl(270 91% 65% / 0.3);
   }
 }
 
@@ -51,11 +56,18 @@
 }
 
 /* Custom animations for Sensei AI */
-@keyframes pulse-gold {
+@keyframes pulse-purple {
   0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7); }
   50% { box-shadow: 0 0 0 10px hsl(var(--primary) / 0); }
 }
-.pulse-gold { animation: pulse-gold 2s infinite; }
+.pulse-purple { animation: pulse-purple 2s infinite; }
+
+/* Glow effects */
+@keyframes glow-purple {
+  0%, 100% { box-shadow: 0 0 5px hsl(var(--primary) / 0.5); }
+  50% { box-shadow: 0 0 20px hsl(var(--primary) / 0.8), 0 0 30px hsl(var(--accent) / 0.6); }
+}
+.glow-purple { animation: glow-purple 3s ease-in-out infinite; }
 
 /* Samurai sword animation */
 @keyframes katana-swing {
