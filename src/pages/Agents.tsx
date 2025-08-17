@@ -64,6 +64,9 @@ export default function Agents() {
     setModel(template.suggestedSettings.model);
     setTopK([template.suggestedSettings.topK]);
     setChunkSize([template.suggestedSettings.chunkSize]);
+    // Switch to custom tab after using template
+    const customTab = document.querySelector('[value="custom"]') as HTMLElement;
+    if (customTab) customTab.click();
   };
 
   const duplicateAgent = (agent: any) => {
@@ -118,14 +121,9 @@ export default function Agents() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="Writing">Writing</SelectItem>
-                      <SelectItem value="Analysis">Analysis</SelectItem>
-                      <SelectItem value="Coding">Coding</SelectItem>
-                      <SelectItem value="Creative">Creative</SelectItem>
-                      <SelectItem value="Research">Research</SelectItem>
-                      <SelectItem value="Business">Business</SelectItem>
-                      <SelectItem value="Teaching">Teaching</SelectItem>
-                      <SelectItem value="Support">Support</SelectItem>
+                      <SelectItem value="marketing">Marketing</SelectItem>
+                      <SelectItem value="sales">Sales</SelectItem>
+                      <SelectItem value="analysis">Analysis</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
