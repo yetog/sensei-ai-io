@@ -252,12 +252,18 @@ export default function Workspace() {
                     <div className="flex items-center gap-3 mb-3">
                       <Database className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium">Dataset:</span>
-                      <Select value={activeDatasetId} onValueChange={loadDataset}>
+                      <Select value={activeDatasetId || "__none__"} onValueChange={(v) => {
+                        if (v === "__none__") {
+                          setActiveDatasetId("");
+                        } else {
+                          loadDataset(v);
+                        }
+                      }}>
                         <SelectTrigger className="w-[200px] bg-input/50 border-border/50">
                           <SelectValue placeholder="Select dataset..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No dataset</SelectItem>
+                          <SelectItem value="__none__">No dataset</SelectItem>
                           {datasets.map(ds => (
                             <SelectItem key={ds.id} value={ds.id}>
                               {ds.name} ({ds.fileIds.length} files)
