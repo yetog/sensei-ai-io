@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2 } from "lucide-react";
+import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot } from "lucide-react";
 import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
 import { useChat } from "@/hooks/useChat";
@@ -21,7 +21,7 @@ import { toast } from "sonner";
 
 
 export default function Workspace() {
-  const { files, addFiles, getRelevantFileContextDetailed, getContextForFiles } = useFileContext();
+  const { files, addFiles, removeFile, getRelevantFileContextDetailed, getContextForFiles } = useFileContext();
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeAgentId, setActiveAgentId] = useState<string>("");
@@ -304,23 +304,37 @@ export default function Workspace() {
                   <ScrollArea className="h-96 pr-2">
                     <div className="space-y-3">
                       {filteredFiles.map((f) => (
-                        <div key={f.id} className="group">
-                          <label className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/20 transition-colors cursor-pointer border border-transparent hover:border-border/50">
-                            <Checkbox
-                              checked={selectedFileIds.includes(f.id)}
-                              onCheckedChange={() => toggleSelect(f.id)}
-                              className="mt-1 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-medium text-foreground group-hover:text-primary transition-colors">
-                                {f.name}
-                              </div>
-                              <div className="text-xs text-muted-foreground truncate mt-1">
-                                {(f.extractedText || f.content).slice(0, 90)}...
-                              </div>
-                            </div>
-                          </label>
-                        </div>
+                         <div key={f.id} className="group">
+                           <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/20 transition-colors border border-transparent hover:border-border/50">
+                             <Checkbox
+                               checked={selectedFileIds.includes(f.id)}
+                               onCheckedChange={() => toggleSelect(f.id)}
+                               className="mt-1 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                             />
+                             <div className="min-w-0 flex-1">
+                               <div className="truncate font-medium text-foreground group-hover:text-primary transition-colors">
+                                 {f.name}
+                               </div>
+                               <div className="text-xs text-muted-foreground truncate mt-1">
+                                 {(f.extractedText || f.content).slice(0, 90)}...
+                               </div>
+                             </div>
+                             <Button
+                               size="sm"
+                               variant="ghost"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 if (confirm(`Are you sure you want to delete "${f.name}"?`)) {
+                                   removeFile(f.id);
+                                   setSelectedFileIds(prev => prev.filter(id => id !== f.id));
+                                 }
+                               }}
+                               className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                             >
+                               <Trash2 className="w-3 h-3" />
+                             </Button>
+                           </div>
+                         </div>
                       ))}
                     </div>
                   </ScrollArea>
@@ -359,15 +373,15 @@ export default function Workspace() {
                     {selectedFileIds.length} sources
                   </Badge>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">Agent:</span>
-                  <Select
-                    value={activeAgentId || undefined}
-                    onValueChange={(v) => setActiveAgentId(v === "__clear__" ? "" : v)}
-                  >
-                    <SelectTrigger className="h-9 w-[180px] bg-input/50 border-border/50">
-                      <SelectValue placeholder="No agent"/>
-                    </SelectTrigger>
+                 <div className="flex items-center gap-3">
+                   <span className="text-sm text-muted-foreground">Agent:</span>
+                   <Select
+                     value={activeAgentId || undefined}
+                     onValueChange={(v) => setActiveAgentId(v === "__clear__" ? "" : v)}
+                   >
+                     <SelectTrigger className="h-9 w-[180px] bg-input/50 border-border/50">
+                       <SelectValue placeholder="No agent"/>
+                     </SelectTrigger>
                     <SelectContent>
                       {agents.length === 0 ? (
                         <SelectGroup>
@@ -386,10 +400,41 @@ export default function Workspace() {
                   <Button size="sm" variant="outline" onClick={clearChat}>
                     Clear Chat
                   </Button>
-                </div>
-              </div>
+                 </div>
+               </div>
 
-              {/* Chat Messages */}
+               {/* Active Agent Info */}
+               {activeAgentId && activeAgent && (
+                 <div className="p-3 bg-muted/30 border-b border-border/30">
+                   <div className="flex items-center gap-2 mb-2">
+                     <Bot className="w-4 h-4 text-primary" />
+                     <span className="font-medium text-sm">{activeAgent.name}</span>
+                     <Badge variant="outline" className="text-xs">
+                       {activeAgent.model || 'gpt-4'}
+                     </Badge>
+                     <Badge variant="outline" className="text-xs">
+                       T: {activeAgent.temperature || 1}
+                     </Badge>
+                   </div>
+                   {activeAgent.datasetIds && activeAgent.datasetIds.length > 0 && (
+                     <div className="text-xs text-muted-foreground">
+                       <span className="font-medium">Linked Datasets: </span>
+                       {activeAgent.datasetIds.map(id => {
+                         const dataset = datasets.find(d => d.id === id);
+                         return dataset ? `${dataset.name} (${dataset.fileIds.length})` : id;
+                       }).join(', ')}
+                     </div>
+                   )}
+                   <details className="text-xs text-muted-foreground mt-2">
+                     <summary className="cursor-pointer hover:text-foreground">System Prompt</summary>
+                     <div className="mt-1 p-2 bg-background/50 rounded text-xs whitespace-pre-wrap max-h-20 overflow-y-auto">
+                       {activeAgent.systemPrompt}
+                     </div>
+                   </details>
+                 </div>
+               )}
+
+               {/* Chat Messages */}
               <ScrollArea className="flex-1 p-4">
                 {messages.length === 0 && (
                   <div className="text-center text-muted-foreground py-8">
