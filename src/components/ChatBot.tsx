@@ -240,11 +240,14 @@ const handleQuickAction = (action: string) => {
             <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm mb-4">
               {activeAgentPrompt ? 
-                `Hi! I'm ${activeAgentName}. ${hasScript || files.length > 0 ? 'How can I help with your content?' : 'Upload files or add script content to get started!'}` :
-                hasScript || files.length > 0 
-                  ? 'Ask me about your script or uploaded files!' 
-                  : 'Add text to your script or upload files to get AI assistance!'
+                `Hi! I'm ${activeAgentName}. How can I assist you today?` :
+                'Hi! I\'m your AI assistant. How can I help you today?'
               }
+              {hasScript || files.length > 0 && (
+                <span className="block text-xs text-muted-foreground mt-1">
+                  I can see you have {hasScript ? 'script content' : ''}{hasScript && files.length > 0 ? ' and ' : ''}{files.length > 0 ? `${files.length} file${files.length > 1 ? 's' : ''}` : ''} ready for analysis.
+                </span>
+              )}
             </p>
             <div className="space-y-2">
               {quickPrompts.map((prompt, index) => (
@@ -260,7 +263,7 @@ const handleQuickAction = (action: string) => {
                       handleQuickAction(prompt);
                     }
                   }}
-                  disabled={!ionosAI.getApiToken() || (!hasScript && files.length === 0)}
+                  disabled={!ionosAI.getApiToken()}
                 >
                   {prompt}
                 </Button>
@@ -304,8 +307,8 @@ const handleQuickAction = (action: string) => {
               !ionosAI.getApiToken() 
                 ? "Set API token in settings" 
                 : hasScript || files.length > 0
-                  ? "Ask about your script or files..." 
-                  : "Add script text or upload files first..."
+                  ? "Ask a question or request assistance..." 
+                  : "How can I help you today?"
             }
             disabled={!ionosAI.getApiToken() || isLoading}
             className={`flex-1 ${isFullscreen ? 'h-12 text-base' : ''}`}

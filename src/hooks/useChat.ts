@@ -35,16 +35,16 @@ export const useChat = () => {
         content: msg.content
       }));
       
-      // Build enhanced message with contexts
+      // Build enhanced message with contexts (all optional now)
       let messageContent = content;
       let contextParts: string[] = [];
       
-      // Include script context if provided
+      // Include script context if provided (optional)
       if (scriptContext && scriptContext.trim()) {
-        contextParts.push(`Current script (${scriptContext.trim().split(/\s+/).length} words):\n"${scriptContext}"`);
+        contextParts.push(`Current script context (${scriptContext.trim().split(/\s+/).length} words):\n"${scriptContext}"`);
       }
       
-      // Include file context if provided
+      // Include file context if provided (optional)
       if (fileContext && fileContext.trim()) {
         contextParts.push(`Relevant file content:\n${fileContext}`);
       }
@@ -79,24 +79,16 @@ IMPORTANT: When referencing information from uploaded files, cite them using the
     }
   }, [chatState.messages]);
 
-  const sendQuickAction = useCallback(async (action: string, scriptContext: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string) => {
-    if (!scriptContext.trim()) {
-      toast.error('Please add some text to your script first');
-      return;
-    }
+  const sendQuickAction = useCallback(async (action: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string) => {
+    // Quick actions now work without script context
     await sendMessage(action, scriptContext, fileContext, usedFiles, suggestions, agentName);
   }, [sendMessage]);
 
-  const generateImage = useCallback(async (scriptContext: string) => {
-    if (!scriptContext.trim()) {
-      toast.error('Please add some text to your script first');
-      return;
-    }
-
+  const generateImage = useCallback(async (scriptContext?: string) => {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: 'Generate an image for this script',
+      content: scriptContext ? 'Generate an image for this script' : 'Generate an image',
       timestamp: new Date()
     };
 

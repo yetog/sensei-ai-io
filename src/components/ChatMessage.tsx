@@ -1,5 +1,6 @@
 
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
 import { ChatMessage as ChatMessageType } from '@/types/chat';
 import { Button } from '@/components/ui/button';
 import { Download, FileText, Bot, User } from 'lucide-react';
@@ -57,8 +58,27 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak }) =>
               ? 'bg-primary text-primary-foreground ml-2' 
               : 'bg-secondary text-secondary-foreground mr-2'
           }`}>
-            <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-              {cleanContent}
+            <div className="text-sm leading-relaxed">
+              {isUser ? (
+                <div className="whitespace-pre-wrap break-words">{cleanContent}</div>
+              ) : (
+                <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground">
+                  <ReactMarkdown 
+                    components={{
+                      p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="mb-3 space-y-1 list-disc ml-4">{children}</ul>,
+                      ol: ({ children }) => <ol className="mb-3 space-y-1 list-decimal ml-4">{children}</ol>,
+                      li: ({ children }) => <li className="text-foreground">{children}</li>,
+                      strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                      h1: ({ children }) => <h1 className="text-lg font-bold mb-2 text-foreground">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-base font-bold mb-2 text-foreground">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 text-foreground">{children}</h3>,
+                    }}
+                  >
+                    {cleanContent}
+                  </ReactMarkdown>
+                </div>
+              )}
             </div>
             {!isUser && onSpeak && (
               <div className="mt-2">
