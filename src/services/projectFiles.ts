@@ -1,10 +1,5 @@
 import { UploadedFile } from '@/types/file';
-// Import project files as raw strings (Vite '?raw')
-// We know READthis.md exists in the project root
-// If it is ever removed, build will still succeed but file list will be empty.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - Vite provides type for '?raw' at runtime
-import READTHIS_MD from '../../READthis.md?raw';
+// Project files service - currently no project files are included in sources
 
 function toUploadedFile(name: string, content: string): UploadedFile {
   return {
@@ -20,13 +15,8 @@ function toUploadedFile(name: string, content: string): UploadedFile {
 }
 
 export const getProjectFiles = (): UploadedFile[] => {
-  const files: UploadedFile[] = [];
-  try {
-    if (READTHIS_MD) files.push(toUploadedFile('READthis.md', READTHIS_MD as string));
-  } catch (e) {
-    // ignore if file is not present
-  }
-  return files;
+  // No project files are included in sources
+  return [];
 };
 
 export const searchProjectFiles = (query: string): UploadedFile[] => {

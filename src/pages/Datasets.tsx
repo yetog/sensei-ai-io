@@ -4,14 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Database, FileText, Trash2 } from "lucide-react";
+import { Plus, Database, FileText, Trash2, Upload } from "lucide-react";
 import { datasetService } from "@/services/datasetService";
+import { FileUpload } from "@/components/FileUpload";
+import { useFileContext } from "@/contexts/FileContext";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Datasets() {
+  const { addFiles } = useFileContext();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [refresh, setRefresh] = useState(0);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>("");
 
   const datasets = useMemo(() => datasetService.list(), [refresh]);
 
@@ -28,10 +43,21 @@ export default function Datasets() {
   };
 
   const remove = (id: string) => {
-    if (confirm("Are you sure you want to delete this dataset?")) {
-      datasetService.remove(id);
-      setRefresh((x) => x + 1);
-      toast.success("Dataset deleted");
+    datasetService.remove(id);
+    setRefresh((x) => x + 1);
+    toast.success("Dataset deleted successfully");
+  };
+
+  const handleFilesUploaded = (files: any[]) => {
+    addFiles(files);
+    
+    if (selectedDatasetId) {
+      const fileIds = files.map(f => f.id);
+      datasetService.attachFiles(selectedDatasetId, fileIds);
+      setRefresh(x => x + 1);
+      toast.success(`Files added to dataset successfully`);
+    } else {
+      toast.success("Files uploaded. Select a dataset to add them to it.");
     }
   };
 
@@ -101,8 +127,38 @@ export default function Datasets() {
               </Card>
             </div>
 
-            {/* Datasets List */}
+            {/* File Upload Section */}
             <div className="lg:col-span-2">
+              <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Upload className="w-5 h-5 text-primary" />
+                  <h3 className="text-lg font-semibold">Upload Files to Dataset</h3>
+                </div>
+                
+                {selectedDatasetId ? (
+                  <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                    <p className="text-sm text-primary">
+                      Files will be added to: <strong>{datasets.find(d => d.id === selectedDatasetId)?.name}</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border/30">
+                    <p className="text-sm text-muted-foreground">
+                      Select a dataset below to upload files directly to it
+                    </p>
+                  </div>
+                )}
+                
+                <FileUpload 
+                  onFilesUploaded={handleFilesUploaded}
+                  projectId="datasets"
+                  maxFiles={20}
+                />
+              </Card>
+            </div>
+
+            {/* Datasets List */}
+            <div className="lg:col-span-3">
               <div className="space-y-4">
                 {datasets.length === 0 ? (
                   <Card className="p-8 text-center bg-gradient-to-br from-muted/10 to-muted/5 border-border/30">
@@ -118,47 +174,79 @@ export default function Datasets() {
                       Create your first dataset
                     </Button>
                   </Card>
-                ) : (
-                  <div className="grid gap-4">
-                    {datasets.map((ds) => (
-                      <Card key={ds.id} className="p-4 bg-gradient-to-br from-card to-card/80 border-border/50 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                                <FileText className="w-4 h-4 text-primary" />
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-foreground">{ds.name}</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    {ds.fileIds.length} files
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground">
-                                    ID: {ds.id.slice(0, 8)}...
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            {ds.description && (
-                              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                                {ds.description}
-                              </p>
-                            )}
-                          </div>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => remove(ds.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-4"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                 ) : (
+                   <div className="grid gap-4">
+                     {datasets.map((ds) => (
+                       <Card 
+                         key={ds.id} 
+                         className={`p-4 bg-gradient-to-br from-card to-card/80 border-border/50 hover:shadow-md transition-all cursor-pointer
+                           ${selectedDatasetId === ds.id ? 'ring-2 ring-primary border-primary/50' : ''}
+                         `}
+                         onClick={() => setSelectedDatasetId(selectedDatasetId === ds.id ? "" : ds.id)}
+                       >
+                         <div className="flex items-start justify-between">
+                           <div className="flex-1">
+                             <div className="flex items-center gap-3 mb-2">
+                               <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                                 <FileText className="w-4 h-4 text-primary" />
+                               </div>
+                               <div>
+                                 <h4 className="font-semibold text-foreground">{ds.name}</h4>
+                                 <div className="flex items-center gap-2 mt-1">
+                                   <Badge variant="outline" className="text-xs">
+                                     {ds.fileIds.length} files
+                                   </Badge>
+                                   {selectedDatasetId === ds.id && (
+                                     <Badge className="bg-primary text-primary-foreground text-xs">
+                                       Selected for upload
+                                     </Badge>
+                                   )}
+                                   <span className="text-xs text-muted-foreground">
+                                     ID: {ds.id.slice(0, 8)}...
+                                   </span>
+                                 </div>
+                               </div>
+                             </div>
+                             {ds.description && (
+                               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                                 {ds.description}
+                               </p>
+                             )}
+                           </div>
+                           <AlertDialog>
+                             <AlertDialogTrigger asChild>
+                               <Button 
+                                 size="sm" 
+                                 variant="ghost"
+                                 onClick={(e) => e.stopPropagation()}
+                                 className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-4"
+                               >
+                                 <Trash2 className="w-4 h-4" />
+                               </Button>
+                             </AlertDialogTrigger>
+                             <AlertDialogContent>
+                               <AlertDialogHeader>
+                                 <AlertDialogTitle>Delete Dataset</AlertDialogTitle>
+                                 <AlertDialogDescription>
+                                   Are you sure you want to delete "{ds.name}"? This action cannot be undone.
+                                 </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                 <AlertDialogAction
+                                   onClick={() => remove(ds.id)}
+                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                 >
+                                   Delete
+                                 </AlertDialogAction>
+                               </AlertDialogFooter>
+                             </AlertDialogContent>
+                           </AlertDialog>
+                         </div>
+                       </Card>
+                     ))}
+                   </div>
+                 )}
               </div>
             </div>
           </div>

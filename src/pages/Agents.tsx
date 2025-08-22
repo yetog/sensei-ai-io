@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { Sparkles, Settings, BookOpen, Copy, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Agents() {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [temperature, setTemperature] = useState([1]);
@@ -106,6 +108,32 @@ export default function Agents() {
     if (customTab) customTab.click();
   };
 
+  const useThisAgent = (template: PromptTemplate) => {
+    try {
+      const agent = agentService.create({
+        name: template.name,
+        systemPrompt: template.systemPrompt,
+        temperature: template.suggestedSettings.temperature,
+        model: template.suggestedSettings.model,
+        topK: template.suggestedSettings.topK,
+        chunkSize: template.suggestedSettings.chunkSize,
+      });
+      
+      // Store agent ID for workspace to pick up
+      localStorage.setItem('sensei:selectedAgentId', agent.id);
+      localStorage.setItem('sensei:workspaceTab', 'chat');
+      
+      toast.success(`Agent "${agent.name}" created! Redirecting to chat...`);
+      
+      // Navigate to workspace
+      setTimeout(() => {
+        navigate('/workspace');
+      }, 1000);
+    } catch (error) {
+      toast.error("Failed to create agent");
+    }
+  };
+
   const duplicateAgent = (agent: any) => {
     setName(`${agent.name} (Copy)`);
     setPrompt(agent.systemPrompt);
@@ -176,9 +204,14 @@ export default function Agents() {
                           <h4 className="font-medium">{template.name}</h4>
                           <p className="text-sm text-muted-foreground">{template.description}</p>
                         </div>
-                        <Button size="sm" onClick={() => useTemplate(template)}>
-                          Use Template
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => useTemplate(template)}>
+                            Use Template
+                          </Button>
+                          <Button size="sm" onClick={() => useThisAgent(template)}>
+                            Use This Agent
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge variant="secondary">{template.category}</Badge>

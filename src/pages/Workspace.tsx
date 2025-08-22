@@ -25,6 +25,22 @@ export default function Workspace() {
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeAgentId, setActiveAgentId] = useState<string>("");
+  
+  // Check for agent selection from other pages
+  useEffect(() => {
+    const savedAgentId = localStorage.getItem('sensei:selectedAgentId');
+    const savedTab = localStorage.getItem('sensei:workspaceTab');
+    
+    if (savedAgentId) {
+      setActiveAgentId(savedAgentId);
+      localStorage.removeItem('sensei:selectedAgentId');
+    }
+    
+    if (savedTab) {
+      setActiveTab(savedTab);
+      localStorage.removeItem('sensei:workspaceTab');
+    }
+  }, []);
   const [activeDatasetId, setActiveDatasetId] = useState<string>("");
   const [activeTab, setActiveTab] = useState("sources");
   const [refresh, setRefresh] = useState(0);
