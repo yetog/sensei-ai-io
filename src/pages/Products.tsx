@@ -90,12 +90,14 @@ const Products = () => {
   };
 
   const handleDelete = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
+    if (confirm("Are you sure you want to delete this product?")) {
+      setProducts(products.filter(p => p.id !== id));
+    }
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <Card>
+      <Card className="bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -196,59 +198,77 @@ const Products = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell className="max-w-xs">
-                      <div className="truncate" title={product.description}>
-                        {product.description}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{product.marketSegment}</Badge>
-                    </TableCell>
-                    <TableCell className="max-w-sm">
-                      <div className="truncate" title={product.pitch}>
-                        {product.pitch}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                      >
-                        <a 
-                          href={product.productLink} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Visit
-                        </a>
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(product)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(product.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                {products.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 bg-muted/20 rounded-full flex items-center justify-center">
+                          <Plus className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-foreground">No products yet</h3>
+                          <p className="text-sm text-muted-foreground">Add your first product to get started</p>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  products.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={product.description}>
+                          {product.description}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{product.marketSegment}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-sm">
+                        <div className="truncate" title={product.pitch}>
+                          {product.pitch}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                        >
+                          <a 
+                            href={product.productLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Visit
+                          </a>
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(product)}
+                            className="hover:bg-primary/10"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(product.id)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

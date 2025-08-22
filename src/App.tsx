@@ -42,6 +42,7 @@ const App = () => (
                 <main>
                   <Routes>
                     <Route path="/" element={<Workspace />} />
+                    <Route path="/workspace" element={<Workspace />} />
                     <Route path="/datasets" element={<Datasets />} />
                     <Route path="/agents" element={<Agents />} />
                     <Route path="/products" element={<Products />} />

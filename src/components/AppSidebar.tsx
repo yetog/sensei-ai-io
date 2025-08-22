@@ -23,7 +23,7 @@ export function AppSidebar() {
     { title: "Workspace", url: "/", icon: Brain },
     { title: "Datasets", url: "/datasets", icon: FolderOpen },
     { title: "Agents", url: "/agents", icon: Users },
-    { title: "Product Knowledge", url: "/products", icon: Package },
+    { title: "Products", url: "/products", icon: Package },
     { title: "Settings", url: "/settings", icon: SettingsIcon },
   ];
 

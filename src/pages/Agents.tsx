@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
 import { promptLibrary, getPromptsByCategory, PromptTemplate } from "@/data/promptLibrary";
-import { Sparkles, Settings, BookOpen, Copy } from "lucide-react";
+import { Sparkles, Settings, BookOpen, Copy, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Agents() {
   const [name, setName] = useState("");
@@ -23,6 +24,7 @@ export default function Agents() {
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [refresh, setRefresh] = useState(0);
+  const [editingAgent, setEditingAgent] = useState<any>(null);
 
   const agents = useMemo(() => agentService.list(), [refresh]);
   const datasets = useMemo(() => datasetService.list(), [refresh]);
@@ -33,16 +35,36 @@ export default function Agents() {
   }, [selectedCategory]);
 
   const create = () => {
-    if (!name.trim() || !prompt.trim()) return;
-    agentService.create({ 
-      name: name.trim(), 
-      systemPrompt: prompt.trim(),
-      temperature: temperature[0],
-      model,
-      datasetIds: selectedDatasets,
-      topK: topK[0],
-      chunkSize: chunkSize[0]
-    });
+    if (!name.trim() || !prompt.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    
+    if (editingAgent) {
+      // Update existing agent
+      agentService.update(editingAgent.id, {
+        name: name.trim(), 
+        systemPrompt: prompt.trim(),
+        temperature: temperature[0],
+        model,
+        datasetIds: selectedDatasets,
+        topK: topK[0],
+        chunkSize: chunkSize[0]
+      });
+      toast.success("Agent updated successfully");
+    } else {
+      // Create new agent
+      agentService.create({ 
+        name: name.trim(), 
+        systemPrompt: prompt.trim(),
+        temperature: temperature[0],
+        model,
+        datasetIds: selectedDatasets,
+        topK: topK[0],
+        chunkSize: chunkSize[0]
+      });
+      toast.success("Agent created successfully");
+    }
     resetForm();
     setRefresh((x) => x + 1);
   };
@@ -55,6 +77,21 @@ export default function Agents() {
     setTopK([4]);
     setChunkSize([800]);
     setSelectedDatasets([]);
+    setEditingAgent(null);
+  };
+
+  const editAgent = (agent: any) => {
+    setName(agent.name);
+    setPrompt(agent.systemPrompt);
+    setTemperature([agent.temperature || 1]);
+    setModel(agent.model || "gpt-4");
+    setTopK([agent.topK || 4]);
+    setChunkSize([agent.chunkSize || 800]);
+    setSelectedDatasets(agent.datasetIds || []);
+    setEditingAgent(agent);
+    // Switch to custom tab
+    const customTab = document.querySelector('[value="custom"]') as HTMLElement;
+    if (customTab) customTab.click();
   };
 
   const useTemplate = (template: PromptTemplate) => {
@@ -80,8 +117,11 @@ export default function Agents() {
   };
 
   const remove = (id: string) => {
-    agentService.remove(id);
-    setRefresh((x) => x + 1);
+    if (confirm("Are you sure you want to delete this agent?")) {
+      agentService.remove(id);
+      setRefresh((x) => x + 1);
+      toast.success("Agent deleted");
+    }
   };
 
   return (
@@ -157,7 +197,9 @@ export default function Agents() {
             {/* Custom Agent Creation */}
             <TabsContent value="custom" className="space-y-4">
               <Card className="p-6">
-                <h3 className="font-semibold mb-4">Create Custom Agent</h3>
+                <h3 className="font-semibold mb-4">
+                  {editingAgent ? 'Edit Agent' : 'Create Custom Agent'}
+                </h3>
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="agent-name">Agent Name</Label>
@@ -261,10 +303,10 @@ export default function Agents() {
 
                   <div className="flex gap-2">
                     <Button onClick={create} disabled={!name.trim() || !prompt.trim()}>
-                      Create Agent
+                      {editingAgent ? 'Update Agent' : 'Create Agent'}
                     </Button>
                     <Button variant="outline" onClick={resetForm}>
-                      Reset
+                      {editingAgent ? 'Cancel' : 'Reset'}
                     </Button>
                   </div>
                 </div>
@@ -291,16 +333,26 @@ export default function Agents() {
                         <Button 
                           size="sm" 
                           variant="ghost"
+                          onClick={() => editAgent(agent)}
+                          className="hover:bg-primary/10"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
                           onClick={() => duplicateAgent(agent)}
+                          className="hover:bg-muted/50"
                         >
                           <Copy className="w-3 h-3" />
                         </Button>
                         <Button 
                           size="sm" 
-                          variant="destructive"
+                          variant="ghost"
                           onClick={() => remove(agent.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
-                          Delete
+                          <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
