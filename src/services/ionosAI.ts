@@ -7,9 +7,10 @@ const TEXT_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct";
 
 export class IONOSAIService {
   private apiToken: string | null = null;
+  private defaultToken = "eyJ0eXAiOiJKV1QiLCJraWQiOiI1MThkZmJmYS0zN2QwLTRiNWMtOTEyZC0wNDlkN2JiYWFmODUiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJpb25vc2Nsb3VkIiwiaWF0IjoxNzU2MjU5MTAwLCJjbGllbnQiOiJVU0VSIiwiaWRlbnRpdHkiOnsiaXNQYXJlbnQiOmZhbHNlLCJjb250cmFjdE51bWJlciI6MzM5NzEwMzMsInJvbGUiOiJvd25lciIsInJlZ0RvbWFpbiI6Imlvbm9zLmNvbSIsInJlc2VsbGVySWQiOjEsInV1aWQiOiI3YmNiNzg4MS1hZDMxLTQxMDgtOGI3Zi0wOGIyNjdiYTI0ZWUiLCJwcml2aWxlZ2VzIjpbIkRBVEFfQ0VOVEVSX0NSRUFURSIsIlNOQVBTSE9UX0NSRUFURSIsIklQX0JMT0NLX1JFU0VSVkUiLCJNQU5BR0VfREFUQVBMQVRGT1JNIiwiQUNDRVNTX0FDVElWSVRZX0xPRyIsIlBDQ19DUkVBVEUiLCJBQ0NFU1NfUzNfT0JKRUNUX1NUT1JBR0UiLCJCQUNLVVBfVU5JVF9DUkVBVEUiLCJDUkVBVEVfSU5URVJORVRfQUNDRVNTIiwiSzhTX0NMVVNURVJfQ1JFQVRFIiwiRkxPV19MT0dfQ1JFQVRFIiwiQUNDRVNTX0FORF9NQU5BR0VfTU9OSVRPUklORyIsIkFDQ0VTU19BTkRfTUFOQUdFX0NFUlRJRklDQVRFUyIsIkFDQ0VTU19BTkRfTUFOQUdFX0xPR0dJTkciLCJNQU5BR0VfREJBQVMiLCJBQ0NFU1NfQU5EX01BTkFHRV9ETlMiLCJNQU5BR0VfUkVHSVNUUlkiLCJBQ0NFU1NfQU5EX01BTkFHRV9DRE4iLCJBQ0NFU1NfQU5EX01BTkFHRV9WUE4iLCJBQ0NFU1NfQU5EX01BTkFHRV9BUElfR0FURVdBWSIsIkFDQ0VTU19BTkRfTUFOQUdFX05HUyIsIkFDQ0VTU19BTkRfTUFOQUdFX0tBQVMiLCJBQ0NFU1NfQU5EX01BTkFHRV9ORVRXT1JLX0ZJTEVfU1RPUkFHRSIsIkFDQ0VTU19BTkRfTUFOQUdFX0FJX01PREVMX0hVQiIsIkNSRUFURV9ORVRXT1JLX1NFQ1VSSVRZX0dST1VQUyIsIkFDQ0VTU19BTkRfTUFOQUdFX0lBTV9SRVNPVVJDRVMiXX0sImV4cCI6MTc4Nzc5NTEwMH0.JUs7bZrmqZl23L1bFshjoQp9Ny6u4IieenOgUJps0wmrtidVQgpUwdv0jzqnvFw1p-Dx7yBYI4_2hxGTHbnd9kO__MCJPzZK7yYPz3e2z3GbB__KyAcW7XeEXaSNxA1uN4u1rm4XIyptAopqQL-6iEzmJpX2evm1C4663VrRqqmMIeA6JNbFZSf5kFUqGV1VlyO-lz4HSGCr8be6tmJ4UVJIfs678LbKbKteuhWuExJPR3IwprL16YPvT47TeNSkx0f4iRFFd2IjAn4ZeI9h60ZLDhgdH0E5q1FwfEZnVAdunIZJFlhpFTU0G7bPCVvYM5Hloum0cF8LCXmQk6DfLA";
 
   constructor() {
-    this.apiToken = localStorage.getItem('ionos-api-token');
+    this.apiToken = localStorage.getItem('ionos-api-token') || this.defaultToken;
   }
 
   setApiToken(token: string) {
@@ -18,17 +19,18 @@ export class IONOSAIService {
   }
 
   getApiToken(): string | null {
-    return this.apiToken;
+    return this.apiToken || this.defaultToken;
   }
 
   async getAvailableModels(): Promise<string[]> {
     const endpoint = 'https://openai.inference.de-txl.ionos.com/v1/models';
+    const token = this.apiToken || this.defaultToken;
     
     try {
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -60,7 +62,8 @@ export class IONOSAIService {
   }
 
   async sendMessage(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, agentName?: string): Promise<string> {
-    if (!this.apiToken) {
+    const token = this.apiToken || this.defaultToken;
+    if (!token) {
       throw new Error('API token not set');
     }
 
@@ -108,7 +111,7 @@ Provide clear, actionable advice tailored to the user's specific needs.`;
       const response = await fetch(TEXT_ENDPOINT, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request)
@@ -129,7 +132,8 @@ Provide clear, actionable advice tailored to the user's specific needs.`;
   async generateImage(prompt: string, size: string = '1024x1024'): Promise<string> {
     console.log('Starting image generation with prompt:', prompt);
     
-    if (!this.apiToken) {
+    const token = this.apiToken || this.defaultToken;
+    if (!token) {
       throw new Error('API token not set');
     }
 
@@ -168,7 +172,7 @@ Provide clear, actionable advice tailored to the user's specific needs.`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
