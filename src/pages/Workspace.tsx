@@ -211,8 +211,10 @@ export default function Workspace() {
         usedFiles = detail.files.map(f => f.name);
       }
 
+      // Allow chat without agent - use empty string if no agent
       const agentContext = activeAgent?.systemPrompt || '';
-      sendMessage(inputValue, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, activeAgent?.name);
+      const agentName = activeAgent?.name || undefined;
+      sendMessage(inputValue, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, agentName);
       setInputValue('');
     }
   };
@@ -231,8 +233,10 @@ export default function Workspace() {
       usedFiles = detail.files.map(f => f.name);
     }
 
+    // Allow quick actions without agent
     const agentContext = activeAgent?.systemPrompt || '';
-    sendQuickAction(action, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, activeAgent?.name);
+    const agentName = activeAgent?.name || undefined;
+    sendQuickAction(action, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, agentName);
   };
 
   // Allow TTS to be triggered from chat
