@@ -15,8 +15,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot } from "lucide-react";
 import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
+import { agentTrainingService } from "@/services/agentTrainingService";
 import { useChat } from "@/hooks/useChat";
 import { ChatMessage } from "@/components/ChatMessage";
+import { AgentIntroduction } from "@/components/AgentIntroduction";
+import { TypingIndicator } from "@/components/TypingIndicator";
 import { toast } from "sonner";
 
 
@@ -44,17 +47,18 @@ export default function Workspace() {
   const [activeDatasetId, setActiveDatasetId] = useState<string>("");
   const [activeTab, setActiveTab] = useState("sources");
   const [refresh, setRefresh] = useState(0);
+  const [showAgentIntro, setShowAgentIntro] = useState(false);
   const agents = useMemo(() => agentService.list(), []);
   const datasets = useMemo(() => datasetService.list(), [refresh]);
   const activeAgent = useMemo(() => agents.find(a => a.id === activeAgentId), [agents, activeAgentId]);
 
-  // Auto-introduce agent when selected
+  // Initialize agent when selected
   useEffect(() => {
-    if (activeAgent && messages.length === 0) {
-      setTimeout(() => {
-        const introAction = `Introduce yourself as ${activeAgent.name} and briefly explain how you can help based on your specialization.`;
-        handleQuickAction(introAction);
-      }, 500);
+    if (activeAgent) {
+      agentTrainingService.initializeAgent(activeAgent);
+      if (messages.length === 0) {
+        setShowAgentIntro(true);
+      }
     }
   }, [activeAgent?.id]);
   const activeDataset = useMemo(() => datasets.find(d => d.id === activeDatasetId), [datasets, activeDatasetId]);
@@ -214,7 +218,7 @@ export default function Workspace() {
       // Allow chat without agent - use empty string if no agent
       const agentContext = activeAgent?.systemPrompt || '';
       const agentName = activeAgent?.name || undefined;
-      sendMessage(inputValue, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, agentName);
+      sendMessage(inputValue, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, agentName, activeAgent);
       setInputValue('');
     }
   };
@@ -236,7 +240,7 @@ export default function Workspace() {
     // Allow quick actions without agent
     const agentContext = activeAgent?.systemPrompt || '';
     const agentName = activeAgent?.name || undefined;
-    sendQuickAction(action, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, agentName);
+    sendQuickAction(action, agentContext, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, agentName, activeAgent);
   };
 
   // Allow TTS to be triggered from chat
@@ -466,7 +470,18 @@ export default function Workspace() {
 
                {/* Chat Messages */}
               <ScrollArea className="flex-1 p-4">
-                {messages.length === 0 && (
+                {/* Agent Introduction */}
+                {showAgentIntro && activeAgent && messages.length === 0 && (
+                  <div className="mb-4">
+                    <AgentIntroduction 
+                      agent={activeAgent}
+                      onStarterClick={handleQuickAction}
+                      onClose={() => setShowAgentIntro(false)}
+                    />
+                  </div>
+                )}
+                
+                {messages.length === 0 && !showAgentIntro && (
                   <div className="text-center text-muted-foreground py-8">
                     <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p className="text-sm mb-4">
@@ -500,11 +515,7 @@ export default function Workspace() {
                 {isLoading && (
                   <div className="flex justify-start mb-4">
                     <div className="bg-secondary rounded-lg px-4 py-2">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
+                      <TypingIndicator agentName={activeAgent?.name} />
                     </div>
                   </div>
                 )}

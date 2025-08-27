@@ -7,6 +7,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChat } from '@/hooks/useChat';
 import { useFileContext } from '@/contexts/FileContext';
 import { ChatMessage } from '@/components/ChatMessage';
+import { AgentIntroduction } from '@/components/AgentIntroduction';
+import { TypingIndicator } from '@/components/TypingIndicator';
+import { agentTrainingService } from '@/services/agentTrainingService';
+import { AgentConfig } from '@/types/agent';
 import { ionosAI } from '@/services/ionosAI';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -18,17 +22,27 @@ interface ChatBotProps {
   activeAgentPrompt?: string;
   activeAgentName?: string;
   activeAgentDatasets?: string[];
+  activeAgent?: AgentConfig;
   onSpeak?: (text: string) => void;
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, selectedFileIds, activeAgentPrompt, activeAgentName = "AI Assistant", activeAgentDatasets = [], onSpeak }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, selectedFileIds, activeAgentPrompt, activeAgentName = "AI Assistant", activeAgentDatasets = [], activeAgent, onSpeak }) => {
   const { messages, isLoading, isOpen, sendMessage, sendQuickAction, generateImage, toggleChat, clearChat } = useChat();
   const { files, getRelevantFileContext, getRelevantFileContextDetailed, getContextForFiles } = useFileContext();
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showAgentIntro, setShowAgentIntro] = useState(false);
   const [apiToken, setApiToken] = useState(ionosAI.getApiToken() || '');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize agent when provided
+  useEffect(() => {
+    if (activeAgent && messages.length === 0) {
+      agentTrainingService.initializeAgent(activeAgent);
+      setShowAgentIntro(true);
+    }
+  }, [activeAgent?.id, messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,7 +65,7 @@ const handleSendMessage = (e: React.FormEvent) => {
     }
 
     const agentContext = activeAgentPrompt ? `${activeAgentPrompt}\n\n` : '';
-    sendMessage(inputValue, agentContext + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, activeAgentName);
+    sendMessage(inputValue, agentContext + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(inputValue).suggestions, activeAgentName, activeAgent);
     setInputValue('');
   }
 };
@@ -71,7 +85,7 @@ const handleQuickAction = (action: string) => {
   }
 
   const agentContext = activeAgentPrompt ? `${activeAgentPrompt}\n\n` : '';
-  sendQuickAction(action, agentContext + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, activeAgentName);
+  sendQuickAction(action, agentContext + script, context, usedFiles, selectedFileIds && selectedFileIds.length > 0 ? [] : getRelevantFileContextDetailed(action).suggestions, activeAgentName, activeAgent);
 };
 
   const handleGenerateImage = async () => {
@@ -235,7 +249,18 @@ const handleQuickAction = (action: string) => {
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
-        {messages.length === 0 && (
+        {/* Agent Introduction */}
+        {showAgentIntro && activeAgent && messages.length === 0 && (
+          <div className="mb-4">
+            <AgentIntroduction 
+              agent={activeAgent}
+              onStarterClick={handleQuickAction}
+              onClose={() => setShowAgentIntro(false)}
+            />
+          </div>
+        )}
+        
+        {messages.length === 0 && !showAgentIntro && (
           <div className="text-center text-muted-foreground py-8">
             <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm mb-4">
@@ -285,11 +310,7 @@ const handleQuickAction = (action: string) => {
         {isLoading && (
           <div className="flex justify-start mb-4">
             <div className="bg-secondary rounded-lg px-4 py-2">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              </div>
+              <TypingIndicator agentName={activeAgentName} />
             </div>
           </div>
         )}

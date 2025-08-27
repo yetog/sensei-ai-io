@@ -2,6 +2,8 @@
 import { useState, useCallback } from 'react';
 import { ChatMessage, ChatState } from '@/types/chat';
 import { ionosAI } from '@/services/ionosAI';
+import { agentTrainingService } from '@/services/agentTrainingService';
+import { AgentConfig } from '@/types/agent';
 import { toast } from 'sonner';
 
 export const useChat = () => {
@@ -11,7 +13,7 @@ export const useChat = () => {
     isOpen: false
   });
 
-  const sendMessage = useCallback(async (content: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string) => {
+  const sendMessage = useCallback(async (content: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string, agent?: AgentConfig) => {
     if (!content.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -35,6 +37,12 @@ export const useChat = () => {
         content: msg.content
       }));
       
+      // Use enhanced system prompt if agent is provided
+      let systemPrompt = '';
+      if (agent) {
+        systemPrompt = agentTrainingService.getEnhancedSystemPrompt(agent);
+      }
+      
       // Build enhanced message with contexts (all optional now)
       let messageContent = content;
       let contextParts: string[] = [];
@@ -55,9 +63,12 @@ export const useChat = () => {
 IMPORTANT: When referencing information from uploaded files, cite them using the format [📄filename.ext] in your response.`;
       }
       
-      apiMessages.push({ role: 'user', content: messageContent });
+      // Add system message first if we have enhanced prompt
+      const finalMessages = systemPrompt ? 
+        [{ role: 'system' as const, content: systemPrompt }, ...apiMessages, { role: 'user' as const, content: messageContent }] :
+        [...apiMessages, { role: 'user' as const, content: messageContent }];
 
-      const response = await ionosAI.sendMessage(apiMessages, agentName);
+      const response = await ionosAI.sendMessage(finalMessages, agentName);
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -79,9 +90,9 @@ IMPORTANT: When referencing information from uploaded files, cite them using the
     }
   }, [chatState.messages]);
 
-  const sendQuickAction = useCallback(async (action: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string) => {
+  const sendQuickAction = useCallback(async (action: string, scriptContext?: string, fileContext?: string, usedFiles?: string[], suggestions?: string[], agentName?: string, agent?: AgentConfig) => {
     // Quick actions now work without script context
-    await sendMessage(action, scriptContext, fileContext, usedFiles, suggestions, agentName);
+    await sendMessage(action, scriptContext, fileContext, usedFiles, suggestions, agentName, agent);
   }, [sendMessage]);
 
   const generateImage = useCallback(async (scriptContext?: string) => {
