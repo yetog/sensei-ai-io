@@ -9,6 +9,7 @@ import Datasets from "./pages/Datasets";
 import Agents from "./pages/Agents";
 import Products from "./pages/Products";
 import Settings from "./pages/Settings";
+import Tools from "./pages/Tools";
 import NotFound from "./pages/NotFound";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -46,6 +47,7 @@ const App = () => (
                     <Route path="/datasets" element={<Datasets />} />
                     <Route path="/agents" element={<Agents />} />
                     <Route path="/products" element={<Products />} />
+                    <Route path="/tools" element={<Tools />} />
                     <Route path="/settings" element={<Settings />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />

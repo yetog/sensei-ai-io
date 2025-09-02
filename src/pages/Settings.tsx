@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ionosAI } from "@/services/ionosAI";
 import { toast } from "sonner";
 import { HelpCircle, Users, MessageSquare, Settings as SettingsIcon, Bot, FileText, Zap } from "lucide-react";
+import { ModelSelector } from "@/components/ModelSelector";
 
 export default function Settings() {
   const [token, setToken] = useState(ionosAI.getApiToken() || "");
@@ -19,10 +20,14 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="api" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="api" className="flex items-center gap-2">
             <SettingsIcon className="w-4 h-4" />
             API Configuration
+          </TabsTrigger>
+          <TabsTrigger value="models" className="flex items-center gap-2">
+            <Bot className="w-4 h-4" />
+            Models & TTS
           </TabsTrigger>
           <TabsTrigger value="help" className="flex items-center gap-2">
             <HelpCircle className="w-4 h-4" />
@@ -56,6 +61,10 @@ export default function Settings() {
               Save Token
             </Button>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="models" className="space-y-4">
+          <ModelSelector />
         </TabsContent>
 
         <TabsContent value="help" className="space-y-6">

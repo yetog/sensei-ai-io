@@ -37,8 +37,8 @@ export class FileService {
           extractedText = await this.processCsvFile(file);
           break;
         case 'application/pdf':
-          // For now, we'll show a placeholder. PDF processing requires additional libraries
-          extractedText = 'PDF processing coming soon. Please convert to text for now.';
+          const { PDFProcessor } = await import('./pdfProcessor');
+          extractedText = await PDFProcessor.extractTextFromPDF(file);
           break;
         default:
           throw new Error(`Unsupported file type: ${file.type}`);
