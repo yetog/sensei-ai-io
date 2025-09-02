@@ -12,7 +12,11 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot } from "lucide-react";
+import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot, BarChart3, Headphones, Lightbulb } from "lucide-react";
+import { PerformanceDashboard } from "@/components/PerformanceDashboard";
+import { ObjectionHandler } from "@/components/ObjectionHandler";
+import { CallAssistant } from "@/components/CallAssistant";
+import { BetaOnboarding } from "@/components/BetaOnboarding";
 import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
 import { agentTrainingService } from "@/services/agentTrainingService";
@@ -28,6 +32,7 @@ export default function Workspace() {
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeAgentId, setActiveAgentId] = useState<string>("");
+  const [showOnboarding, setShowOnboarding] = useState(true);
   
   // Check for agent selection from other pages
   useEffect(() => {
@@ -249,11 +254,33 @@ export default function Workspace() {
     handlePlay(text);
   };
 
+  const handleNavigateToTools = () => {
+    setActiveTab("tools");
+    setShowOnboarding(false);
+  };
+
+  const handleNavigateToWorkspace = () => {
+    setActiveTab("sources");
+    setShowOnboarding(false);
+  };
+
+  if (showOnboarding) {
+    return (
+      <div className="h-full flex items-center justify-center p-6">
+        <BetaOnboarding
+          onNavigateToTools={handleNavigateToTools}
+          onNavigateToWorkspace={handleNavigateToWorkspace}
+          onClose={() => setShowOnboarding(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             <TabsTrigger value="sources" className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Sources
@@ -265,6 +292,18 @@ export default function Workspace() {
             <TabsTrigger value="tools" className="flex items-center gap-2">
               <Wrench className="w-4 h-4" />
               Tools
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Performance
+            </TabsTrigger>
+            <TabsTrigger value="assistant" className="flex items-center gap-2">
+              <Headphones className="w-4 h-4" />
+              Call Assistant
+            </TabsTrigger>
+            <TabsTrigger value="objections" className="flex items-center gap-2">
+              <Lightbulb className="w-4 h-4" />
+              Objections
             </TabsTrigger>
           </TabsList>
 
@@ -679,6 +718,22 @@ export default function Workspace() {
                 </div>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-6">
+            <PerformanceDashboard 
+              userKPIs={{ responseTime: 2.5, pitchQuality: 85, quotesSent: 12, conversionRate: 18 }}
+              teamAverage={{ responseTime: 3.2, pitchQuality: 75, quotesSent: 8, conversionRate: 15 }}
+              period="daily"
+            />
+          </TabsContent>
+
+          <TabsContent value="assistant" className="space-y-6">
+            <CallAssistant />
+          </TabsContent>
+
+          <TabsContent value="objections" className="space-y-6">
+            <ObjectionHandler />
           </TabsContent>
         </Tabs>
       </div>
