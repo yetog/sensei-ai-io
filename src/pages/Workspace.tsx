@@ -32,8 +32,6 @@ export default function Workspace() {
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeAgentId, setActiveAgentId] = useState<string>("");
-  const [showOnboarding, setShowOnboarding] = useState(true);
-  
   // Check for agent selection from other pages
   useEffect(() => {
     const savedAgentId = localStorage.getItem('sensei:selectedAgentId');
@@ -254,27 +252,6 @@ export default function Workspace() {
     handlePlay(text);
   };
 
-  const handleNavigateToTools = () => {
-    setActiveTab("tools");
-    setShowOnboarding(false);
-  };
-
-  const handleNavigateToWorkspace = () => {
-    setActiveTab("sources");
-    setShowOnboarding(false);
-  };
-
-  if (showOnboarding) {
-    return (
-      <div className="h-full flex items-center justify-center p-6">
-        <BetaOnboarding
-          onNavigateToTools={handleNavigateToTools}
-          onNavigateToWorkspace={handleNavigateToWorkspace}
-          onClose={() => setShowOnboarding(false)}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">

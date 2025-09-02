@@ -8,6 +8,7 @@ import { ionosAI } from "@/services/ionosAI";
 import { toast } from "sonner";
 import { HelpCircle, Users, MessageSquare, Settings as SettingsIcon, Bot, FileText, Zap } from "lucide-react";
 import { ModelSelector } from "@/components/ModelSelector";
+import { BetaOnboarding } from "@/components/BetaOnboarding";
 
 export default function Settings() {
   const [token, setToken] = useState(ionosAI.getApiToken() || "");
@@ -20,7 +21,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="api" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="api" className="flex items-center gap-2">
             <SettingsIcon className="w-4 h-4" />
             API Configuration
@@ -28,6 +29,10 @@ export default function Settings() {
           <TabsTrigger value="models" className="flex items-center gap-2">
             <Bot className="w-4 h-4" />
             Models & TTS
+          </TabsTrigger>
+          <TabsTrigger value="beta" className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Beta Onboarding
           </TabsTrigger>
           <TabsTrigger value="help" className="flex items-center gap-2">
             <HelpCircle className="w-4 h-4" />
@@ -65,6 +70,10 @@ export default function Settings() {
 
         <TabsContent value="models" className="space-y-4">
           <ModelSelector />
+        </TabsContent>
+
+        <TabsContent value="beta" className="space-y-4">
+          <BetaOnboarding />
         </TabsContent>
 
         <TabsContent value="help" className="space-y-6">
