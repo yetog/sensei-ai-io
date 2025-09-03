@@ -1,6 +1,5 @@
 import { conversationAnalyzer } from './conversationAnalyzer';
 import { ionosAI } from './ionosAI';
-import { getRunwareService } from './runwareAI';
 
 interface EnhancedQuoteRequest {
   conversationContext: string;
@@ -31,14 +30,8 @@ export class IntelligentQuoteGenerator {
     // Analyze the conversation context to extract structured data
     const analysis = await this.analyzeQuoteContext(request);
     
-    // Determine if we should use visual quote generation with Runware
-    const shouldUseVisualQuote = getRunwareService() && analysis.complexity > 0.6;
-    
-    if (shouldUseVisualQuote) {
-      return this.generateVisualQuote(request, analysis);
-    } else {
-      return this.generateStandardQuote(request, analysis);
-    }
+    // Beta optimization: Always generate visual quotes with IONOS AI for consistency
+    return this.generateVisualQuote(request, analysis);
   }
 
   private async analyzeQuoteContext(request: EnhancedQuoteRequest): Promise<any> {
@@ -122,11 +115,21 @@ Extract and provide in JSON format:
   }
 
   private async generateVisualQuote(request: EnhancedQuoteRequest, analysis: any): Promise<IntelligentQuote> {
-    // Create pricing structure
+    // Beta optimization: Simplified 3-tier pricing for quick decisions
+    const urgency = analysis.extractedInfo.urgency || 'medium';
+    const basePrice = urgency === 'high' ? 3000 : urgency === 'low' ? 1500 : 2000;
+    
     const baseProducts = [
-      { name: 'Professional Package', price: 2500 },
-      { name: 'Implementation Services', price: 1500 },
-      { name: 'Training Program', price: 1000 }
+      { 
+        name: 'Solution Package', 
+        price: basePrice,
+        description: 'Complete solution tailored to your needs' 
+      },
+      { 
+        name: 'Setup & Training', 
+        price: Math.round(basePrice * 0.3),
+        description: 'Professional implementation and team training'
+      }
     ];
 
     const subtotal = baseProducts.reduce((sum, product) => sum + product.price, 0);
@@ -134,12 +137,12 @@ Extract and provide in JSON format:
     const total = subtotal - discount;
 
     const quoteData = {
-      id: `VQ-${Date.now()}`,
+      id: `IQ-${Date.now()}`,
       company: request.customerInfo?.company || 'Valued Customer',
       industry: request.customerInfo?.industry || 'Technology',
       items: baseProducts.map(product => ({
         name: product.name,
-        description: `Professional ${product.name.toLowerCase()} tailored to your needs`,
+        description: product.description,
         price: product.price,
         quantity: 1
       })),
@@ -151,13 +154,14 @@ Extract and provide in JSON format:
     let imageUrl: string | undefined;
     
     try {
-      const runware = getRunwareService();
-      if (runware) {
-        imageUrl = await runware.generateQuoteImage(quoteData);
-      }
+      // Use IONOS AI for image generation instead of Runware
+      const imagePrompt = `Professional sales proposal document for ${quoteData.company}, modern business design, clean layout with pricing table showing $${total.toLocaleString()}, corporate blue and white theme, high-quality business document`;
+      
+      imageUrl = await ionosAI.generateImage(imagePrompt, '1024x1024');
+      console.log('Quote image generated with IONOS AI');
     } catch (error) {
-      console.error('Failed to generate quote image:', error);
-      // Continue without image
+      console.error('Failed to generate quote image with IONOS AI:', error);
+      // Continue without image for beta reliability
     }
 
     return {
@@ -166,10 +170,28 @@ Extract and provide in JSON format:
       content: quoteData,
       imageUrl,
       recommendations: this.generateRecommendations(analysis),
-      nextActions: analysis.nextBestActions || ['Follow up within 24 hours'],
+      nextActions: this.getQuickActions(analysis, urgency),
       confidenceScore: analysis.confidence || 0.7,
       generatedAt: new Date()
     };
+  }
+
+  private getQuickActions(analysis: any, urgency: string): string[] {
+    const baseActions = ['Follow up within 24 hours'];
+    
+    if (urgency === 'high') {
+      return ['Send quote immediately', 'Schedule same-day follow-up call', 'Prepare contract'];
+    }
+    
+    if (analysis.extractedInfo.budget && analysis.extractedInfo.budget !== 'Not specified') {
+      baseActions.push('Discuss budget alignment');
+    }
+    
+    if (analysis.presentationNeeded) {
+      baseActions.push('Schedule demo presentation');
+    }
+    
+    return baseActions;
   }
 
   private async generateStandardQuote(request: EnhancedQuoteRequest, analysis: any): Promise<IntelligentQuote> {

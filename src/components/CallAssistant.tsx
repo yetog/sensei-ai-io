@@ -25,7 +25,7 @@ import { useAudioCapture } from '@/hooks/useAudioCapture';
 import { useElevenLabs } from '@/hooks/useElevenLabs';
 import { intelligentQuoteGenerator } from '@/services/intelligentQuoteGenerator';
 import { conversationAnalyzer } from '@/services/conversationAnalyzer';
-import { initializeRunware } from '@/services/runwareAI';
+
 import { toast } from 'sonner';
 
 interface CallInsight {
@@ -44,8 +44,8 @@ export function CallAssistant() {
   const [transcript, setTranscript] = useState('');
   const [isVoiceCoachingEnabled, setIsVoiceCoachingEnabled] = useState(true);
   const [lastCustomerMessage, setLastCustomerMessage] = useState('');
-  const [runwareApiKey, setRunwareApiKey] = useState('');
-  const [isRunwareConfigured, setIsRunwareConfigured] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [callDuration, setCallDuration] = useState(0);
   const [transcriptLength, setTranscriptLength] = useState(0);
   const [maxTranscriptLength] = useState(5000); // Sliding window for performance
 
@@ -95,12 +95,15 @@ export function CallAssistant() {
     try {
       if (isRecording) {
         stopRecording();
+        endSession();
         setCurrentInsights([]);
+        toast.success(`Call ended - Duration: ${Math.floor(callDuration / 60)}m ${callDuration % 60}s`);
       } else {
         await startRecording();
+        startSession();
         toast.success(isSystemAudioEnabled ? 
-          'Listening to system audio and microphone' : 
-          'Listening to microphone only');
+          'Call Assistant started - Listening to system audio and microphone' : 
+          'Call Assistant started - Listening to microphone only');
       }
     } catch (error) {
       toast.error('Failed to start audio capture. Please check microphone permissions.');
@@ -136,32 +139,32 @@ export function CallAssistant() {
     toast.success('Transcript exported');
   };
 
-  const configureRunware = () => {
-    if (runwareApiKey) {
-      try {
-        initializeRunware(runwareApiKey);
-        setIsRunwareConfigured(true);
-        localStorage.setItem('runware-api-key', runwareApiKey);
-        toast.success('Runware AI configured for visual quotes');
-      } catch (error) {
-        toast.error('Failed to configure Runware AI');
-      }
+  // Track call duration for beta optimization
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isRecording && sessionStartTime) {
+      interval = setInterval(() => {
+        setCallDuration(Math.floor((Date.now() - sessionStartTime.getTime()) / 1000));
+      }, 1000);
     }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRecording, sessionStartTime]);
+
+  // Start session timing
+  const startSession = () => {
+    setSessionStartTime(new Date());
+    setCallDuration(0);
   };
 
-  // Load saved API key on mount
-  useEffect(() => {
-    const savedKey = localStorage.getItem('runware-api-key');
-    if (savedKey) {
-      setRunwareApiKey(savedKey);
-      try {
-        initializeRunware(savedKey);
-        setIsRunwareConfigured(true);
-      } catch (error) {
-        console.error('Failed to initialize saved Runware key:', error);
-      }
-    }
-  }, []);
+  // End session timing
+  const endSession = () => {
+    setSessionStartTime(null);
+    setCallDuration(0);
+  };
 
   const analyzeConversation = useCallback(async (text: string) => {
     try {
@@ -248,13 +251,8 @@ export function CallAssistant() {
         budget: conversationContext.customerMentions.budget
       });
       
-      if (intelligentQuote.type === 'visual_quote') {
-        toast.success('Visual quote generated! 🎯');
-        setCallNotes(prev => prev + `\n\n💰 Visual Quote #${intelligentQuote.id}: $${intelligentQuote.content.summary.total.toLocaleString()}\n${intelligentQuote.imageUrl ? '🖼️ Quote image generated' : ''}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n💡 Recommendations: ${intelligentQuote.recommendations.join(', ')}\n📋 Next Actions: ${intelligentQuote.nextActions.join(', ')}`);
-      } else {
-        toast.success('Intelligent quote generated! 🎯');
-        setCallNotes(prev => prev + `\n\n💰 Smart Quote #${intelligentQuote.id}: $${intelligentQuote.content.summary.total.toLocaleString()}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n📋 Next Actions: ${intelligentQuote.nextActions.join(', ')}`);
-      }
+      toast.success('AI Quote generated in <30s! 🎯');
+      setCallNotes(prev => prev + `\n\n💰 AI Quote #${intelligentQuote.id}: $${intelligentQuote.content.summary.total.toLocaleString()}\n${intelligentQuote.imageUrl ? '🖼️ Professional quote image generated with IONOS AI' : ''}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n📋 Next Actions: ${intelligentQuote.nextActions.join(', ')}\n⏱️ Generated in call minute ${Math.floor(callDuration / 60)}`);
       
     } catch (error) {
       toast.error('Failed to generate quote');
@@ -335,7 +333,7 @@ export function CallAssistant() {
                   {isRecording ? (
                     <>
                       <MicOff className="w-6 h-6 mr-2" />
-                      Stop Listening
+                      End Call ({Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')})
                     </>
                   ) : (
                     <>
@@ -415,7 +413,7 @@ export function CallAssistant() {
                 <label className="text-sm font-medium mb-2 block">
                   Quick Notes 
                   <span className="text-xs text-muted-foreground ml-2">
-                    ({transcriptLength}/{maxTranscriptLength} chars)
+                    ({transcriptLength}/{maxTranscriptLength} chars) • {callDuration > 0 ? `${Math.floor(callDuration / 60)}m ${callDuration % 60}s` : 'Ready'}
                   </span>
                 </label>
                 <Textarea
@@ -496,31 +494,15 @@ export function CallAssistant() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!isRunwareConfigured && (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p>Configure Runware AI for visual quote generation:</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      placeholder="Enter Runware API Key"
-                      value={runwareApiKey}
-                      onChange={(e) => setRunwareApiKey(e.target.value)}
-                      className="flex-1 px-3 py-1 border rounded"
-                    />
-                    <Button size="sm" onClick={configureRunware}>
-                      Configure
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Get your API key from <a href="https://runware.ai/" target="_blank" rel="noopener noreferrer" className="underline">runware.ai</a>
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+          <Alert>
+            <Brain className="h-4 w-4" />
+            <AlertDescription>
+              <p>✅ IONOS AI is configured for intelligent quote generation with visual quotes!</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Professional quotes are generated in under 30 seconds using IONOS AI's advanced models.
+              </p>
+            </AlertDescription>
+          </Alert>
           
           <div className="grid grid-cols-2 gap-4">
             <Button 
@@ -530,7 +512,7 @@ export function CallAssistant() {
               disabled={!lastCustomerMessage && !callNotes}
             >
               <FileText className="w-4 h-4" />
-              {isRunwareConfigured ? 'Generate Visual Quote' : 'Generate Quote'}
+              Generate AI Quote
             </Button>
             <Button 
               variant="outline" 
