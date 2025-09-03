@@ -23,14 +23,18 @@ import {
 } from 'lucide-react';
 import { useAudioCapture } from '@/hooks/useAudioCapture';
 import { useElevenLabs } from '@/hooks/useElevenLabs';
-import { quoteGenerator } from '@/services/quoteGenerator';
+import { intelligentQuoteGenerator } from '@/services/intelligentQuoteGenerator';
+import { conversationAnalyzer } from '@/services/conversationAnalyzer';
 import { toast } from 'sonner';
 
 interface CallInsight {
-  type: 'opportunity' | 'objection' | 'next_step' | 'warning';
+  type: 'opportunity' | 'objection' | 'next_step' | 'warning' | 'buying_signal' | 'risk';
   title: string;
   message: string;
   action?: string;
+  confidence?: number;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  salesStage?: string;
 }
 
 export function CallAssistant() {
@@ -90,72 +94,85 @@ export function CallAssistant() {
   };
 
   const analyzeConversation = useCallback(async (text: string) => {
-    // Simple keyword-based analysis for real-time insights
+    try {
+      // Use intelligent conversation analyzer instead of simple keywords
+      const insights = await conversationAnalyzer.analyzeConversation(text);
+      
+      // Add insights to current list
+      setCurrentInsights(prev => [...prev, ...insights]);
+      
+      // Trigger voice coaching for high-priority insights
+      if (isVoiceCoachingEnabled) {
+        const criticalInsight = insights.find(insight => insight.priority === 'critical');
+        const highPriorityInsight = insights.find(insight => insight.priority === 'high');
+        
+        const targetInsight = criticalInsight || highPriorityInsight;
+        if (targetInsight) {
+          const coachingResponse = conversationAnalyzer.getSmartCoachingResponse(targetInsight);
+          await speakCoaching(coachingResponse, { agentType: 'sales', whisperMode: true });
+        }
+      }
+    } catch (error) {
+      console.error('Conversation analysis error:', error);
+      // Fallback to simple analysis
+      const simpleInsights = getSimpleInsights(text);
+      setCurrentInsights(prev => [...prev, ...simpleInsights]);
+    }
+  }, [isVoiceCoachingEnabled, speakCoaching]);
+
+  const getSimpleInsights = (text: string): CallInsight[] => {
     const insights: CallInsight[] = [];
-    
     const lowerText = text.toLowerCase();
-    
+
     if (lowerText.includes('price') || lowerText.includes('cost') || lowerText.includes('expensive')) {
       insights.push({
         type: 'objection',
-        title: 'Price Objection Detected',
-        message: 'Customer mentioned pricing concerns',
-        action: 'Focus on value and ROI'
+        title: 'Price Concern',
+        message: 'Customer mentioned pricing',
+        action: 'Focus on value and ROI',
+        confidence: 0.8,
+        priority: 'high'
       });
-      
-      if (isVoiceCoachingEnabled) {
-        await generateQuickResponse('price_objection', 'sales');
-      }
     }
-    
-    if (lowerText.includes('team') || lowerText.includes('people') || lowerText.includes('employees')) {
+
+    if (lowerText.includes('when can') || lowerText.includes('timeline') || lowerText.includes('start')) {
       insights.push({
-        type: 'opportunity',
-        title: 'Team Size Opportunity',
-        message: 'Customer mentioned team size',
-        action: 'Ask about enterprise needs'
+        type: 'buying_signal',
+        title: 'Timeline Interest',
+        message: 'Customer asking about implementation',
+        action: 'Provide clear timeline and next steps',
+        confidence: 0.9,
+        priority: 'critical'
       });
     }
-    
-    if (lowerText.includes('demo') || lowerText.includes('show me') || lowerText.includes('see it')) {
-      insights.push({
-        type: 'next_step',
-        title: 'Demo Request',
-        message: 'Customer wants to see the product',
-        action: 'Schedule technical demonstration'
-      });
-    }
-    
-    if (lowerText.includes('not sure') || lowerText.includes('think about') || lowerText.includes('maybe')) {
-      insights.push({
-        type: 'warning',
-        title: 'Hesitation Detected',
-        message: 'Customer seems uncertain',
-        action: 'Address concerns and build confidence'
-      });
-    }
-    
-    setCurrentInsights(prev => [...prev, ...insights]);
-  }, [isVoiceCoachingEnabled, generateQuickResponse]);
+
+    return insights;
+  };
 
   const handleGenerateQuote = async () => {
     try {
-      const quote = await quoteGenerator.generateQuote({
+      const conversationContext = conversationAnalyzer.getConversationContext();
+      
+      const intelligentQuote = await intelligentQuoteGenerator.generateIntelligentQuote({
+        conversationContext: transcript,
         customerInfo: {
           company: 'Current Call Customer',
           industry: 'Technology',
-          size: 'medium',
-          needs: [lastCustomerMessage || callNotes]
+          size: 'medium'
         },
-        products: ['hosting', 'domain'],
-        timeline: 'Immediate',
-        additionalNotes: callNotes
+        callNotes,
+        detectedNeeds: conversationContext.customerMentions.painPoints,
+        timeline: conversationContext.customerMentions.timeline,
+        budget: conversationContext.customerMentions.budget
       });
       
-      toast.success('Quote generated successfully!');
-      
-      // Add to call notes
-      setCallNotes(prev => prev + `\n\nGenerated Quote #${quote.id}: $${quote.total.toFixed(2)}`);
+      if (intelligentQuote.type === 'gamma_presentation') {
+        toast.success('Professional presentation generated! 🎯');
+        setCallNotes(prev => prev + `\n\n📊 Gamma Presentation Generated: ${intelligentQuote.content.title}\n🔗 Share URL: ${intelligentQuote.content.shareUrl}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n💡 Recommendations: ${intelligentQuote.recommendations.join(', ')}`);
+      } else {
+        toast.success('Intelligent quote generated! 🎯');
+        setCallNotes(prev => prev + `\n\n💰 Smart Quote #${intelligentQuote.id}: $${intelligentQuote.content.summary.total.toLocaleString()}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n📋 Next Actions: ${intelligentQuote.nextActions.join(', ')}`);
+      }
       
     } catch (error) {
       toast.error('Failed to generate quote');
@@ -186,18 +203,22 @@ export function CallAssistant() {
       case 'opportunity': return <TrendingUp className="h-4 w-4 text-green-500" />;
       case 'objection': return <AlertCircle className="h-4 w-4 text-orange-500" />;
       case 'next_step': return <Lightbulb className="h-4 w-4 text-blue-500" />;
-      case 'warning': return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case 'warning': return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'buying_signal': return <TrendingUp className="h-4 w-4 text-green-600" />;
+      case 'risk': return <AlertTriangle className="h-4 w-4 text-red-600" />;
       default: return <Brain className="h-4 w-4" />;
     }
   };
 
   const getInsightColor = (type: string) => {
     switch (type) {
-      case 'opportunity': return 'border-green-200 bg-green-50';
-      case 'objection': return 'border-orange-200 bg-orange-50';
-      case 'next_step': return 'border-blue-200 bg-blue-50';
-      case 'warning': return 'border-red-200 bg-red-50';
-      default: return 'border-gray-200 bg-gray-50';
+      case 'opportunity': return 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950';
+      case 'objection': return 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950';
+      case 'next_step': return 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950';
+      case 'warning': return 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950';
+      case 'buying_signal': return 'border-green-300 bg-green-100 dark:border-green-700 dark:bg-green-900';
+      case 'risk': return 'border-red-300 bg-red-100 dark:border-red-700 dark:bg-red-900';
+      default: return 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900';
     }
   };
 
@@ -318,13 +339,28 @@ export function CallAssistant() {
                   <div className="flex items-start gap-2 mb-2">
                     {getInsightIcon(insight.type)}
                     <div className="flex-1">
-                      <h4 className="font-medium text-sm">{insight.title}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-sm">{insight.title}</h4>
+                        {insight.priority && (
+                          <Badge 
+                            variant={insight.priority === 'critical' ? 'destructive' : insight.priority === 'high' ? 'default' : 'secondary'} 
+                            className="text-xs"
+                          >
+                            {insight.priority}
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">{insight.message}</p>
+                      {insight.confidence && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Confidence: {Math.round(insight.confidence * 100)}%
+                        </p>
+                      )}
                     </div>
                   </div>
                   {insight.action && (
                     <div className="mt-2">
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="outline" className="text-xs">
                         💡 {insight.action}
                       </Badge>
                     </div>
