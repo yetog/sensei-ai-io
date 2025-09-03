@@ -1,0 +1,300 @@
+{
+  "meta": {
+    "instanceId": "call-automation-workflow"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "path": "call-automation",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "call-webhook",
+      "name": "Call Completed Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        200
+      ],
+      "webhookId": "call-automation-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openai.inference.de-txl.ionos.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "meta-llama/llama-3.1-8b-instruct"
+            },
+            {
+              "name": "messages",
+              "value": [
+                {
+                  "role": "system",
+                  "content": "You are a professional call analyst. Create a comprehensive call summary including: 1) Key discussion points 2) Customer needs identified 3) Next steps agreed upon 4) Follow-up timeline 5) Deal probability (High/Medium/Low) 6) Action items for sales rep. Format as structured markdown for email."
+                },
+                {
+                  "role": "user",
+                  "content": "Call Summary Request:\nTranscript: {{ $json.body.fullTranscript }}\nDuration: {{ $json.body.callDuration }}s\nInsights Generated: {{ $json.body.insights }}\nQuotes Generated: {{ $json.body.quotes }}\nCustomer: {{ $json.body.customerInfo.name }} ({{ $json.body.customerInfo.email }})\nCompany: {{ $json.body.customerInfo.company }}"
+                }
+              ]
+            },
+            {
+              "name": "temperature",
+              "value": 0.3
+            },
+            {
+              "name": "max_tokens",
+              "value": 800
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "generate-summary",
+      "name": "Generate Call Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": "ionos-api-credentials"
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openai.inference.de-txl.ionos.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "meta-llama/llama-3.1-8b-instruct"
+            },
+            {
+              "name": "messages",
+              "value": [
+                {
+                  "role": "system",
+                  "content": "You are a professional email writer. Create a personalized follow-up email to send to the prospect after a sales call. Include: 1) Thank you for their time 2) Key points discussed 3) Attached quote (if generated) 4) Clear next steps 5) Contact information. Keep professional but warm tone."
+                },
+                {
+                  "role": "user",
+                  "content": "Email Context:\nCustomer: {{ $('Call Completed Webhook').item.json.body.customerInfo.name }}\nCompany: {{ $('Call Completed Webhook').item.json.body.customerInfo.company }}\nCall Summary: {{ $json.choices[0].message.content }}\nQuote Available: {{ $('Call Completed Webhook').item.json.body.quotes ? 'Yes' : 'No' }}"
+                }
+              ]
+            },
+            {
+              "name": "temperature",
+              "value": 0.4
+            },
+            {
+              "name": "max_tokens",
+              "value": 600
+            }
+          ]
+        },
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "id": "generate-email",
+      "name": "Generate Follow-up Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -200,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": "ionos-api-credentials"
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Call Completed Webhook').item.json.body.customerInfo.email }}",
+        "subject": "Thank you for today's call - {{ $('Call Completed Webhook').item.json.body.customerInfo.company }}",
+        "emailFormat": "html",
+        "message": "={{ $json.choices[0].message.content.replace(/\\n/g, '<br>') }}",
+        "options": {
+          "ccEmail": "{{ $('Call Completed Webhook').item.json.body.repEmail }}",
+          "attachments": "={{ $('Call Completed Webhook').item.json.body.quotes ? 'quote-' + $('Call Completed Webhook').item.json.body.customerInfo.company.toLowerCase().replace(/\\s/g, '-') + '.pdf' : '' }}"
+        }
+      },
+      "id": "send-email",
+      "name": "Send Follow-up Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "credentials": {
+        "smtp": "email-credentials"
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Call Completed Webhook').item.json.body.crmWebhook || 'https://your-crm-webhook.com/leads' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Call Completed Webhook').item.json.body.crmApiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lead_id",
+              "value": "={{ $('Call Completed Webhook').item.json.body.customerInfo.id }}"
+            },
+            {
+              "name": "call_summary",
+              "value": "={{ $('Generate Call Summary').item.json.choices[0].message.content }}"
+            },
+            {
+              "name": "call_duration",
+              "value": "={{ $('Call Completed Webhook').item.json.body.callDuration }}"
+            },
+            {
+              "name": "quote_generated",
+              "value": "={{ $('Call Completed Webhook').item.json.body.quotes ? true : false }}"
+            },
+            {
+              "name": "next_follow_up",
+              "value": "={{ new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() }}"
+            },
+            {
+              "name": "deal_stage",
+              "value": "qualified"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-crm",
+      "name": "Update CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": true,\n  \"callSummary\": \"{{ $('Generate Call Summary').item.json.choices[0].message.content }}\",\n  \"emailSent\": true,\n  \"crmUpdated\": {{ $('Update CRM').item.json ? true : false }},\n  \"followUpScheduled\": \"{{ new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() }}\",\n  \"timestamp\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {}
+      },
+      "id": "automation-response",
+      "name": "Automation Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        400,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Call Completed Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generate Call Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Call Summary": {
+      "main": [
+        [
+          {
+            "node": "Generate Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Update CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CRM": {
+      "main": [
+        [
+          {
+            "node": "Automation Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
