@@ -25,6 +25,7 @@ import { useAudioCapture } from '@/hooks/useAudioCapture';
 import { useElevenLabs } from '@/hooks/useElevenLabs';
 import { intelligentQuoteGenerator } from '@/services/intelligentQuoteGenerator';
 import { conversationAnalyzer } from '@/services/conversationAnalyzer';
+import { initializeRunware } from '@/services/runwareAI';
 import { toast } from 'sonner';
 
 interface CallInsight {
@@ -43,6 +44,10 @@ export function CallAssistant() {
   const [transcript, setTranscript] = useState('');
   const [isVoiceCoachingEnabled, setIsVoiceCoachingEnabled] = useState(true);
   const [lastCustomerMessage, setLastCustomerMessage] = useState('');
+  const [runwareApiKey, setRunwareApiKey] = useState('');
+  const [isRunwareConfigured, setIsRunwareConfigured] = useState(false);
+  const [transcriptLength, setTranscriptLength] = useState(0);
+  const [maxTranscriptLength] = useState(5000); // Sliding window for performance
 
   const { 
     isRecording, 
@@ -69,7 +74,17 @@ export function CallAssistant() {
   }, [initializeElevenLabs]);
 
   function handleTranscript(text: string) {
-    setTranscript(prev => prev + ' ' + text);
+    setTranscript(prev => {
+      const newTranscript = prev + ' ' + text;
+      // Implement sliding window to prevent memory issues
+      if (newTranscript.length > maxTranscriptLength) {
+        const trimmed = newTranscript.slice(-maxTranscriptLength);
+        setTranscriptLength(trimmed.length);
+        return trimmed;
+      }
+      setTranscriptLength(newTranscript.length);
+      return newTranscript;
+    });
     setLastCustomerMessage(text);
     
     // Auto-generate insights based on transcript
@@ -88,37 +103,104 @@ export function CallAssistant() {
           'Listening to microphone only');
       }
     } catch (error) {
-      toast.error('Failed to start audio capture');
+      toast.error('Failed to start audio capture. Please check microphone permissions.');
       console.error('Audio capture error:', error);
     }
   };
+
+  const clearTranscript = () => {
+    setTranscript('');
+    setCurrentInsights([]);
+    setTranscriptLength(0);
+    conversationAnalyzer.reset();
+    toast.success('Transcript cleared');
+  };
+
+  const exportTranscript = () => {
+    const exportData = {
+      transcript,
+      insights: currentInsights,
+      callNotes,
+      timestamp: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `call-transcript-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Transcript exported');
+  };
+
+  const configureRunware = () => {
+    if (runwareApiKey) {
+      try {
+        initializeRunware(runwareApiKey);
+        setIsRunwareConfigured(true);
+        localStorage.setItem('runware-api-key', runwareApiKey);
+        toast.success('Runware AI configured for visual quotes');
+      } catch (error) {
+        toast.error('Failed to configure Runware AI');
+      }
+    }
+  };
+
+  // Load saved API key on mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('runware-api-key');
+    if (savedKey) {
+      setRunwareApiKey(savedKey);
+      try {
+        initializeRunware(savedKey);
+        setIsRunwareConfigured(true);
+      } catch (error) {
+        console.error('Failed to initialize saved Runware key:', error);
+      }
+    }
+  }, []);
 
   const analyzeConversation = useCallback(async (text: string) => {
     try {
       // Use intelligent conversation analyzer instead of simple keywords
       const insights = await conversationAnalyzer.analyzeConversation(text);
       
-      // Add insights to current list
-      setCurrentInsights(prev => [...prev, ...insights]);
+      // Implement insight deduplication
+      const newInsights = insights.filter(insight => 
+        !currentInsights.some(existing => 
+          existing.title === insight.title && existing.type === insight.type
+        )
+      );
       
-      // Trigger voice coaching for high-priority insights
-      if (isVoiceCoachingEnabled) {
-        const criticalInsight = insights.find(insight => insight.priority === 'critical');
-        const highPriorityInsight = insights.find(insight => insight.priority === 'high');
+      if (newInsights.length > 0) {
+        setCurrentInsights(prev => [...prev.slice(-10), ...newInsights]); // Keep only last 10 insights
         
-        const targetInsight = criticalInsight || highPriorityInsight;
-        if (targetInsight) {
-          const coachingResponse = conversationAnalyzer.getSmartCoachingResponse(targetInsight);
-          await speakCoaching(coachingResponse, { agentType: 'sales', whisperMode: true });
+        // Trigger voice coaching for high-priority insights with confidence threshold
+        if (isVoiceCoachingEnabled) {
+          const criticalInsight = newInsights.find(insight => 
+            insight.priority === 'critical' && (insight.confidence || 0) > 0.7
+          );
+          const highPriorityInsight = newInsights.find(insight => 
+            insight.priority === 'high' && (insight.confidence || 0) > 0.8
+          );
+          
+          const targetInsight = criticalInsight || highPriorityInsight;
+          if (targetInsight) {
+            const coachingResponse = conversationAnalyzer.getSmartCoachingResponse(targetInsight);
+            await speakCoaching(coachingResponse, { agentType: 'sales', whisperMode: true });
+          }
         }
       }
     } catch (error) {
       console.error('Conversation analysis error:', error);
       // Fallback to simple analysis
       const simpleInsights = getSimpleInsights(text);
-      setCurrentInsights(prev => [...prev, ...simpleInsights]);
+      setCurrentInsights(prev => [...prev.slice(-10), ...simpleInsights]);
     }
-  }, [isVoiceCoachingEnabled, speakCoaching]);
+  }, [isVoiceCoachingEnabled, speakCoaching, currentInsights]);
 
   const getSimpleInsights = (text: string): CallInsight[] => {
     const insights: CallInsight[] = [];
@@ -166,9 +248,9 @@ export function CallAssistant() {
         budget: conversationContext.customerMentions.budget
       });
       
-      if (intelligentQuote.type === 'gamma_presentation') {
-        toast.success('Professional presentation generated! 🎯');
-        setCallNotes(prev => prev + `\n\n📊 Gamma Presentation Generated: ${intelligentQuote.content.title}\n🔗 Share URL: ${intelligentQuote.content.shareUrl}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n💡 Recommendations: ${intelligentQuote.recommendations.join(', ')}`);
+      if (intelligentQuote.type === 'visual_quote') {
+        toast.success('Visual quote generated! 🎯');
+        setCallNotes(prev => prev + `\n\n💰 Visual Quote #${intelligentQuote.id}: $${intelligentQuote.content.summary.total.toLocaleString()}\n${intelligentQuote.imageUrl ? '🖼️ Quote image generated' : ''}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n💡 Recommendations: ${intelligentQuote.recommendations.join(', ')}\n📋 Next Actions: ${intelligentQuote.nextActions.join(', ')}`);
       } else {
         toast.success('Intelligent quote generated! 🎯');
         setCallNotes(prev => prev + `\n\n💰 Smart Quote #${intelligentQuote.id}: $${intelligentQuote.content.summary.total.toLocaleString()}\n🎯 Confidence: ${Math.round(intelligentQuote.confidenceScore * 100)}%\n📋 Next Actions: ${intelligentQuote.nextActions.join(', ')}`);
@@ -309,14 +391,40 @@ export function CallAssistant() {
               )}
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Quick Notes</label>
-              <Textarea
-                placeholder="AI insights and key points will be added here automatically..."
-                value={callNotes}
-                onChange={(e) => setCallNotes(e.target.value)}
-                rows={4}
-              />
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearTranscript}
+                  disabled={!transcript}
+                >
+                  Clear Transcript
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportTranscript}
+                  disabled={!transcript}
+                >
+                  Export Session
+                </Button>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Quick Notes 
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({transcriptLength}/{maxTranscriptLength} chars)
+                  </span>
+                </label>
+                <Textarea
+                  placeholder="AI insights and key points will be added here automatically..."
+                  value={callNotes}
+                  onChange={(e) => setCallNotes(e.target.value)}
+                  rows={4}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -387,7 +495,33 @@ export function CallAssistant() {
             AI-powered actions during and after calls
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {!isRunwareConfigured && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p>Configure Runware AI for visual quote generation:</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Enter Runware API Key"
+                      value={runwareApiKey}
+                      onChange={(e) => setRunwareApiKey(e.target.value)}
+                      className="flex-1 px-3 py-1 border rounded"
+                    />
+                    <Button size="sm" onClick={configureRunware}>
+                      Configure
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Get your API key from <a href="https://runware.ai/" target="_blank" rel="noopener noreferrer" className="underline">runware.ai</a>
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <Button 
               variant="outline" 
@@ -396,7 +530,7 @@ export function CallAssistant() {
               disabled={!lastCustomerMessage && !callNotes}
             >
               <FileText className="w-4 h-4" />
-              Generate Quote
+              {isRunwareConfigured ? 'Generate Visual Quote' : 'Generate Quote'}
             </Button>
             <Button 
               variant="outline" 

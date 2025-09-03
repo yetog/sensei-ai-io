@@ -1,6 +1,6 @@
-import { gammaAI, GammaAIService } from './gammaAI';
 import { conversationAnalyzer } from './conversationAnalyzer';
 import { ionosAI } from './ionosAI';
+import { getRunwareService } from './runwareAI';
 
 interface EnhancedQuoteRequest {
   conversationContext: string;
@@ -17,12 +17,13 @@ interface EnhancedQuoteRequest {
 
 interface IntelligentQuote {
   id: string;
-  type: 'standard' | 'gamma_presentation';
-  content: any; // Standard quote or Gamma presentation
+  type: 'standard' | 'visual_quote';
+  content: any; // Standard quote or visual quote with image
   recommendations: string[];
   nextActions: string[];
   confidenceScore: number;
   generatedAt: Date;
+  imageUrl?: string;
 }
 
 export class IntelligentQuoteGenerator {
@@ -30,11 +31,11 @@ export class IntelligentQuoteGenerator {
     // Analyze the conversation context to extract structured data
     const analysis = await this.analyzeQuoteContext(request);
     
-    // Determine if we should use Gamma AI or standard quote generation
-    const shouldUseGamma = gammaAI.isConfigured() && analysis.complexity > 0.6;
+    // Determine if we should use visual quote generation with Runware
+    const shouldUseVisualQuote = getRunwareService() && analysis.complexity > 0.6;
     
-    if (shouldUseGamma) {
-      return this.generateGammaQuote(request, analysis);
+    if (shouldUseVisualQuote) {
+      return this.generateVisualQuote(request, analysis);
     } else {
       return this.generateStandardQuote(request, analysis);
     }
@@ -120,7 +121,7 @@ Extract and provide in JSON format:
     };
   }
 
-  private async generateGammaQuote(request: EnhancedQuoteRequest, analysis: any): Promise<IntelligentQuote> {
+  private async generateVisualQuote(request: EnhancedQuoteRequest, analysis: any): Promise<IntelligentQuote> {
     // Create pricing structure
     const baseProducts = [
       { name: 'Professional Package', price: 2500 },
@@ -132,29 +133,38 @@ Extract and provide in JSON format:
     const discount = Math.round(subtotal * (analysis.pricingStrategy.suggestedDiscount / 100));
     const total = subtotal - discount;
 
-    const gammaRequest = {
-      customerInfo: {
-        company: request.customerInfo?.company || 'Valued Customer',
-        industry: request.customerInfo?.industry || 'Technology',
-        size: request.customerInfo?.size || 'medium',
-        painPoints: analysis.extractedInfo.painPoints || ['Operational efficiency'],
-        budget: analysis.extractedInfo.budget,
-        timeline: analysis.extractedInfo.timeline
-      },
-      proposedSolution: {
-        products: analysis.recommendedProducts.map((p: any) => p.product),
-        value: this.createValueProposition(analysis),
-        pricing: { subtotal, discount, total }
-      },
-      conversationContext: request.conversationContext
+    const quoteData = {
+      id: `VQ-${Date.now()}`,
+      company: request.customerInfo?.company || 'Valued Customer',
+      industry: request.customerInfo?.industry || 'Technology',
+      items: baseProducts.map(product => ({
+        name: product.name,
+        description: `Professional ${product.name.toLowerCase()} tailored to your needs`,
+        price: product.price,
+        quantity: 1
+      })),
+      summary: { subtotal, discount, total },
+      value: this.createValueProposition(analysis),
+      painPoints: analysis.extractedInfo.painPoints || []
     };
 
-    const presentation = await gammaAI.generateQuotePresentation(gammaRequest);
+    let imageUrl: string | undefined;
+    
+    try {
+      const runware = getRunwareService();
+      if (runware) {
+        imageUrl = await runware.generateQuoteImage(quoteData);
+      }
+    } catch (error) {
+      console.error('Failed to generate quote image:', error);
+      // Continue without image
+    }
 
     return {
-      id: presentation.id,
-      type: 'gamma_presentation',
-      content: presentation,
+      id: quoteData.id,
+      type: 'visual_quote',
+      content: quoteData,
+      imageUrl,
       recommendations: this.generateRecommendations(analysis),
       nextActions: analysis.nextBestActions || ['Follow up within 24 hours'],
       confidenceScore: analysis.confidence || 0.7,
