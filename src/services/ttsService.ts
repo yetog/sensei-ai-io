@@ -33,6 +33,9 @@ export class TTSService {
     return TTSService.instance;
   }
 
+  // Pre-configured API key for seamless experience
+  private readonly EMBEDDED_API_KEY = 'sk_' + process.env.ELEVENLABS_API_KEY || '';
+
   async setApiKey(apiKey: string) {
     this.apiKey = apiKey;
     localStorage.setItem('elevenlabs-api-key', apiKey);
@@ -40,12 +43,19 @@ export class TTSService {
 
   getApiKey(): string | null {
     if (!this.apiKey) {
-      this.apiKey = localStorage.getItem('elevenlabs-api-key');
+      // Try embedded API key first, then localStorage
+      this.apiKey = this.EMBEDDED_API_KEY || localStorage.getItem('elevenlabs-api-key');
     }
     return this.apiKey;
   }
 
   async requestApiKey(): Promise<string> {
+    // Auto-initialize with embedded key if available
+    if (this.EMBEDDED_API_KEY) {
+      this.apiKey = this.EMBEDDED_API_KEY;
+      return this.EMBEDDED_API_KEY;
+    }
+    
     const apiKey = prompt('Please enter your ElevenLabs API key:');
     if (apiKey) {
       await this.setApiKey(apiKey);

@@ -13,22 +13,21 @@ export const useElevenLabs = () => {
 
   const initializeElevenLabs = useCallback(async () => {
     try {
-      // Set the API key from environment or prompt user
-      const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY || 
-                    localStorage.getItem('elevenlabs-api-key');
-      
-      if (!apiKey) {
-        const userApiKey = await ttsService.requestApiKey();
-        if (userApiKey) {
-          setIsInitialized(true);
-        }
-      } else {
-        await ttsService.setApiKey(apiKey);
+      // Auto-initialize with embedded API key
+      const userApiKey = await ttsService.requestApiKey();
+      if (userApiKey) {
         setIsInitialized(true);
       }
     } catch (error) {
       console.error('Failed to initialize ElevenLabs:', error);
-      throw error;
+      // Fallback to localStorage or user input
+      const savedKey = localStorage.getItem('elevenlabs-api-key');
+      if (savedKey) {
+        await ttsService.setApiKey(savedKey);
+        setIsInitialized(true);
+      } else {
+        throw error;
+      }
     }
   }, []);
 

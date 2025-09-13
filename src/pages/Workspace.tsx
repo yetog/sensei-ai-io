@@ -41,18 +41,14 @@ export default function Workspace() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-3 mb-6 h-auto p-1">
             <TabsTrigger value="sources" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
               Data Sources
             </TabsTrigger>
-            <TabsTrigger value="intelligence" className="flex items-center gap-2">
+            <TabsTrigger value="live-ops" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
-              Intelligence Hub
-            </TabsTrigger>
-            <TabsTrigger value="conversations" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Conversation Center
+              Live Operations
             </TabsTrigger>
             <TabsTrigger value="content" className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
@@ -98,15 +94,14 @@ export default function Workspace() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="intelligence">
-            <IntelligenceHub 
-              callTranscript={callTranscript}
-              isCallActive={isCallActive}
-            />
-          </TabsContent>
-
-          <TabsContent value="conversations">
-            <ConversationCenter selectedFileIds={selectedFileIds} />
+          <TabsContent value="live-ops">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <IntelligenceHub 
+                callTranscript={callTranscript}
+                isCallActive={isCallActive}
+              />
+              <ConversationCenter selectedFileIds={selectedFileIds} />
+            </div>
           </TabsContent>
 
           <TabsContent value="content">
