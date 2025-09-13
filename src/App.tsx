@@ -13,6 +13,8 @@ import Tools from "./pages/Tools";
 import NotFound from "./pages/NotFound";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { BreadcrumbNav } from "@/components/ui/breadcrumb-nav";
+import { WelcomeOnboarding } from "@/components/WelcomeOnboarding";
 import { Sword } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -28,9 +30,12 @@ const App = () => (
             <div className="min-h-screen flex w-full">
               <AppSidebar />
               <SidebarInset className="flex-1">
-                <header className="h-14 flex items-center border-b px-4">
-                  <SidebarTrigger className="mr-2" />
-                  <div className="flex items-center gap-2 group relative">
+                <header className="sticky top-0 z-40 h-14 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+                  <div className="flex items-center gap-4">
+                    <SidebarTrigger className="-ml-1" />
+                    <BreadcrumbNav />
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 group relative">
                     <div className="relative">
                       <span className="text-lg font-bold">Sensei <span className="text-primary">AI</span></span>
                       {/* Samurai sword animation */}
@@ -40,7 +45,7 @@ const App = () => (
                   </div>
                 </header>
 
-                <main>
+                <main className="animate-fade-in">
                   <Routes>
                     <Route path="/" element={<Workspace />} />
                     <Route path="/workspace" element={<Workspace />} />
@@ -55,6 +60,7 @@ const App = () => (
                 </main>
               </SidebarInset>
             </div>
+            <WelcomeOnboarding />
           </SidebarProvider>
         </BrowserRouter>
       </FileProvider>

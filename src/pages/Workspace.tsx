@@ -255,38 +255,42 @@ export default function Workspace() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-6">
-            <TabsTrigger value="sources" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Sources
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto p-1">
+            <TabsTrigger value="sources" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-2 sm:px-3">
+              <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Sources</span>
+              <span className="sm:hidden">Files</span>
             </TabsTrigger>
-            <TabsTrigger value="chat" className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
+            <TabsTrigger value="chat" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-2 sm:px-3">
+              <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" />
               Chat
             </TabsTrigger>
-            <TabsTrigger value="tools" className="flex items-center gap-2">
-              <Wrench className="w-4 h-4" />
+            <TabsTrigger value="tools" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-2 sm:px-3">
+              <Wrench className="w-3 h-3 sm:w-4 sm:h-4" />
               Tools
             </TabsTrigger>
-            <TabsTrigger value="performance" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Performance
+            <TabsTrigger value="performance" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-2 sm:px-3">
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Performance</span>
+              <span className="sm:hidden">Stats</span>
             </TabsTrigger>
-            <TabsTrigger value="assistant" className="flex items-center gap-2">
-              <Headphones className="w-4 h-4" />
-              Call Assistant
+            <TabsTrigger value="assistant" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-2 sm:px-3">
+              <Headphones className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Call Assistant</span>
+              <span className="sm:hidden">Calls</span>
             </TabsTrigger>
-            <TabsTrigger value="objections" className="flex items-center gap-2">
-              <Lightbulb className="w-4 h-4" />
-              Objections
+            <TabsTrigger value="objections" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-2 sm:px-3">
+              <Lightbulb className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Objections</span>
+              <span className="sm:hidden">Help</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Sources Tab */}
-          <TabsContent value="sources" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="sources" className="space-y-4 sm:space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               {/* Sources Management */}
               <div className="lg:col-span-2 space-y-4">
                 <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
@@ -412,8 +416,8 @@ export default function Workspace() {
           </TabsContent>
 
           {/* Chat Tab */}
-          <TabsContent value="chat" className="space-y-4">
-            <Card className="h-[600px] flex flex-col bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+          <TabsContent value="chat" className="space-y-4 animate-fade-in">
+            <Card className="h-[500px] sm:h-[600px] flex flex-col bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
               {/* Chat Header */}
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-3">
