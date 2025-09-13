@@ -24,9 +24,7 @@ import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
 import { agentTrainingService } from "@/services/agentTrainingService";
 import { useChat } from "@/hooks/useChat";
-import { ChatMessage } from "@/components/ChatMessage";
-import { AgentIntroduction } from "@/components/AgentIntroduction";
-import { TypingIndicator } from "@/components/TypingIndicator";
+import { Chat } from "@/components/Chat";
 import { toast } from "sonner";
 
 
@@ -84,14 +82,9 @@ export default function Workspace() {
           </TabsContent>
 
           <TabsContent value="chat">
-            <Card className="h-[600px] flex flex-col">
-              <div className="p-4">
-                <h3 className="font-semibold">AI Chat Assistant</h3>
-              </div>
-              <div className="flex-1 p-4">
-                <p>Chat interface here...</p>
-              </div>
-            </Card>
+            <div className="h-[600px]">
+              <Chat selectedFileIds={selectedFileIds} className="h-full" />
+            </div>
           </TabsContent>
 
           <TabsContent value="assistant">
