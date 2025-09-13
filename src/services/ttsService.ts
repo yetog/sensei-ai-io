@@ -33,8 +33,8 @@ export class TTSService {
     return TTSService.instance;
   }
 
-  // Pre-configured API key for seamless experience
-  private readonly EMBEDDED_API_KEY = 'sk_' + process.env.ELEVENLABS_API_KEY || '';
+  // API key will be managed through secrets system
+  private readonly EMBEDDED_API_KEY = '';
 
   async setApiKey(apiKey: string) {
     this.apiKey = apiKey;
