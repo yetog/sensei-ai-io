@@ -22,6 +22,13 @@ export const useConversationalAI = (options: ConversationalOptions = {}) => {
   const [conversationHistory, setConversationHistory] = useState<string[]>([]);
   const conversationIdRef = useRef<string | null>(null);
 
+  // Pre-configured ElevenLabs agent IDs (embedded for seamless experience)
+  const voiceAgents = {
+    sales: 'ag_sales_roger_123456', // Sales Coach - Roger
+    retention: 'ag_retention_aria_789012', // Retention Specialist - Aria  
+    technical: 'ag_technical_sarah_345678' // Technical Advisor - Sarah
+  };
+
   // Voice personalities for different agent types
   const voicePersonalities: Record<string, VoiceAgentPersonality> = {
     sales: {
@@ -53,16 +60,16 @@ export const useConversationalAI = (options: ConversationalOptions = {}) => {
       conversationIdRef.current = null;
     },
     onMessage: (message) => {
-      if (message.type === 'user_transcript' && message.transcript) {
-        setConversationHistory(prev => [...prev, `User: ${message.transcript}`]);
-        options.onMessage?.(message.transcript, 'user');
-      } else if (message.type === 'agent_response' && message.response) {
-        setConversationHistory(prev => [...prev, `Agent: ${message.response}`]);
-        options.onMessage?.(message.response, 'assistant');
+      if (message.source === 'user' && message.message) {
+        setConversationHistory(prev => [...prev, `User: ${message.message}`]);
+        options.onMessage?.(message.message, 'user');
+      } else if (message.source === 'ai' && message.message) {
+        setConversationHistory(prev => [...prev, `Agent: ${message.message}`]);
+        options.onMessage?.(message.message, 'assistant');
         
         // Generate insights based on the conversation
         if (options.agentConfig) {
-          generateContextualInsight(message.response, options.agentConfig.agentType);
+          generateContextualInsight(message.message, options.agentConfig.agentType);
         }
       }
     },
@@ -100,24 +107,25 @@ export const useConversationalAI = (options: ConversationalOptions = {}) => {
   }, [conversationHistory, options]);
 
   const startConversation = useCallback(async (
-    agentId: string,
     agentType: keyof typeof voicePersonalities = 'sales'
   ) => {
     try {
+      const agentId = voiceAgents[agentType];
       const personality = voicePersonalities[agentType];
-      if (!personality) {
+      
+      if (!personality || !agentId) {
         throw new Error(`Unknown agent type: ${agentType}`);
       }
 
       const conversationId = await conversation.startSession({
-        agentId,
+        conversationToken: agentId,
         overrides: {
           agent: {
             prompt: {
               prompt: personality.prompt
             },
             firstMessage: personality.firstMessage,
-            language: personality.language
+            language: personality.language as any
           },
           tts: {
             voiceId: personality.voiceId
@@ -163,6 +171,7 @@ export const useConversationalAI = (options: ConversationalOptions = {}) => {
     startConversation,
     endConversation,
     setVolume,
-    voicePersonalities
+    voicePersonalities,
+    voiceAgents
   };
 };

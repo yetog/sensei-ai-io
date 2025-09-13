@@ -1,56 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileUpload } from "@/components/FileUpload";
 import { useFileContext } from "@/contexts/FileContext";
 import { getProjectFiles } from "@/services/projectFiles";
-import { MindMap } from "@/components/MindMap";
-import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot, BarChart3, Headphones, Lightbulb, Mic } from "lucide-react";
-import { PerformanceDashboard } from "@/components/PerformanceDashboard";
-import { ObjectionHandler } from "@/components/ObjectionHandler";
-import { CallAssistant } from "@/components/CallAssistant";
-import { EnhancedCallIntelligence } from "@/components/EnhancedCallIntelligence";
-import { GammaIntegration } from "@/components/GammaIntegration";
-import { QuoteGenerator } from "@/components/QuoteGenerator";
-import { BetaOnboarding } from "@/components/BetaOnboarding";
-import { ConversationalDashboard } from "@/components/ConversationalDashboard";
-import { agentService } from "@/services/agentService";
-import { datasetService } from "@/services/datasetService";
-import { agentTrainingService } from "@/services/agentTrainingService";
+import { Database, Brain, MessageSquare, Sparkles } from "lucide-react";
+import { IntelligenceHub } from "@/components/IntelligenceHub";
+import { ConversationCenter } from "@/components/ConversationCenter";
+import { ContentCreationHub } from "@/components/ContentCreationHub";
 import { useChat } from "@/hooks/useChat";
-import { Chat } from "@/components/Chat";
 import { toast } from "sonner";
 
 
 export default function Workspace() {
-  const { files, addFiles, removeFile, getRelevantFileContextDetailed, getContextForFiles } = useFileContext();
+  const { files, addFiles } = useFileContext();
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [activeAgentId, setActiveAgentId] = useState<string>("");
-  const [activeDatasetId, setActiveDatasetId] = useState<string>("");
   const [activeTab, setActiveTab] = useState("sources");
-  const [refresh, setRefresh] = useState(0);
-  const [showAgentIntro, setShowAgentIntro] = useState(false);
   const [callTranscript, setCallTranscript] = useState('');
   const [isCallActive, setIsCallActive] = useState(false);
   const [lastGeneratedQuote, setLastGeneratedQuote] = useState<any>(null);
-
-  const agents = useMemo(() => agentService.list(), []);
-  const datasets = useMemo(() => datasetService.list(), [refresh]);
-  const activeAgent = useMemo(() => agents.find(a => a.id === activeAgentId), [agents, activeAgentId]);
-  const activeDataset = useMemo(() => datasets.find(d => d.id === activeDatasetId), [datasets, activeDatasetId]);
-
-  // Chat functionality
-  const { messages, isLoading, sendMessage, sendQuickAction, clearChat } = useChat();
-  const [inputValue, setInputValue] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const allFiles = useMemo(() => {
     return [...files, ...getProjectFiles()];
@@ -60,86 +30,90 @@ export default function Workspace() {
     allFiles.filter((f) => f.name.toLowerCase().includes(search.toLowerCase())),
   [allFiles, search]);
 
+  // Mock customer info for demo
+  const customerInfo = {
+    company: "TechCorp Solutions",
+    industry: "Technology",
+    size: "Medium Business"
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-9 mb-6 h-auto p-1">
-            <TabsTrigger value="sources">Sources</TabsTrigger>
-            <TabsTrigger value="chat">Chat</TabsTrigger>
-            <TabsTrigger value="voice">
-              <Mic className="h-4 w-4 mr-1" />
-              Voice AI
+          <TabsList className="grid w-full grid-cols-4 mb-6 h-auto p-1">
+            <TabsTrigger value="sources" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Data Sources
             </TabsTrigger>
-            <TabsTrigger value="assistant">Calls</TabsTrigger>
-            <TabsTrigger value="intelligence">AI Intelligence</TabsTrigger>
-            <TabsTrigger value="objections">Objections</TabsTrigger>
-            <TabsTrigger value="quotes">Quotes</TabsTrigger>
-            <TabsTrigger value="gamma">Gamma</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="intelligence" className="flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              Intelligence Hub
+            </TabsTrigger>
+            <TabsTrigger value="conversations" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Conversation Center
+            </TabsTrigger>
+            <TabsTrigger value="content" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Content Creation
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="sources">
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">File Sources</h3>
-              <FileUpload onFilesUploaded={addFiles} projectId="default" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Data Sources</h3>
+                  <div className="text-sm text-muted-foreground">
+                    {allFiles.length} files available
+                  </div>
+                </div>
+                
+                <Input
+                  placeholder="Search files..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="max-w-sm"
+                />
+                
+                <FileUpload onFilesUploaded={addFiles} projectId="default" />
+                
+                {filteredFiles.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="font-medium mb-3">Available Files ({filteredFiles.length})</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {filteredFiles.map((file) => (
+                        <div key={file.id} className="p-3 border rounded-lg">
+                          <div className="font-medium text-sm truncate">{file.name}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {file.size ? `${Math.round(file.size / 1024)} KB` : 'Unknown size'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </Card>
           </TabsContent>
 
-          <TabsContent value="chat">
-            <div className="h-[600px]">
-              <Chat selectedFileIds={selectedFileIds} className="h-full" />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="voice">
-            <ConversationalDashboard />
-          </TabsContent>
-
-          <TabsContent value="assistant">
-            <CallAssistant />
-          </TabsContent>
-
           <TabsContent value="intelligence">
-            <EnhancedCallIntelligence 
-              transcript={callTranscript}
-              isActive={isCallActive}
-              onInsightGenerated={(insight) => {
-                toast.success(`${insight.agentType} insight: ${insight.title}`);
-              }}
+            <IntelligenceHub 
+              callTranscript={callTranscript}
+              isCallActive={isCallActive}
             />
           </TabsContent>
 
-          <TabsContent value="objections">
-            <ObjectionHandler />
+          <TabsContent value="conversations">
+            <ConversationCenter selectedFileIds={selectedFileIds} />
           </TabsContent>
 
-          <TabsContent value="quotes">
-            <QuoteGenerator 
-              onQuoteGenerated={(quote) => {
-                setLastGeneratedQuote(quote);
-                toast.success('Quote generated successfully!');
-              }}
-            />
-          </TabsContent>
-
-          <TabsContent value="gamma">
-            <GammaIntegration 
+          <TabsContent value="content">
+            <ContentCreationHub 
               quoteData={lastGeneratedQuote}
-              callNotes={'Demo call notes'}
-              customerInfo={{ 
-                company: "Demo Customer", 
-                industry: "Technology",
-                size: "Medium Business"
-              }}
-            />
-          </TabsContent>
-
-          <TabsContent value="performance">
-            <PerformanceDashboard 
-              userKPIs={{ responseTime: 2.5, pitchQuality: 85, quotesSent: 12, conversionRate: 18 }}
-              teamAverage={{ responseTime: 3.2, pitchQuality: 75, quotesSent: 8, conversionRate: 15 }}
-              period="daily"
+              callNotes={callTranscript}
+              customerInfo={customerInfo}
             />
           </TabsContent>
         </Tabs>

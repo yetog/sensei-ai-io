@@ -67,18 +67,9 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({
   }, [volume, setConversationVolume]);
 
   const handleStartConversation = async () => {
-    if (!agentId.trim()) {
-      toast({
-        title: "Agent ID Required",
-        description: "Please enter your ElevenLabs agent ID to start the conversation.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
       const agentType = agentConfig?.agentType || 'sales';
-      await startConversation(agentId, agentType);
+      await startConversation(agentType);
       
       toast({
         title: "🎙️ Voice Agent Active",
@@ -87,7 +78,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({
     } catch (error) {
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to the voice agent. Please check your agent ID and try again.",
+        description: "Failed to connect to the voice agent. Please try again.",
         variant: "destructive"
       });
     }
@@ -143,17 +134,6 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({
         {showSettings && (
           <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
             <div className="space-y-2">
-              <Label htmlFor="agent-id">ElevenLabs Agent ID</Label>
-              <Input
-                id="agent-id"
-                value={agentId}
-                onChange={(e) => setAgentId(e.target.value)}
-                placeholder="Enter your agent ID..."
-                disabled={isActive}
-              />
-            </div>
-            
-            <div className="space-y-2">
               <Label>Volume: {Math.round(volume * 100)}%</Label>
               <Slider
                 value={[volume]}
@@ -173,7 +153,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({
             <Button 
               onClick={handleStartConversation}
               className="flex-1"
-              disabled={!agentId.trim()}
+              disabled={false}
             >
               <Phone className="h-4 w-4 mr-2" />
               Start Coaching

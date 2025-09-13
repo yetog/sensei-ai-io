@@ -32,10 +32,12 @@ interface ConversationMetrics {
 
 interface ConversationalDashboardProps {
   className?: string;
+  onAgentActiveChange?: (isActive: boolean) => void;
 }
 
 export const ConversationalDashboard: React.FC<ConversationalDashboardProps> = ({ 
-  className = "" 
+  className = "",
+  onAgentActiveChange
 }) => {
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | undefined>();
   const [metrics, setMetrics] = useState<ConversationMetrics>({
