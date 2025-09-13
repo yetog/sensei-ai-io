@@ -16,6 +16,16 @@ import {
   AlertTriangle 
 } from 'lucide-react';
 
+interface LiveInsight {
+  id: number;
+  type: string;
+  title: string;
+  description: string;
+  confidence: number;
+  timestamp: Date;
+  actionable: boolean;
+}
+
 interface IntelligenceHubProps {
   callTranscript?: string;
   isCallActive?: boolean;
@@ -27,15 +37,7 @@ export function IntelligenceHub({
   isCallActive = false, 
   className = '' 
 }: IntelligenceHubProps) {
-  const [activeInsights, setActiveInsights] = useState<Array<{
-    id: number;
-    type: string;
-    title: string;
-    description: string;
-    confidence: number;
-    timestamp: Date;
-    actionable: boolean;
-  }>>([]);
+  const [activeInsights, setActiveInsights] = useState<LiveInsight[]>([]);
   const [performanceAlerts, setPerformanceAlerts] = useState<any[]>([]);
   const [recentObjections, setRecentObjections] = useState<any[]>([]);
 
@@ -186,7 +188,7 @@ export function IntelligenceHub({
                           {Math.round(insight.confidence * 100)}%
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground">{(insight as any).description || 'No description available'}</p>
+                      <p className="text-sm text-muted-foreground">{insight.description}</p>
                     </div>
                   </div>
                   {insight.actionable && (
@@ -217,7 +219,7 @@ export function IntelligenceHub({
                   id: Date.now(),
                   type: insight.agentType,
                   title: insight.title,
-                  description: insight.description,
+                  description: (insight as any).description || insight.title || 'AI-generated insight',
                   confidence: insight.confidence || 0.8,
                   timestamp: new Date(),
                   actionable: true
