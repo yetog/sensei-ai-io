@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot, BarChart3, Headphones, Lightbulb } from "lucide-react";
+import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot, BarChart3, Headphones, Lightbulb, Mic } from "lucide-react";
 import { PerformanceDashboard } from "@/components/PerformanceDashboard";
 import { ObjectionHandler } from "@/components/ObjectionHandler";
 import { CallAssistant } from "@/components/CallAssistant";
@@ -20,6 +20,7 @@ import { EnhancedCallIntelligence } from "@/components/EnhancedCallIntelligence"
 import { GammaIntegration } from "@/components/GammaIntegration";
 import { QuoteGenerator } from "@/components/QuoteGenerator";
 import { BetaOnboarding } from "@/components/BetaOnboarding";
+import { ConversationalDashboard } from "@/components/ConversationalDashboard";
 import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
 import { agentTrainingService } from "@/services/agentTrainingService";
@@ -63,9 +64,13 @@ export default function Workspace() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-6 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-9 mb-6 h-auto p-1">
             <TabsTrigger value="sources">Sources</TabsTrigger>
             <TabsTrigger value="chat">Chat</TabsTrigger>
+            <TabsTrigger value="voice">
+              <Mic className="h-4 w-4 mr-1" />
+              Voice AI
+            </TabsTrigger>
             <TabsTrigger value="assistant">Calls</TabsTrigger>
             <TabsTrigger value="intelligence">AI Intelligence</TabsTrigger>
             <TabsTrigger value="objections">Objections</TabsTrigger>
@@ -85,6 +90,10 @@ export default function Workspace() {
             <div className="h-[600px]">
               <Chat selectedFileIds={selectedFileIds} className="h-full" />
             </div>
+          </TabsContent>
+
+          <TabsContent value="voice">
+            <ConversationalDashboard />
           </TabsContent>
 
           <TabsContent value="assistant">
