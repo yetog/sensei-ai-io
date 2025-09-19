@@ -20,6 +20,8 @@ import { useChat } from "@/hooks/useChat";
 import { ChatMessage } from "@/components/ChatMessage";
 import { AgentIntroduction } from "@/components/AgentIntroduction";
 import { TypingIndicator } from "@/components/TypingIndicator";
+import { LiveCoachingDashboard } from "@/components/LiveCoachingDashboard";
+import { KnowledgeBaseManager } from "@/components/KnowledgeBaseManager";
 import { toast } from "sonner";
 
 
@@ -253,7 +255,7 @@ export default function Workspace() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="sources" className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Sources
@@ -261,6 +263,14 @@ export default function Workspace() {
             <TabsTrigger value="chat" className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
               Chat
+            </TabsTrigger>
+            <TabsTrigger value="live-coaching" className="flex items-center gap-2">
+              <Bot className="w-4 h-4" />
+              Live Coaching
+            </TabsTrigger>
+            <TabsTrigger value="knowledge-base" className="flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              Knowledge Base
             </TabsTrigger>
             <TabsTrigger value="tools" className="flex items-center gap-2">
               <Wrench className="w-4 h-4" />
@@ -679,6 +689,16 @@ export default function Workspace() {
                 </div>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Live Coaching Tab */}
+          <TabsContent value="live-coaching">
+            <LiveCoachingDashboard />
+          </TabsContent>
+
+          {/* Knowledge Base Tab */}
+          <TabsContent value="knowledge-base">
+            <KnowledgeBaseManager />
           </TabsContent>
         </Tabs>
       </div>
