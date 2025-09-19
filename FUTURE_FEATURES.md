@@ -75,6 +75,28 @@ interface LiveInsight {
 4. **Performance Data**: Connect to real KPI tracking systems
 5. **Agent Training**: Integrate with actual training platforms
 
+## Removed Dashboard Components
+
+### Call Activity Dashboard
+- **Chat Messages**: Real-time message counter with session tracking
+- **Calls Today**: Daily call volume with average duration (8 calls, 12:34 avg)
+- **Success Rate**: Performance metrics with trend indicators (75%, +5% vs yesterday)
+- **Voice Coaching**: Status indicator with time tracking (Ready, 45m today)
+
+### Recent Call Activity
+- **Call History**: List of recent customer interactions
+- **Performance Scores**: Individual call ratings and outcomes
+- **Contact Information**: Customer names and company details
+- **Call Duration**: Timing and timestamp tracking
+- **Follow-up Status**: Proposal sent, scheduled follow-ups
+
+### Genesys Integration Panel
+- **Connection Status**: Live connection indicator to Genesys Cloud
+- **Client Configuration**: Setup panel for Genesys credentials
+- **Call Controls**: Start/end call functionality
+- **Audio Level Monitoring**: Real-time audio feedback
+- **Setup Instructions**: IT administrator guidance
+
 ## Potential Integrations
 
 - **Call Recording APIs**: Twilio, Genesys, etc.
