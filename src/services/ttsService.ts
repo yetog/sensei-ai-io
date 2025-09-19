@@ -33,9 +33,6 @@ export class TTSService {
     return TTSService.instance;
   }
 
-  // API key managed through Lovable secrets system
-  private readonly EMBEDDED_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || 'sk-fake-elevenlabs-key-for-demo';
-
   async setApiKey(apiKey: string) {
     this.apiKey = apiKey;
     localStorage.setItem('elevenlabs-api-key', apiKey);
@@ -43,27 +40,18 @@ export class TTSService {
 
   getApiKey(): string | null {
     if (!this.apiKey) {
-      // Try embedded API key first, then localStorage
-      this.apiKey = this.EMBEDDED_API_KEY || localStorage.getItem('elevenlabs-api-key');
+      this.apiKey = localStorage.getItem('elevenlabs-api-key');
     }
     return this.apiKey;
   }
 
   async requestApiKey(): Promise<string> {
-    // Always use embedded key - no user prompt required
-    if (this.EMBEDDED_API_KEY) {
-      this.apiKey = this.EMBEDDED_API_KEY;
-      return this.EMBEDDED_API_KEY;
+    const apiKey = prompt('Please enter your ElevenLabs API key:');
+    if (apiKey) {
+      await this.setApiKey(apiKey);
+      return apiKey;
     }
-    
-    // Fallback to localStorage if embedded key not available
-    const storedKey = localStorage.getItem('elevenlabs-api-key');
-    if (storedKey) {
-      this.apiKey = storedKey;
-      return storedKey;
-    }
-    
-    throw new Error('ElevenLabs API key not configured in system');
+    throw new Error('API key required');
   }
 
   getVoiceForAgent(agentType: string): string {

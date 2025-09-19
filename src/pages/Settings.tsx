@@ -8,7 +8,6 @@ import { ionosAI } from "@/services/ionosAI";
 import { toast } from "sonner";
 import { HelpCircle, Users, MessageSquare, Settings as SettingsIcon, Bot, FileText, Zap } from "lucide-react";
 import { ModelSelector } from "@/components/ModelSelector";
-import { BetaOnboarding } from "@/components/BetaOnboarding";
 
 export default function Settings() {
   const [token, setToken] = useState(ionosAI.getApiToken() || "");
@@ -21,7 +20,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="api" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="api" className="flex items-center gap-2">
             <SettingsIcon className="w-4 h-4" />
             API Configuration
@@ -29,10 +28,6 @@ export default function Settings() {
           <TabsTrigger value="models" className="flex items-center gap-2">
             <Bot className="w-4 h-4" />
             Models & TTS
-          </TabsTrigger>
-          <TabsTrigger value="beta" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Beta Onboarding
           </TabsTrigger>
           <TabsTrigger value="help" className="flex items-center gap-2">
             <HelpCircle className="w-4 h-4" />
@@ -42,46 +37,34 @@ export default function Settings() {
 
         <TabsContent value="api" className="space-y-4">
           <Card className="p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                  API Configuration
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                    ✅ Pre-configured
-                  </Badge>
-                </h3>
-                <p className="text-sm text-muted-foreground">All API keys are pre-configured for the demo experience</p>
-              </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">API Keys</h3>
+              <p className="text-sm text-muted-foreground">Configure your IONOS AI API token to enable chat functionality</p>
             </div>
-            <div className="space-y-4 bg-muted/30 p-4 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="text-sm font-medium text-muted-foreground">IONOS AI Integration</div>
-                  <div className="text-xs text-muted-foreground">✅ Active and ready for demo</div>
-                </div>
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  Connected
-                </Badge>
-              </div>
-              
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">ElevenLabs TTS</div>
-                <div className="text-xs text-muted-foreground">✅ Voice synthesis ready</div>
-              </div>
-              
-              <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded border border-blue-200">
-                💡 All API integrations are pre-configured for the demo. No additional setup required!
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">IONOS AI Token</label>
+              <Input 
+                type="password" 
+                value={token} 
+                onChange={(e) => setToken(e.target.value)} 
+                placeholder="Enter your API token" 
+                className="max-w-md"
+              />
             </div>
+            <Button 
+              onClick={() => { 
+                ionosAI.setApiToken(token); 
+                toast.success("API token saved successfully!"); 
+              }}
+              className="w-fit"
+            >
+              Save Token
+            </Button>
           </Card>
         </TabsContent>
 
         <TabsContent value="models" className="space-y-4">
           <ModelSelector />
-        </TabsContent>
-
-        <TabsContent value="beta" className="space-y-4">
-          <BetaOnboarding />
         </TabsContent>
 
         <TabsContent value="help" className="space-y-6">
