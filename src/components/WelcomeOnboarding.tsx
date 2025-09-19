@@ -25,6 +25,7 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [isVisible, setIsVisible] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Check if user has seen onboarding before
   useEffect(() => {
@@ -34,21 +35,52 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
     }
   }, []);
 
+  // Refresh completion status periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check actual completion status based on localStorage or application state
+  const checkStepCompletion = (stepId: string): boolean => {
+    switch (stepId) {
+      case 'welcome':
+        return true; // Always completed
+      case 'workspace':
+        return localStorage.getItem('sensei:hasUploadedFiles') === 'true';
+      case 'agents':
+        return localStorage.getItem('sensei:hasCreatedAgent') === 'true';
+      case 'tools':
+        return localStorage.getItem('sensei:hasUsedTools') === 'true';
+      case 'assistant':
+        return localStorage.getItem('sensei:hasUsedAssistant') === 'true';
+      case 'settings':
+        return localStorage.getItem('sensei:hasConfiguredSettings') === 'true';
+      default:
+        return false;
+    }
+  };
+
   const steps: OnboardingStep[] = [
     {
       id: 'welcome',
       title: 'Welcome to Sensei AI',
       description: 'Your intelligent sales assistant that reduces mental load and improves sales consistency. Let\'s get you started!',
       icon: <CheckCircle className="w-6 h-6 text-primary" />,
-      completed: true
+      completed: checkStepCompletion('welcome')
     },
     {
       id: 'workspace',
       title: 'Upload Your Knowledge Base',
       description: 'Start by uploading product docs, sales scripts, or any materials. The AI will use these to provide contextual assistance.',
       icon: <FileText className="w-6 h-6" />,
-      completed: false,
-      action: () => navigate('/'),
+      completed: checkStepCompletion('workspace'),
+      action: () => {
+        navigate('/');
+        localStorage.setItem('sensei:hasUsedWorkspace', 'true');
+      },
       route: '/'
     },
     {
@@ -56,8 +88,11 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
       title: 'Create Your Sales Agents',
       description: 'Build specialized AI agents for different sales scenarios - prospecting, objection handling, closing, etc.',
       icon: <Users className="w-6 h-6" />,
-      completed: false,
-      action: () => navigate('/agents'),
+      completed: checkStepCompletion('agents'),
+      action: () => {
+        navigate('/agents');
+        localStorage.setItem('sensei:hasVisitedAgents', 'true');
+      },
       route: '/agents'
     },
     {
@@ -65,8 +100,11 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
       title: 'Explore Sales Tools',
       description: 'Use Quote Generator, Meeting Prep Podcasts, and other tools to save 20-40 minutes per sales activity.',
       icon: <PlayCircle className="w-6 h-6" />,
-      completed: false,
-      action: () => navigate('/products'),
+      completed: checkStepCompletion('tools'),
+      action: () => {
+        navigate('/products');
+        localStorage.setItem('sensei:hasVisitedTools', 'true');
+      },
       route: '/products'
     },
     {
@@ -74,12 +112,12 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
       title: 'Try the Call Assistant',
       description: 'Get real-time suggestions during customer calls. It\'s like having a coach whispering in your ear.',
       icon: <Mic className="w-6 h-6" />,
-      completed: false,
+      completed: checkStepCompletion('assistant'),
       action: () => {
         navigate('/');
+        localStorage.setItem('sensei:workspaceTab', 'assistant');
+        localStorage.setItem('sensei:hasVisitedAssistant', 'true');
         setTimeout(() => {
-          // Switch to call assistant tab
-          localStorage.setItem('sensei:workspaceTab', 'assistant');
           window.location.reload();
         }, 100);
       }
@@ -89,22 +127,27 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
       title: 'Customize Your Setup',
       description: 'Choose your preferred AI model, voice settings, and other preferences to match your working style.',
       icon: <Settings className="w-6 h-6" />,
-      completed: false,
-      action: () => navigate('/settings'),
+      completed: checkStepCompletion('settings'),
+      action: () => {
+        navigate('/settings');
+        localStorage.setItem('sensei:hasVisitedSettings', 'true');
+      },
       route: '/settings'
     }
   ];
 
   const handleStepAction = (step: OnboardingStep) => {
-    setCompletedSteps(prev => new Set([...prev, step.id]));
-    
     if (step.action) {
       step.action();
     }
     
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
+    // Mark step as manually triggered
+    localStorage.setItem(`sensei:triggered_${step.id}`, 'true');
+    
+    // Refresh to update completion status
+    setTimeout(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 500);
   };
 
   const handleSkip = () => {
@@ -119,7 +162,9 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
     onClose?.();
   };
 
-  const progress = (completedSteps.size / steps.length) * 100;
+  // Calculate progress based on actual completion status
+  const completedCount = steps.filter(step => step.completed).length;
+  const progress = (completedCount / steps.length) * 100;
 
   if (!isVisible) return null;
 
@@ -155,7 +200,7 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
           <div className="pt-4">
             <div className="flex justify-between text-sm text-muted-foreground mb-2">
               <span>Setup Progress</span>
-              <span>{completedSteps.size}/{steps.length} completed</span>
+              <span>{completedCount}/{steps.length} completed</span>
             </div>
             <Progress 
               value={progress} 
@@ -166,43 +211,53 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
 
         <CardContent className="space-y-4 max-h-96 overflow-y-auto">
           {steps.map((step, index) => {
-            const isCompleted = completedSteps.has(step.id) || step.completed;
-            const isCurrent = index === currentStep;
+            const isCompleted = step.completed;
+            const isClickable = step.action || step.route;
             
             return (
               <div
                 key={step.id}
+                onClick={() => isClickable && !isCompleted ? handleStepAction(step) : undefined}
                 className={`flex items-start gap-4 p-4 rounded-lg border transition-all duration-200 ${
-                  isCurrent 
-                    ? 'border-primary bg-primary/5 shadow-md animate-glow-purple' 
-                    : 'border-border hover:border-border/80'
-                } ${isCompleted ? 'opacity-75' : ''}`}
+                  isClickable && !isCompleted
+                    ? 'cursor-pointer hover:border-primary/50 hover:bg-primary/5 hover:shadow-md' 
+                    : isCompleted 
+                    ? 'opacity-75 border-green-500/30 bg-green-500/5'
+                    : 'border-border'
+                } ${isCompleted ? '' : 'animate-pulse-border'}`}
               >
                 <div className={`shrink-0 transition-colors ${
-                  isCompleted ? 'text-green-500' : isCurrent ? 'text-primary' : 'text-muted-foreground'
+                  isCompleted ? 'text-green-500' : 'text-primary'
                 }`}>
                   {isCompleted ? <CheckCircle className="w-6 h-6" /> : step.icon}
                 </div>
                 
                 <div className="flex-1 space-y-2">
                   <h3 className={`font-medium transition-colors ${
-                    isCurrent ? 'text-primary' : 'text-foreground'
+                    isCompleted ? 'text-green-700 dark:text-green-400' : 'text-foreground'
                   }`}>
                     {step.title}
+                    {isCompleted && <span className="ml-2 text-xs text-green-600">✓ Complete</span>}
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {step.description}
                   </p>
                   
-                  {isCurrent && !isCompleted && (
-                    <Button
-                      onClick={() => handleStepAction(step)}
-                      size="sm"
-                      className="mt-3 animate-fade-in"
-                    >
-                      {step.action ? 'Let\'s go' : 'Mark complete'}
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
+                  {!isCompleted && isClickable && (
+                    <div className="pt-2">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStepAction(step);
+                        }}
+                        size="sm"
+                        variant="outline"
+                        className="hover:bg-primary hover:text-primary-foreground"
+                      >
+                        {step.action ? 'Let\'s go' : 'Mark complete'}
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
