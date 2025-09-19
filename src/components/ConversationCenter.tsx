@@ -11,7 +11,9 @@ import {
   Headphones,
   Play,
   Square,
-  CheckCircle
+  CheckCircle,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { useChat } from '@/hooks/useChat';
 
@@ -32,7 +34,10 @@ export function ConversationCenter({ selectedFileIds = [], className = '' }: Con
     stopCoaching,
     triggerTestInsight,
     currentCall,
-    audioLevel
+    audioLevel,
+    isListening,
+    isRecording,
+    transcription
   } = useRealTimeCoaching({
     agentType: 'sales',
     enableVoiceCoaching: true,
@@ -67,9 +72,17 @@ export function ConversationCenter({ selectedFileIds = [], className = '' }: Con
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">Status</span>
-              <Badge variant={coachingActive ? "default" : "secondary"}>
-                {coachingActive ? "Active" : "Ready"}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant={coachingActive ? "default" : "secondary"}>
+                  {coachingActive ? "Active" : "Ready"}
+                </Badge>
+                {isRecording && (
+                  <div className="flex items-center gap-1">
+                    <Mic className="h-3 w-3 text-red-500 animate-pulse" />
+                    <span className="text-xs text-red-500">Recording</span>
+                  </div>
+                )}
+              </div>
             </div>
             
             {coachingActive && currentCall && (
@@ -106,6 +119,19 @@ export function ConversationCenter({ selectedFileIds = [], className = '' }: Con
                 Test
               </Button>
             </div>
+
+            {/* Live Transcription */}
+            {isRecording && transcription && (
+              <div className="space-y-2 p-2 bg-yellow-50 dark:bg-yellow-950/20 rounded border">
+                <div className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Mic className="h-3 w-3" />
+                  Live Transcription
+                </div>
+                <div className="text-xs max-h-20 overflow-y-auto">
+                  {transcription.slice(-200)}...
+                </div>
+              </div>
+            )}
 
             {/* Recent Insights */}
             {insights.length > 0 && (

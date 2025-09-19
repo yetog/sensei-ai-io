@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useElevenLabs } from './useElevenLabs';
 import { useConversationalAI } from './useConversationalAI';
 import { useGenesysIntegration } from '@/services/genesysIntegration';
+import { useAudioCapture } from './useAudioCapture';
 import { SpecializedAgentService } from '@/services/specializedAgents';
 
 interface CoachingInsight {
@@ -25,6 +26,7 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
   const [isActive, setIsActive] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [conversationContext, setConversationContext] = useState<string[]>([]);
+  const [isListeningToAudio, setIsListeningToAudio] = useState(false);
   
   const { speakCoaching, isPlaying, stopSpeaking } = useElevenLabs();
   const { startConversation, endConversation, isActive: voiceAgentActive } = useConversationalAI({
@@ -50,6 +52,14 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
   const { currentCall, audioLevel, isListening } = useGenesysIntegration();
   const specializedService = useRef(new SpecializedAgentService());
   const analysisTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  // Audio capture for speech-to-text
+  const { startRecording, stopRecording, isRecording } = useAudioCapture({
+    onTranscript: (transcript) => {
+      setTranscription(prev => prev + ' ' + transcript);
+    },
+    includeSystemAudio: false
+  });
 
   // Auto-analyze conversation segments
   useEffect(() => {
@@ -158,6 +168,11 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
       setIsActive(true);
       setInsights([]);
       setConversationContext([]);
+      setTranscription('');
+      
+      // Start speech-to-text recording
+      setIsListeningToAudio(true);
+      await startRecording();
       
       if (options.enableVoiceCoaching) {
         await startConversation(options.agentType);
@@ -172,12 +187,15 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
     } catch (error) {
       console.error('Failed to start coaching:', error);
       setIsActive(false);
+      setIsListeningToAudio(false);
     }
-  }, [options.agentType, options.enableVoiceCoaching, startConversation, addInsight]);
+  }, [options.agentType, options.enableVoiceCoaching, startConversation, addInsight, startRecording]);
 
   const stopCoaching = useCallback(async () => {
     setIsActive(false);
+    setIsListeningToAudio(false);
     stopSpeaking();
+    stopRecording();
     
     if (voiceAgentActive) {
       await endConversation();
@@ -188,7 +206,7 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
       message: 'Coaching session ended. Great job!',
       confidence: 1.0
     });
-  }, [stopSpeaking, voiceAgentActive, endConversation, addInsight]);
+  }, [stopSpeaking, voiceAgentActive, endConversation, addInsight, stopRecording]);
 
   const clearInsights = useCallback(() => {
     setInsights([]);
@@ -241,7 +259,8 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
     transcription,
     conversationContext,
     audioLevel,
-    isListening,
+    isListening: isListening || isListeningToAudio,
+    isRecording,
     currentCall,
     startCoaching,
     stopCoaching,
