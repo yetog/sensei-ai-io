@@ -5,8 +5,7 @@ import { useFileContext } from "@/contexts/FileContext";
 import { getProjectFiles } from "@/services/projectFiles";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Database, Brain, MessageSquare, Sparkles } from "lucide-react";
-import { IntelligenceHub } from "@/components/IntelligenceHub";
+import { Database, MessageSquare, Sparkles } from "lucide-react";
 import { ConversationCenter } from "@/components/ConversationCenter";
 import { ContentCreationHub } from "@/components/ContentCreationHub";
 import { useChat } from "@/hooks/useChat";
@@ -46,9 +45,9 @@ export default function Workspace() {
               <Database className="h-4 w-4" />
               Data Sources
             </TabsTrigger>
-            <TabsTrigger value="live-ops" className="flex items-center gap-2">
-              <Brain className="h-4 w-4" />
-              Live Operations
+            <TabsTrigger value="objections" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Objection Handling
             </TabsTrigger>
             <TabsTrigger value="content" className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
@@ -94,14 +93,8 @@ export default function Workspace() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="live-ops">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <IntelligenceHub 
-                callTranscript={callTranscript}
-                isCallActive={isCallActive}
-              />
-              <ConversationCenter selectedFileIds={selectedFileIds} />
-            </div>
+          <TabsContent value="objections">
+            <ConversationCenter selectedFileIds={selectedFileIds} />
           </TabsContent>
 
           <TabsContent value="content">
