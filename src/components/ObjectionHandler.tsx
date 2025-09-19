@@ -1,74 +1,128 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Copy, ThumbsUp, MessageCircle } from 'lucide-react';
+import { Search, Copy, ThumbsUp, ThumbsDown, MessageCircle, TrendingUp, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { knowledgeBaseService } from '@/services/knowledgeBaseService';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Objection {
   id: string;
-  category: 'pricing' | 'product' | 'timing' | 'authority' | 'trust';
+  category: 'pricing' | 'product' | 'timing' | 'authority' | 'trust' | 'competition';
   objection: string;
   response: string;
   context: string;
   success_rate: number;
+  agentType: 'outbound' | 'retention' | 'telesales' | 'any';
+  product: string;
+  lastUsed: string;
 }
 
-const objections: Objection[] = [
-  {
-    id: '1',
-    category: 'pricing',
-    objection: "Your prices are too high",
-    response: "I understand cost is important. Let me show you the ROI calculation - with our premium support and uptime guarantee, you'll actually save money in the long run. Plus, we can discuss a 36-month plan that locks in significant savings.",
-    context: "Domain/hosting pricing concerns",
-    success_rate: 85
-  },
-  {
-    id: '2',
-    category: 'pricing',
-    objection: "GoDaddy is cheaper",
-    response: "You're right that GoDaddy has lower initial prices, but let's compare the total cost of ownership. Our premium DNS, included SSL certificates, and 24/7 expert support often make us more cost-effective. Here's a direct comparison...",
-    context: "Competitor pricing comparison",
-    success_rate: 78
-  },
-  {
-    id: '3',
-    category: 'product',
-    objection: "I'm not using my current hosting",
-    response: "That's actually perfect timing! If you're not using your current hosting, we can help you get set up properly. Our migration team will handle everything, and I'll make sure you have the right resources to actually use what you're paying for.",
-    context: "Unused services/retention",
-    success_rate: 72
-  },
-  {
-    id: '4',
-    category: 'timing',
-    objection: "I need to think about it",
-    response: "I completely understand - this is an important decision. What specific aspects would you like to think through? I'm here to help clarify anything. Also, with economic uncertainty, locking in these rates now for 36 months gives you cost control.",
-    context: "General hesitation",
-    success_rate: 65
-  },
-  {
-    id: '5',
-    category: 'authority',
-    objection: "I need to ask my boss/team",
-    response: "That makes sense. Would it be helpful if I prepared a brief summary of our discussion and the proposal for you to share? I can also schedule a quick call with your team to answer any technical questions they might have.",
-    context: "Decision maker not present",
-    success_rate: 70
-  },
-  {
-    id: '6',
-    category: 'trust',
-    objection: "I've had bad experiences with hosting companies",
-    response: "I'm sorry to hear that, and I completely understand your hesitation. What specifically went wrong? Our approach is different - we assign dedicated account managers and have a 99.9% uptime guarantee. Let me share some customer success stories similar to your situation.",
-    context: "Past negative experiences",
-    success_rate: 68
-  }
-];
+interface FeedbackDialogProps {
+  objection: Objection;
+  onSubmit: (helpful: boolean, reason?: string, note?: string) => void;
+}
+
+function FeedbackDialog({ objection, onSubmit }: FeedbackDialogProps) {
+  const [reason, setReason] = useState<string>('');
+  const [note, setNote] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleSubmit = (helpful: boolean) => {
+    onSubmit(helpful, reason || undefined, note || undefined);
+    setIsOpen(false);
+    setReason('');
+    setNote('');
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="ml-2">
+          Feedback
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Was this objection response helpful?</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
+            <strong>Objection:</strong> {objection.objection}
+          </div>
+          
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => handleSubmit(true)}
+              className="flex-1"
+              variant="default"
+            >
+              <ThumbsUp className="w-4 h-4 mr-2" />
+              Helpful
+            </Button>
+            <Button 
+              onClick={() => handleSubmit(false)}
+              className="flex-1"
+              variant="destructive"
+            >
+              <ThumbsDown className="w-4 h-4 mr-2" />
+              Not Helpful
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Why? (optional)</label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a reason" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="clear">Clear and effective</SelectItem>
+                <SelectItem value="off-topic">Off-topic response</SelectItem>
+                <SelectItem value="outdated">Outdated information</SelectItem>
+                <SelectItem value="too-long">Too lengthy</SelectItem>
+                <SelectItem value="missing-context">Missing context</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Additional notes (optional)</label>
+            <Textarea 
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Any specific feedback or suggestions..."
+              rows={3}
+            />
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function ObjectionHandler() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedAgentType, setSelectedAgentType] = useState<string>('all');
+  const [objections, setObjections] = useState<Objection[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Load objections from knowledge base
+    const loadedObjections = knowledgeBaseService.getExpandedObjections() as Objection[];
+    setObjections(loadedObjections);
+    
+    // Load analytics
+    const analyticsData = knowledgeBaseService.getUsageAnalytics();
+    setAnalytics(analyticsData);
+  }, []);
 
   const categories = [
     { value: 'all', label: 'All Objections' },
@@ -79,15 +133,49 @@ export function ObjectionHandler() {
     { value: 'trust', label: 'Trust' }
   ];
 
+  const agentTypes = [
+    { value: 'all', label: 'All Agents' },
+    { value: 'outbound', label: 'Outbound' },
+    { value: 'retention', label: 'Retention' },
+    { value: 'telesales', label: 'Telesales' }
+  ];
+
   const filteredObjections = objections.filter(obj => {
     const matchesSearch = obj.objection.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          obj.response.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || obj.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesAgentType = selectedAgentType === 'all' || obj.agentType === selectedAgentType || obj.agentType === 'any';
+    return matchesSearch && matchesCategory && matchesAgentType;
   });
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied to clipboard",
+      description: "Response text copied successfully",
+      duration: 2000,
+    });
+  };
+
+  const handleFeedback = (objectionId: string, helpful: boolean, reason?: string, note?: string) => {
+    knowledgeBaseService.saveObjectionFeedback({
+      objectionId,
+      helpful,
+      reason: reason as any,
+      note,
+      agentId: `current-agent-${selectedAgentType}`,
+      timestamp: new Date().toISOString()
+    });
+
+    // Refresh analytics
+    const updatedAnalytics = knowledgeBaseService.getUsageAnalytics();
+    setAnalytics(updatedAnalytics);
+
+    toast({
+      title: helpful ? "Thanks for the feedback!" : "Feedback received",
+      description: helpful ? "This helps us improve our suggestions" : "We'll work on improving this response",
+      duration: 3000,
+    });
   };
 
   const getCategoryColor = (category: string) => {
@@ -103,42 +191,70 @@ export function ObjectionHandler() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Objection Handler</h2>
-        <p className="text-muted-foreground">Quick access to proven responses for common sales objections</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Objection Handler</h2>
+          <p className="text-muted-foreground">Real IONOS objections with proven responses</p>
+        </div>
+        {analytics && (
+          <div className="flex gap-4 text-sm">
+            <div className="text-center">
+              <div className="font-bold text-lg">{analytics.totalQueries}</div>
+              <div className="text-muted-foreground">Total Uses</div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold text-lg text-green-600">{analytics.averageHelpfulRate}%</div>
+              <div className="text-muted-foreground">Helpful Rate</div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search objections..."
+              placeholder="Search objections and responses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
         </div>
-        <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full sm:w-auto">
-          <TabsList className="grid grid-cols-3 sm:grid-cols-6">
-            {categories.map((category) => (
-              <TabsTrigger key={category.value} value={category.value} className="text-xs">
-                {category.label.split(' ')[0]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex gap-2">
+          <Select value={selectedAgentType} onValueChange={setSelectedAgentType}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {agentTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-auto">
+            <TabsList className="grid grid-cols-3 lg:grid-cols-6">
+              {categories.map((category) => (
+                <TabsTrigger key={category.value} value={category.value} className="text-xs">
+                  {category.label.split(' ')[0]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       <div className="grid gap-4">
         {filteredObjections.map((objection) => (
           <Card key={objection.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
+                <div className="flex items-start justify-between">
+                <div className="space-y-1 flex-1">
                   <CardTitle className="text-lg">{objection.objection}</CardTitle>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge className={getCategoryColor(objection.category)}>
                       {objection.category}
                     </Badge>
@@ -146,16 +262,28 @@ export function ObjectionHandler() {
                       <ThumbsUp className="w-3 h-3 mr-1" />
                       {objection.success_rate}% success
                     </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {objection.agentType}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {objection.product}
+                    </Badge>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => copyToClipboard(objection.response)}
-                  className="shrink-0"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => copyToClipboard(objection.response)}
+                    title="Copy response"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <FeedbackDialog 
+                    objection={objection}
+                    onSubmit={(helpful, reason, note) => handleFeedback(objection.id, helpful, reason, note)}
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -164,9 +292,17 @@ export function ObjectionHandler() {
                   <h4 className="text-sm font-medium mb-1">Recommended Response:</h4>
                   <p className="text-sm leading-relaxed">{objection.response}</p>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  <MessageCircle className="inline w-3 h-3 mr-1" />
-                  Context: {objection.context}
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center">
+                      <MessageCircle className="inline w-3 h-3 mr-1" />
+                      {objection.context}
+                    </span>
+                    <span className="flex items-center">
+                      <TrendingUp className="inline w-3 h-3 mr-1" />
+                      Last used: {new Date(objection.lastUsed).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>
