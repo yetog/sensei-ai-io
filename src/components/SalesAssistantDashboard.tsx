@@ -21,9 +21,12 @@ import {
   PauseCircle,
   FileText,
   MessageSquare,
-  Zap
+  Zap,
+  Settings
 } from 'lucide-react';
 import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
+import { ConversationSimulator } from './ConversationSimulator';
+import { LiveTranscriptionPanel } from './LiveTranscriptionPanel';
 
 interface SalesAssistantDashboardProps {
   className?: string;
@@ -57,6 +60,8 @@ export function SalesAssistantDashboard({ className = '' }: SalesAssistantDashbo
   const [callProgress, setCallProgress] = useState(0);
   const [demoMode, setDemoMode] = useState(true);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
+  const [simulatedTranscript, setSimulatedTranscript] = useState('');
+  const [simulatedInsights, setSimulatedInsights] = useState<any[]>([]);
   
   const {
     isActive: coachingActive,
@@ -66,7 +71,9 @@ export function SalesAssistantDashboard({ className = '' }: SalesAssistantDashbo
     currentCall,
     isListening,
     isRecording,
-    transcription
+    transcription,
+    simulateTranscription,
+    addInsight
   } = useRealTimeCoaching({
     agentType: 'sales',
     enableVoiceCoaching: true,
@@ -87,7 +94,20 @@ export function SalesAssistantDashboard({ className = '' }: SalesAssistantDashbo
   const handleStartDemo = (type: string) => {
     setActiveDemo(type);
     setDemoMode(false);
+    setSimulatedInsights([]);
+    setSimulatedTranscript('');
     startCoaching();
+  };
+
+  const handleSimulatedTranscript = (text: string, speaker: 'rep' | 'customer') => {
+    const fullText = `[${speaker}] ${text}`;
+    setSimulatedTranscript(prev => prev + (prev ? '\n' : '') + fullText);
+    simulateTranscription(text);
+  };
+
+  const handleSimulatedInsight = (insight: any) => {
+    setSimulatedInsights(prev => [...prev, insight]);
+    addInsight(insight);
   };
 
   const callStage = callProgress < 20 ? 'Opening' : 
@@ -103,7 +123,9 @@ export function SalesAssistantDashboard({ className = '' }: SalesAssistantDashbo
     }
   };
 
-  const displayInsights = insights.length > 0 ? insights.slice(-3) : DEMO_INSIGHTS;
+  const displayInsights = insights.length > 0 ? insights.slice(-3) : 
+                        simulatedInsights.length > 0 ? simulatedInsights.slice(-3) : 
+                        DEMO_INSIGHTS;
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -155,21 +177,40 @@ export function SalesAssistantDashboard({ className = '' }: SalesAssistantDashbo
       </div>
 
       {/* Main Dashboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
         {/* Left Column: Live Coaching */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="xl:col-span-2 space-y-6">
           
+          {/* Demo Conversation Simulator or Live Transcription */}
+          {demoMode && !coachingActive ? (
+            <ConversationSimulator 
+              onTranscriptUpdate={handleSimulatedTranscript}
+              onInsightGenerated={handleSimulatedInsight}
+              isActive={coachingActive}
+            />
+          ) : (
+            <LiveTranscriptionPanel 
+              isRecording={isRecording}
+              isListening={isListening}
+              transcription={transcription || simulatedTranscript}
+              onStartRecording={startCoaching}
+              onStopRecording={stopCoaching}
+              isActive={coachingActive}
+              audioLevel={0.7}
+            />
+          )}
+
           {/* Live Coaching Status */}
           <Card className={coachingActive ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : ''}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Phone className="h-5 w-5" />
-                Live Call Coaching
+                <Brain className="h-5 w-5" />
+                AI Coaching Status
                 {coachingActive && (
                   <Badge variant="default" className="animate-pulse">
                     <div className="w-2 h-2 bg-white rounded-full mr-2" />
-                    Live
+                    Active
                   </Badge>
                 )}
               </CardTitle>
@@ -177,95 +218,72 @@ export function SalesAssistantDashboard({ className = '' }: SalesAssistantDashbo
             <CardContent className="space-y-4">
               
               {!coachingActive ? (
-                <div className="text-center py-8">
+                <div className="text-center py-6">
                   <div className="space-y-4">
                     <div className="text-muted-foreground">
-                      <Phone className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Ready to start your sales call?</p>
-                      <p className="text-sm mt-2">Get real-time AI coaching and insights</p>
+                      <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>AI Coaching is ready to assist</p>
+                      <p className="text-sm mt-2">Start a call or demo to see real-time insights</p>
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
-                      <Button onClick={() => handleStartDemo('discovery')} className="flex-1">
-                        <PlayCircle className="h-4 w-4 mr-2" />
-                        Start Call
+                      <Button onClick={() => handleStartDemo('live')} className="flex-1">
+                        <Mic className="h-4 w-4 mr-2" />
+                        Start Live Call
                       </Button>
                       <Button 
                         variant="outline" 
-                        onClick={() => handleStartDemo('demo')}
+                        onClick={() => {
+                          setDemoMode(true);
+                          setActiveDemo(null);
+                        }}
                         className="flex-1"
                       >
+                        <PlayCircle className="h-4 w-4 mr-2" />
                         Try Demo
                       </Button>
-                    </div>
-
-                    {/* How It Works Preview */}
-                    <div className="mt-8 p-4 bg-muted/50 rounded-lg text-left">
-                      <h4 className="font-medium mb-3 flex items-center gap-2">
-                        <Zap className="h-4 w-4" />
-                        How it works:
-                      </h4>
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
-                          AI listens to your conversation in real-time
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
-                          Get instant suggestions for objections & opportunities
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
-                          Access your knowledge base during calls
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
-                          Automatic call notes and follow-up suggestions
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* AI Processing Flow */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <div className={`w-3 h-3 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                      <div>
+                        <div className="text-sm font-medium">Listening</div>
+                        <div className="text-xs text-muted-foreground">Speech Detection</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <div className={`w-3 h-3 rounded-full ${transcription ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`} />
+                      <div>
+                        <div className="text-sm font-medium">Transcribing</div>
+                        <div className="text-xs text-muted-foreground">Speech-to-Text</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <div className={`w-3 h-3 rounded-full ${insights.length > 0 || simulatedInsights.length > 0 ? 'bg-purple-500 animate-pulse' : 'bg-gray-400'}`} />
+                      <div>
+                        <div className="text-sm font-medium">Analyzing</div>
+                        <div className="text-xs text-muted-foreground">AI Insights</div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        {isRecording ? (
-                          <Mic className="h-4 w-4 text-red-500 animate-pulse" />
-                        ) : (
-                          <MicOff className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span className="text-sm font-medium">
-                          {isRecording ? 'Recording' : 'Paused'}
-                        </span>
-                      </div>
                       <Badge variant="outline">{callStage} Stage</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {activeDemo === 'demo' ? 'Demo Mode' : 'Live Call'}
+                      </span>
                     </div>
                     <Button onClick={stopCoaching} variant="destructive" size="sm">
                       <PauseCircle className="h-4 w-4 mr-2" />
-                      End Call
+                      End Session
                     </Button>
                   </div>
-
-                  {currentCall && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                      <div className="text-sm text-muted-foreground">Customer</div>
-                      <div className="font-medium">{currentCall.participantData.customerPhoneNumber}</div>
-                    </div>
-                  )}
-
-                  {/* Live Transcription */}
-                  {transcription && (
-                    <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border">
-                      <div className="text-sm font-medium text-muted-foreground mb-2">
-                        Live Transcription
-                      </div>
-                      <div className="text-sm max-h-20 overflow-y-auto">
-                        {transcription.slice(-200)}...
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </CardContent>

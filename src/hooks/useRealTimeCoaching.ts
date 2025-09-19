@@ -267,6 +267,7 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
     clearInsights,
     simulateTranscription,
     triggerTestInsight,
+    addInsight,
     isVoiceAgentActive: voiceAgentActive,
     isSpeaking: isPlaying
   };
