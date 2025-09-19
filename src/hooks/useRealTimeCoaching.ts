@@ -30,7 +30,7 @@ export const useRealTimeCoaching = (options: RealTimeCoachingOptions) => {
   const { startConversation, endConversation, isActive: voiceAgentActive } = useConversationalAI({
     agentConfig: {
       id: options.agentType,
-      agentType: options.agentType,
+      agentType: options.agentType as 'outbound' | 'retention' | 'telesales',
       name: `${options.agentType} Coach`,
       systemPrompt: '',
       createdAt: new Date().toISOString(),

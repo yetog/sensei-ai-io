@@ -96,7 +96,7 @@ class EnhancedAgentService {
     if (!agent) return [];
 
     const agentType = agent.agentType || 'outbound';
-    return knowledgeBaseService.getObjectionsForAgent(agentType);
+    return knowledgeBaseService.getObjectionsForAgent(agentType as 'outbound' | 'retention' | 'telesales');
   }
 
   // Get performance metrics for all agents
@@ -125,7 +125,7 @@ class EnhancedAgentService {
     if (!agent) return [];
 
     const agentType = agent.agentType || 'outbound';
-    const objections = knowledgeBaseService.getObjectionsForAgent(agentType);
+    const objections = knowledgeBaseService.getObjectionsForAgent(agentType as 'outbound' | 'retention' | 'telesales');
     
     return objections
       .sort((a, b) => b.success_rate - a.success_rate)

@@ -9,7 +9,7 @@ export interface AgentConfig {
   chunkSize?: number;
   createdAt: string; // ISO
   updatedAt: string; // ISO
-  agentType?: 'sales' | 'retention' | 'technical';
+  agentType?: 'outbound' | 'retention' | 'telesales';
   specialization?: {
     industry?: string;
     products?: string[];
@@ -22,7 +22,7 @@ export interface AgentPersonality {
   responseStyle: 'formal' | 'casual' | 'technical' | 'consultative';
   conversationStarters: string[];
   expertise: string[];
-  agentType: 'sales' | 'retention' | 'technical';
+  agentType: 'outbound' | 'retention' | 'telesales';
 }
 
 export interface CallContext {

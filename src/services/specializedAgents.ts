@@ -24,7 +24,7 @@ export class SpecializedAgentService {
         'Upselling strategies',
         'Competitive positioning'
       ],
-      agentType: 'sales'
+      agentType: 'outbound'
     },
     retention: {
       greetings: [
@@ -70,7 +70,7 @@ export class SpecializedAgentService {
         'Performance optimization',
         'Architecture recommendations'
       ],
-      agentType: 'technical'
+      agentType: 'telesales'
     }
   };
 

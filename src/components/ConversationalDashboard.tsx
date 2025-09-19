@@ -76,7 +76,7 @@ export const ConversationalDashboard: React.FC<ConversationalDashboardProps> = (
       id: 'sales-agent-1',
       name: 'Roger - Sales Coach',
       systemPrompt: 'Expert sales coaching agent',
-      agentType: 'sales',
+      agentType: 'outbound',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       specialization: {
@@ -102,7 +102,7 @@ export const ConversationalDashboard: React.FC<ConversationalDashboardProps> = (
       id: 'technical-agent-1',
       name: 'Sarah - Technical Advisor',
       systemPrompt: 'Technical solutions and product expert',
-      agentType: 'technical',
+      agentType: 'telesales',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       specialization: {
