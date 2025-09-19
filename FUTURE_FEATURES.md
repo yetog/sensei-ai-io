@@ -2,6 +2,46 @@
 
 This document contains ideas for advanced features that were removed from the current implementation to focus on core objection handling functionality.
 
+## Real-Time Coaching System (Currently Implemented)
+
+### How Real-Time Coaching Works
+The current real-time coaching system provides AI-powered assistance during live calls:
+
+1. **Live Audio Analysis**: Captures conversation audio and analyzes in real-time
+2. **Intelligent Insights**: Uses specialized AI agents to provide contextual suggestions
+3. **Voice Feedback**: Delivers coaching through ElevenLabs TTS (API key auto-managed via secrets)
+4. **Context-Aware Coaching**: Adapts suggestions based on call type (outbound, retention, telesales)
+
+### Current Capabilities
+- Automated objection detection and handling suggestions
+- Product knowledge assistance during technical questions  
+- Sentiment analysis and conversation coaching
+- Real-time transcription and context tracking
+- Voice coaching with whisper mode for discrete feedback
+
+### Automated Follow-Up System (Phase 2 Priority)
+
+A comprehensive system to eliminate manual case note writing and follow-up tasks:
+
+#### Core Features
+- **Auto-Generated Case Notes**: Complete call summaries with key points, customer concerns, and outcomes
+- **Smart Follow-Up Emails**: Personalized emails based on conversation content and customer sentiment
+- **Priority Scoring**: Automatically calculates follow-up priority using buying signals and engagement
+- **Timeline Recommendations**: Suggests optimal follow-up timing based on call sentiment and urgency
+
+#### Data Processing Flow
+1. **Audio Capture**: Records both customer and agent audio streams using `useAudioCapture`
+2. **Transcription**: Converts audio to text using Web Speech API with real-time processing
+3. **Analysis**: AI analyzes conversation for objections, buying signals, key topics, and sentiment
+4. **Automation**: Generates comprehensive case notes, follow-up emails, and prioritized action items
+5. **CRM Integration**: Updates customer records with call data, outcomes, and scheduled next steps
+
+#### Technical Implementation
+- `CallAutomationService`: Main service for processing call data and generating follow-ups
+- `useCallAutomation`: React hook for managing automated call workflow
+- Integration with existing `ConversationAnalyzer` and `SpecializedAgentService`
+- Support for different agent types with specialized coaching approaches
+
 ## Live Intelligence Dashboard
 
 ### Real-time Call Intelligence

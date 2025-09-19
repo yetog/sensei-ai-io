@@ -13,7 +13,7 @@ export const useElevenLabs = () => {
 
   const initializeElevenLabs = useCallback(async () => {
     try {
-      // Auto-initialize with embedded API key
+      // Auto-initialize with system API key
       const userApiKey = await ttsService.requestApiKey();
       if (userApiKey) {
         setIsInitialized(true);
