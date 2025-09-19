@@ -34,7 +34,7 @@ export class TTSService {
   }
 
   // API key managed through Lovable secrets system
-  private readonly EMBEDDED_API_KEY = process.env.ELEVENLABS_API_KEY || 'sk-fake-elevenlabs-key-for-demo';
+  private readonly EMBEDDED_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || 'sk-fake-elevenlabs-key-for-demo';
 
   async setApiKey(apiKey: string) {
     this.apiKey = apiKey;
