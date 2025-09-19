@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Circle, ArrowRight, PlayCircle, FileText, Mic, BarChart3, X, Users, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { initializeDemoData } from '@/data/demoData';
 
 interface OnboardingStep {
   id: string;
@@ -27,8 +28,11 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Check if user has seen onboarding before
+  // Initialize demo data and check if user has seen onboarding before
   useEffect(() => {
+    // Initialize demo data for seamless experience
+    initializeDemoData();
+    
     const hasSeenOnboarding = localStorage.getItem('sensei:hasSeenOnboarding');
     if (hasSeenOnboarding) {
       setIsVisible(false);
@@ -45,19 +49,23 @@ export function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
 
   // Check actual completion status based on localStorage or application state
   const checkStepCompletion = (stepId: string): boolean => {
+    // Check if manually triggered or has visited the section
+    const manuallyTriggered = localStorage.getItem(`sensei:triggered_${stepId}`) === 'true';
+    const hasVisited = localStorage.getItem(`sensei:hasVisited${stepId.charAt(0).toUpperCase() + stepId.slice(1)}`) === 'true';
+    
     switch (stepId) {
       case 'welcome':
         return true; // Always completed
       case 'workspace':
-        return localStorage.getItem('sensei:hasUploadedFiles') === 'true';
+        return manuallyTriggered || hasVisited || localStorage.getItem('sensei:hasUploadedFiles') === 'true';
       case 'agents':
-        return localStorage.getItem('sensei:hasCreatedAgent') === 'true';
+        return manuallyTriggered || hasVisited || localStorage.getItem('sensei:hasCreatedAgent') === 'true';
       case 'tools':
-        return localStorage.getItem('sensei:hasUsedTools') === 'true';
+        return manuallyTriggered || hasVisited || localStorage.getItem('sensei:hasUsedTools') === 'true';
       case 'assistant':
-        return localStorage.getItem('sensei:hasUsedAssistant') === 'true';
+        return manuallyTriggered || hasVisited || localStorage.getItem('sensei:hasUsedAssistant') === 'true';
       case 'settings':
-        return localStorage.getItem('sensei:hasConfiguredSettings') === 'true';
+        return manuallyTriggered || hasVisited || localStorage.getItem('sensei:hasConfiguredSettings') === 'true';
       default:
         return false;
     }

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FileProvider } from "@/contexts/FileContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Workspace from "./pages/Workspace";
 import Datasets from "./pages/Datasets";
 import Agents from "./pages/Agents";
@@ -20,12 +21,13 @@ import { Sword } from "lucide-react";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <FileProvider projectId="default">
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <FileProvider projectId="default">
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <SidebarProvider>
             <div className="min-h-screen flex w-full">
               <AppSidebar />
@@ -62,10 +64,11 @@ const App = () => (
             </div>
             <WelcomeOnboarding />
           </SidebarProvider>
-        </BrowserRouter>
-      </FileProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+          </BrowserRouter>
+        </FileProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

@@ -59,7 +59,7 @@ export function ConversationCenter({ selectedFileIds = [], className = '' }: Con
         
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="text-lg flex items-center gap-2 ml-4">
               <Headphones className="h-5 w-5" />
               Real-Time Coaching
             </CardTitle>
