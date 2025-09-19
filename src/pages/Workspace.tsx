@@ -47,7 +47,7 @@ export default function Workspace() {
             </TabsTrigger>
             <TabsTrigger value="objections" className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
-              Objection Handling
+              Sales Assistant
             </TabsTrigger>
             <TabsTrigger value="content" className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
