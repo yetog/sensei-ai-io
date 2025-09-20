@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,8 @@ import {
   MessageSquare,
   FileText,
   Users,
-  TrendingUp
+  TrendingUp,
+  History
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -134,6 +136,7 @@ Best regards,
 ];
 
 export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostCallSummaryProps) {
+  const navigate = useNavigate();
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>(EMAIL_TEMPLATES[0]);
   const [customEmail, setCustomEmail] = useState('');
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
@@ -267,12 +270,23 @@ Generate a personalized follow-up email using the extracted conversation data.
   };
 
   const handleSaveAndClose = () => {
-    const emailToSave = customEmail || selectedTemplate.body;
+    const emailToSave = customEmail || fillTemplate(selectedTemplate.body);
     onSaveToHistory(callSummary, emailToSave);
     onClose();
     toast({
       title: "Call Saved",
       description: "Call summary and follow-up email saved to history."
+    });
+  };
+
+  const handleViewHistory = () => {
+    const emailToSave = customEmail || fillTemplate(selectedTemplate.body);
+    onSaveToHistory(callSummary, emailToSave);
+    onClose();
+    navigate('/call-history');
+    toast({
+      title: "Navigating to Call History",
+      description: "Call saved and redirecting to history page."
     });
   };
 
@@ -572,6 +586,10 @@ Generate a personalized follow-up email using the extracted conversation data.
                 Close
               </Button>
               <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={handleViewHistory}>
+                  <History className="h-4 w-4 mr-2" />
+                  View in History
+                </Button>
                 <Button variant="outline" onClick={handleSaveAndClose}>
                   Save to History
                 </Button>
