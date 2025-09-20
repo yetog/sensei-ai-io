@@ -154,8 +154,8 @@ export function useRealTimeCoaching() {
       return false;
     }
 
-    // Limit total active suggestions to 3
-    if (currentState.suggestions.length >= 3) {
+    // Limit total active suggestions to 2 for better readability
+    if (currentState.suggestions.length >= 2) {
       return false;
     }
 
@@ -278,8 +278,9 @@ Response format (ONLY if clear trigger detected):
   "suggestions": [
     {
       "type": "objection|product_pitch|closing|retention|general",
-      "context": "Specific trigger detected in customer statement",
-      "suggestion": "Exact response to use immediately",
+      "analysis": "Brief 1-2 line analysis of what customer said",
+      "suggestion1": "First actionable response",
+      "suggestion2": "Second actionable response", 
       "confidence": 0.9
     }
   ]
@@ -294,14 +295,24 @@ If no clear trigger, respond with: {"suggestions": []}`;
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.suggestions?.map((suggestion: any, index: number) => ({
-          id: `${Date.now()}_${index}`,
-          type: suggestion.type || 'general',
-          context: suggestion.context || context,
-          suggestion: suggestion.suggestion || '',
-          confidence: suggestion.confidence || 0.7,
-          timestamp: Date.now()
-        })) || [];
+        return parsed.suggestions?.flatMap((suggestion: any) => [
+          {
+            id: `${Date.now()}_1`,
+            type: suggestion.type || 'general',
+            context: suggestion.analysis || context,
+            suggestion: suggestion.suggestion1 || '',
+            confidence: suggestion.confidence || 0.7,
+            timestamp: Date.now()
+          },
+          {
+            id: `${Date.now()}_2`,
+            type: suggestion.type || 'general',
+            context: suggestion.analysis || context,
+            suggestion: suggestion.suggestion2 || '',
+            confidence: suggestion.confidence || 0.7,
+            timestamp: Date.now()
+          }
+        ]).filter(s => s.suggestion.length > 0) || [];
       }
     } catch (error) {
       console.error('Error parsing coaching response:', error);
@@ -310,6 +321,42 @@ If no clear trigger, respond with: {"suggestions": []}`;
     // Return empty array if no clear suggestions
     return [];
   };
+
+  const saveTranscript = useCallback(() => {
+    const transcript = state.transcription.map(seg => 
+      `[${new Date(seg.timestamp).toLocaleTimeString()}] ${seg.speaker === 'user' ? 'You' : 'Customer'}: ${seg.text}`
+    ).join('\n');
+    
+    const blob = new Blob([transcript], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `coaching-transcript-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [state.transcription]);
+
+  const exportTranscriptData = useCallback(() => {
+    const data = {
+      transcript: state.transcription,
+      suggestions: state.suggestions,
+      callType: state.callType,
+      duration: state.conversationLength,
+      timestamp: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `coaching-session-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [state.transcription, state.suggestions, state.callType, state.conversationLength]);
 
   const startListening = useCallback((callType: CoachingState['callType'] = 'general') => {
     if (recognitionRef.current) {
@@ -378,6 +425,8 @@ If no clear trigger, respond with: {"suggestions": []}`;
     dismissSuggestion,
     toggleDemoMode,
     requestCoaching,
+    saveTranscript,
+    exportTranscriptData,
     isAvailable: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
   };
 }

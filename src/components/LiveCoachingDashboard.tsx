@@ -19,7 +19,10 @@ import {
   AlertCircle,
   PhoneCall,
   Settings,
-  History
+  History,
+  Download,
+  FileText,
+  Save
 } from 'lucide-react';
 import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
 import { PostCallSummary } from '@/components/PostCallSummary';
@@ -47,6 +50,8 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     dismissSuggestion,
     toggleDemoMode,
     requestCoaching,
+    saveTranscript,
+    exportTranscriptData,
     isAvailable
   } = useRealTimeCoaching();
 
@@ -282,6 +287,16 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 Request Coaching
               </Button>
               
+              <Button 
+                onClick={saveTranscript} 
+                variant="outline" 
+                size="sm"
+                disabled={transcription.length === 0}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Save Transcript
+              </Button>
+              
               <Button onClick={clearSession} variant="outline" size="sm">
                 Clear Session
               </Button>
@@ -299,9 +314,24 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               <Mic className="h-4 w-4" />
               Live Conversation
               {isDemoMode && (
-                <Badge variant="secondary" className="text-xs">Demo Mode</Badge>
+                <Badge variant="outline" className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300">DEMO MODE</Badge>
               )}
             </CardTitle>
+            <div className="flex items-center gap-2 pt-2">
+              <Button 
+                onClick={exportTranscriptData} 
+                variant="ghost" 
+                size="sm"
+                disabled={transcription.length === 0}
+                className="text-xs"
+              >
+                <FileText className="h-3 w-3 mr-1" />
+                Export JSON
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {transcription.length} exchanges
+              </span>
+            </div>
           </CardHeader>
           <CardContent className="h-[500px]">
             <ScrollArea className="h-full">
@@ -313,29 +343,29 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                   </div>
                 </div>
               ) : (
-                 <div className="space-y-4">
+                 <div className="space-y-3">
                   {transcription.slice(-10).map((segment) => (
                     <div
                       key={segment.id}
                       className={cn(
-                        "p-4 rounded-lg border-l-4 transition-all duration-200",
+                        "p-4 rounded-xl border-l-4 transition-all duration-200 shadow-sm",
                         segment.speaker === 'user' 
-                          ? "bg-primary/20 border-l-primary" 
-                          : "bg-accent/20 border-l-accent"
+                          ? "bg-primary/10 border-l-primary hover:bg-primary/15" 
+                          : "bg-accent/10 border-l-accent hover:bg-accent/15"
                       )}
                     >
                       <div className="flex items-center gap-2 mb-3">
                         <Badge 
                           variant={segment.speaker === 'user' ? 'default' : 'secondary'} 
-                          className="text-sm font-semibold px-3 py-1"
+                          className="text-sm font-bold px-3 py-1"
                         >
                           {segment.speaker === 'user' ? 'You' : 'Customer'}
                         </Badge>
-                        <span className="text-sm text-foreground/70">
+                        <span className="text-sm text-muted-foreground font-medium">
                           {new Date(segment.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p className="text-base text-foreground font-medium leading-relaxed">{segment.text}</p>
+                      <p className="text-lg text-foreground font-medium leading-relaxed tracking-wide">{segment.text}</p>
                     </div>
                   ))}
                 </div>
@@ -351,7 +381,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               <Brain className="h-4 w-4" />
               AI Coaching Suggestions
               <Badge variant="secondary" className="text-xs">
-                {suggestions.length}/3 active
+                {suggestions.length}/2 active
               </Badge>
               {isProcessing && (
                 <div className="flex items-center gap-1 text-sm text-amber-600">
@@ -373,16 +403,16 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 </div>
               ) : (
                  <div className="space-y-4">
-                  {suggestions.slice().reverse().slice(0, 3).map((suggestion) => (
+                  {suggestions.slice().reverse().slice(0, 2).map((suggestion) => (
                     <div
                       key={suggestion.id}
                       className={cn(
-                        "p-5 rounded-lg border-2 transition-all duration-200 shadow-lg",
-                        suggestion.type === 'objection' && "border-red-500/60 bg-red-500/15",
-                        suggestion.type === 'product_pitch' && "border-blue-500/60 bg-blue-500/15",
-                        suggestion.type === 'closing' && "border-green-500/60 bg-green-500/15",
-                        suggestion.type === 'retention' && "border-purple-500/60 bg-purple-500/15",
-                        suggestion.type === 'general' && "border-primary/60 bg-primary/15"
+                        "p-6 rounded-xl border-2 transition-all duration-200 shadow-lg hover:shadow-xl",
+                        suggestion.type === 'objection' && "border-red-500/60 bg-red-500/10 hover:bg-red-500/15",
+                        suggestion.type === 'product_pitch' && "border-blue-500/60 bg-blue-500/10 hover:bg-blue-500/15",
+                        suggestion.type === 'closing' && "border-green-500/60 bg-green-500/10 hover:bg-green-500/15",
+                        suggestion.type === 'retention' && "border-purple-500/60 bg-purple-500/10 hover:bg-purple-500/15",
+                        suggestion.type === 'general' && "border-primary/60 bg-primary/10 hover:bg-primary/15"
                       )}
                     >
                       <div className="flex items-start justify-between gap-2 mb-3">
@@ -431,17 +461,19 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                       
                       {suggestion.context && (
                         <>
-                          <div className="p-2 rounded bg-background/50 mb-3">
-                            <p className="text-sm text-foreground/80 font-medium">
-                              <strong>Trigger:</strong> {suggestion.context}
+                          <div className="p-3 rounded-lg bg-background/70 mb-4 border border-border/50">
+                            <p className="text-base text-foreground font-medium leading-relaxed">
+                              <strong className="text-foreground/90">Analysis:</strong> {suggestion.context}
                             </p>
                           </div>
                         </>
                       )}
                       
-                      <p className="text-lg font-semibold leading-relaxed text-foreground">
-                        {suggestion.suggestion}
-                      </p>
+                      <div className="bg-foreground/5 p-4 rounded-lg border border-border/30">
+                        <p className="text-lg font-semibold leading-relaxed text-foreground tracking-wide">
+                          {suggestion.suggestion}
+                        </p>
+                      </div>
                       
                       <div className="flex items-center justify-between mt-4">
                         <span className="text-sm text-foreground/70 font-medium">
