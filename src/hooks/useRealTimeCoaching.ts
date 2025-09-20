@@ -163,29 +163,35 @@ export function useRealTimeCoaching() {
       general: "Provide general sales coaching and conversation guidance."
     };
 
-    return `You are a real-time sales coaching assistant. Analyze this conversation and provide specific coaching suggestions.
+    return `You are a real-time sales coaching assistant analyzing a live ${callType} call. Analyze this conversation and provide specific, actionable coaching suggestions.
 
 Call Type: ${callType}
 Instructions: ${callTypeInstructions[callType as keyof typeof callTypeInstructions]}
 
-Conversation History:
+Recent Conversation History:
 ${context}
 
-Latest Customer Statement: "${currentText}"
+Current Customer Statement: "${currentText}"
 
-Provide coaching suggestions in this JSON format:
+ANALYSIS FOCUS:
+- Detect objections, buying signals, hesitation, pricing concerns
+- Identify opportunities for product demos, features, benefits
+- Recognize closing moments and urgency indicators
+- Note emotional state and rapport-building opportunities
+
+Provide 1-3 immediate coaching suggestions in this JSON format:
 {
   "suggestions": [
     {
       "type": "objection|product_pitch|closing|retention|general",
-      "context": "Brief context about what triggered this suggestion",
-      "suggestion": "Specific response or action the sales rep should take",
+      "context": "What customer behavior/words triggered this suggestion",
+      "suggestion": "Exact phrase or approach the sales rep should use RIGHT NOW",
       "confidence": 0.9
     }
   ]
 }
 
-Focus on actionable, specific suggestions that can help the sales rep respond effectively right now.`;
+Make suggestions conversational, natural, and ready to use immediately. Focus on what to say next, not general advice.`;
   };
 
   const parseCoachingResponse = (response: string, context: string): CoachingSuggestion[] => {
@@ -232,10 +238,11 @@ Focus on actionable, specific suggestions that can help the sales rep respond ef
   }, []);
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
+    if (recognitionRef.current && state.isListening) {
       recognitionRef.current.stop();
+      setState(prev => ({ ...prev, isListening: false, isProcessing: false }));
     }
-  }, []);
+  }, [state.isListening]);
 
   const toggleSpeaker = useCallback(() => {
     setState(prev => ({ 

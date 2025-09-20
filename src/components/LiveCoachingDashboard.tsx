@@ -210,29 +210,29 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                 <div className="space-y-3">
                   {transcription.map((segment) => (
                     <div
                       key={segment.id}
                       className={cn(
-                        "p-3 rounded-lg border-l-4",
+                        "p-4 rounded-lg border-l-4",
                         segment.speaker === 'user' 
-                          ? "bg-blue-50 border-l-blue-400" 
-                          : "bg-green-50 border-l-green-400"
+                          ? "bg-primary/10 border-l-primary text-foreground" 
+                          : "bg-accent/10 border-l-accent text-foreground"
                       )}
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant={segment.speaker === 'user' ? 'default' : 'secondary'}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant={segment.speaker === 'user' ? 'default' : 'secondary'} className="text-xs font-medium">
                           {segment.speaker === 'user' ? 'You' : 'Customer'}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-foreground/80 font-medium">
                           {new Date(segment.timestamp).toLocaleTimeString()}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-foreground/80 font-medium">
                           {Math.round(segment.confidence * 100)}% confidence
                         </span>
                       </div>
-                      <p className="text-sm">{segment.text}</p>
+                      <p className="text-sm text-foreground font-medium leading-relaxed">{segment.text}</p>
                     </div>
                   ))}
                 </div>
@@ -265,22 +265,26 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                 <div className="space-y-3">
                   {suggestions.slice().reverse().map((suggestion) => (
                     <div
                       key={suggestion.id}
                       className={cn(
-                        "p-4 rounded-lg border-2 transition-all duration-200",
-                        getSuggestionColor(suggestion.type)
+                        "p-4 rounded-lg border-2 transition-all duration-200 bg-card text-foreground shadow-lg",
+                        suggestion.type === 'objection' && "border-red-500/50 bg-red-500/10",
+                        suggestion.type === 'product_pitch' && "border-blue-500/50 bg-blue-500/10",
+                        suggestion.type === 'closing' && "border-green-500/50 bg-green-500/10",
+                        suggestion.type === 'retention' && "border-purple-500/50 bg-purple-500/10",
+                        suggestion.type === 'general' && "border-primary/50 bg-primary/10"
                       )}
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
                           {getSuggestionIcon(suggestion.type)}
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs font-medium bg-foreground text-background">
                             {suggestion.type.replace('_', ' ').toUpperCase()}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-foreground/80 font-medium">
                             {Math.round(suggestion.confidence * 100)}% confidence
                           </span>
                         </div>
@@ -310,23 +314,23 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                       
                       {suggestion.context && (
                         <>
-                          <p className="text-xs text-muted-foreground mb-2">
+                          <p className="text-xs text-foreground/80 mb-2 font-medium">
                             Context: {suggestion.context}
                           </p>
                           <Separator className="my-2" />
                         </>
                       )}
                       
-                      <p className="text-sm font-medium leading-relaxed">
+                      <p className="text-base font-semibold leading-relaxed text-foreground">
                         {suggestion.suggestion}
                       </p>
                       
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-muted-foreground">
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="text-xs text-foreground/70 font-medium">
                           {new Date(suggestion.timestamp).toLocaleTimeString()}
                         </span>
                         {suggestion.sourceDocument && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs bg-accent text-accent-foreground">
                             From KB
                           </Badge>
                         )}
