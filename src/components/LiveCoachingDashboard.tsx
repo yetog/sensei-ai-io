@@ -17,10 +17,15 @@ import {
   Copy,
   CheckCircle,
   AlertCircle,
-  PhoneCall
+  PhoneCall,
+  Settings,
+  History
 } from 'lucide-react';
 import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
+import { PostCallSummary } from '@/components/PostCallSummary';
+import { callHistoryService } from '@/services/callHistoryService';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface LiveCoachingDashboardProps {
   onClose?: () => void;
@@ -47,9 +52,83 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
 
   const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
   const [copiedSuggestionId, setCopiedSuggestionId] = useState<string | null>(null);
+  const [showPostCallSummary, setShowPostCallSummary] = useState(false);
+  const [callStartTime, setCallStartTime] = useState<number | null>(null);
+  const { toast } = useToast();
 
   const handleStartCoaching = () => {
+    setCallStartTime(Date.now());
     startListening(selectedCallType);
+  };
+
+  const handleStopCall = () => {
+    stopListening();
+    
+    // Show post-call summary if we have meaningful data
+    if (transcription.length > 0 && callStartTime) {
+      setShowPostCallSummary(true);
+    }
+    setCallStartTime(null);
+  };
+
+  const formatDuration = (milliseconds: number): string => {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const generateCallSummary = () => {
+    const duration = callStartTime ? formatDuration(Date.now() - callStartTime) : '0:00';
+    
+    // Extract key points from transcription
+    const customerSegments = transcription.filter(seg => seg.speaker === 'customer');
+    const keyPoints = customerSegments
+      .slice(0, 5)
+      .map(seg => seg.text.substring(0, 100) + (seg.text.length > 100 ? '...' : ''));
+    
+    // Extract objections (segments with negative keywords)
+    const objectionKeywords = ['but', 'however', 'concern', 'worry', 'expensive', 'cost', 'budget'];
+    const objections = customerSegments
+      .filter(seg => objectionKeywords.some(keyword => seg.text.toLowerCase().includes(keyword)))
+      .slice(0, 3)
+      .map(seg => seg.text.substring(0, 80) + (seg.text.length > 80 ? '...' : ''));
+
+    // Generate next steps based on suggestions
+    const nextSteps = suggestions
+      .slice(0, 3)
+      .map(suggestion => suggestion.suggestion.substring(0, 80) + (suggestion.suggestion.length > 80 ? '...' : ''));
+
+    return {
+      duration,
+      customerName: undefined,
+      callType: selectedCallType,
+      keyPoints: keyPoints.length > 0 ? keyPoints : ['Customer expressed interest in our solution'],
+      objections: objections.length > 0 ? objections : [],
+      nextSteps: nextSteps.length > 0 ? nextSteps : ['Follow up within 24 hours'],
+      outcome: 'follow_up' as const,
+      transcriptHighlights: transcription.slice(-3).map(seg => seg.text)
+    };
+  };
+
+  const handleSaveToHistory = (summary: any, email?: string) => {
+    try {
+      callHistoryService.saveCall({
+        ...summary,
+        followUpEmail: email
+      });
+      
+      toast({
+        title: "Call Saved",
+        description: "Call summary saved to history successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save call to history.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCopySuggestion = async (suggestion: string, id: string) => {
@@ -163,9 +242,9 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                   Start Coaching
                 </Button>
               ) : (
-                <Button onClick={stopListening} variant="destructive" className="flex items-center gap-2">
+                <Button onClick={handleStopCall} variant="destructive" className="flex items-center gap-2">
                   <MicOff className="h-4 w-4" />
-                  Stop Listening
+                  Stop Call
                 </Button>
               )}
               
@@ -252,11 +331,8 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                         >
                           {segment.speaker === 'user' ? 'You' : 'Customer'}
                         </Badge>
-                        <span className="text-sm text-foreground/90 font-medium">
+                        <span className="text-sm text-foreground/70">
                           {new Date(segment.timestamp).toLocaleTimeString()}
-                        </span>
-                        <span className="text-sm text-foreground/90 font-medium">
-                          {Math.round(segment.confidence * 100)}% confidence
                         </span>
                       </div>
                       <p className="text-base text-foreground font-medium leading-relaxed">{segment.text}</p>
@@ -426,6 +502,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Post-Call Summary Modal */}
+      {showPostCallSummary && (
+        <PostCallSummary
+          callSummary={generateCallSummary()}
+          onClose={() => setShowPostCallSummary(false)}
+          onSaveToHistory={handleSaveToHistory}
+        />
       )}
     </div>
   );
