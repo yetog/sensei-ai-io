@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -138,7 +138,69 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
   const [customEmail, setCustomEmail] = useState('');
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [conversationData, setConversationData] = useState({
+    customerName: '',
+    companyName: '',
+    keyPain: '',
+    desiredOutcome: ''
+  });
   const { toast } = useToast();
+
+  // Auto-analyze conversation data on mount
+  useEffect(() => {
+    if (callSummary.transcriptHighlights?.length > 0) {
+      analyzeConversationData();
+    }
+  }, [callSummary]);
+
+  const analyzeConversationData = async () => {
+    try {
+      const transcriptText = callSummary.transcriptHighlights.join(' ');
+      const analysisPrompt = `
+Analyze this sales conversation and extract key information:
+
+Transcript: "${transcriptText}"
+
+Extract and return ONLY a JSON object with:
+{
+  "customerName": "first name only if clearly mentioned",
+  "companyName": "company name if mentioned", 
+  "keyPain": "main problem/challenge customer mentioned",
+  "desiredOutcome": "what customer wants to achieve"
+}
+
+If any field is not clearly mentioned, use empty string.
+      `;
+
+      const response = await ionosAI.sendMessage([
+        {
+          role: 'system',
+          content: 'You are an expert at extracting key information from sales conversations. Return only valid JSON.'
+        },
+        {
+          role: 'user',
+          content: analysisPrompt
+        }
+      ]);
+
+      try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const extracted = JSON.parse(jsonMatch[0]);
+          setConversationData({
+            customerName: extracted.customerName || '',
+            companyName: extracted.companyName || '',
+            keyPain: extracted.keyPain || '',
+            desiredOutcome: extracted.desiredOutcome || ''
+          });
+        }
+      } catch (parseError) {
+        console.error('Failed to parse conversation analysis:', parseError);
+      }
+    } catch (error) {
+      console.error('Failed to analyze conversation:', error);
+    }
+  };
 
   const generateAIEmail = async () => {
     setIsGeneratingEmail(true);
@@ -147,18 +209,22 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
 Call Summary:
 - Duration: ${callSummary.duration}
 - Type: ${callSummary.callType}
+- Customer: ${conversationData.customerName || 'Customer'}
+- Company: ${conversationData.companyName || 'Their company'}
+- Key Pain: ${conversationData.keyPain || 'Business challenges'}
+- Desired Outcome: ${conversationData.desiredOutcome || 'Improved efficiency'}
 - Key Points: ${callSummary.keyPoints.join(', ')}
 - Objections: ${callSummary.objections.join(', ')}
 - Next Steps: ${callSummary.nextSteps.join(', ')}
 - Outcome: ${callSummary.outcome}
 
-Please generate a professional follow-up email based on this call summary. Make it personalized and actionable.
+Generate a personalized follow-up email using the extracted conversation data.
       `;
 
       const emailContent = await ionosAI.sendMessage([
         {
           role: 'system',
-          content: 'You are an expert sales professional. Generate a professional, personalized follow-up email based on the call summary provided. Keep it concise but warm and actionable.'
+          content: 'You are an expert sales professional. Generate a professional, personalized follow-up email using the conversation data provided. Make it specific and actionable.'
         },
         {
           role: 'user',
@@ -212,17 +278,39 @@ Please generate a professional follow-up email based on this call summary. Make 
 
   const fillTemplate = (template: string) => {
     return template
-      .replace(/{{customerName}}/g, callSummary.customerName || '[Customer Name]')
+      .replace(/{{customerName}}/g, conversationData.customerName || callSummary.customerName || '[Customer Name]')
+      .replace(/{{companyName}}/g, conversationData.companyName || '[Company Name]')
+      .replace(/{{keyPain}}/g, conversationData.keyPain || 'business challenges')
+      .replace(/{{desiredOutcome}}/g, conversationData.desiredOutcome || 'improved efficiency')
       .replace(/{{keyPoints}}/g, callSummary.keyPoints.map(point => `• ${point}`).join('\n'))
       .replace(/{{nextSteps}}/g, callSummary.nextSteps.map(step => `• ${step}`).join('\n'))
       .replace(/{{timeline}}/g, '[Timeline]')
-      .replace(/{{yourName}}/g, '[Your Name]')
-      .replace(/{{companyName}}/g, '[Company Name]');
+      .replace(/{{yourName}}/g, '[Your Name]');
   };
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div 
+      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={handleBackdropClick}
+    >
+      <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <CardHeader className="border-b bg-muted/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -375,6 +463,27 @@ Please generate a professional follow-up email based on this call summary. Make 
                       )}
                     </Button>
                   </div>
+
+                  {/* Auto-detected Conversation Data */}
+                  {(conversationData.customerName || conversationData.companyName || conversationData.keyPain) && (
+                    <div className="space-y-2 p-3 bg-muted/50 rounded-lg border">
+                      <label className="text-sm font-medium">Auto-detected Information</label>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {conversationData.customerName && (
+                          <div><span className="font-medium">Customer:</span> {conversationData.customerName}</div>
+                        )}
+                        {conversationData.companyName && (
+                          <div><span className="font-medium">Company:</span> {conversationData.companyName}</div>
+                        )}
+                        {conversationData.keyPain && (
+                          <div className="col-span-2"><span className="font-medium">Key Pain:</span> {conversationData.keyPain}</div>
+                        )}
+                        {conversationData.desiredOutcome && (
+                          <div className="col-span-2"><span className="font-medium">Desired Outcome:</span> {conversationData.desiredOutcome}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Template Selection */}
                   <div className="space-y-2">

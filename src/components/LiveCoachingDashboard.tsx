@@ -344,7 +344,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 </div>
               ) : (
                  <div className="space-y-3">
-                  {transcription.slice(-10).map((segment) => (
+                  {transcription.slice(-15).map((segment) => (
                     <div
                       key={segment.id}
                       className={cn(
@@ -365,7 +365,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                           {new Date(segment.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p className="text-xl text-foreground font-medium leading-relaxed tracking-wide antialiased">{segment.text}</p>
+                      <p className="text-lg text-foreground font-medium leading-relaxed tracking-wide antialiased">{segment.text}</p>
                     </div>
                   ))}
                 </div>

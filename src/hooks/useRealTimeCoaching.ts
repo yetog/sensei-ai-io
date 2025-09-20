@@ -107,10 +107,10 @@ export function useRealTimeCoaching() {
               const lastSegment = prev.transcription[prev.transcription.length - 1];
               const currentSpeaker = prev.currentTurn || 'user';
               
-              // Smart consolidation: merge with previous segment if same speaker and within 3 seconds
+              // Smart consolidation: merge with previous segment if same speaker and within 5 seconds
               if (lastSegment && 
                   lastSegment.speaker === currentSpeaker && 
-                  Date.now() - lastSegment.timestamp < 3000) {
+                  Date.now() - lastSegment.timestamp < 5000) {
                 
                 // Update the last segment instead of creating new one
                 const updatedTranscription = [...prev.transcription];
