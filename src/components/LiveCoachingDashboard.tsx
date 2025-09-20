@@ -43,6 +43,10 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     currentTurn,
     callType,
     isDemoMode,
+    audioSource,
+    micLevel,
+    tabLevel,
+    isTabAudioAvailable,
     startListening,
     stopListening,
     toggleSpeaker,
@@ -58,12 +62,13 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
   const [copiedSuggestionId, setCopiedSuggestionId] = useState<string | null>(null);
   const [showPostCallSummary, setShowPostCallSummary] = useState(false);
+  const [selectedAudioSource, setSelectedAudioSource] = useState<'microphone' | 'tab' | 'both'>('microphone');
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const { toast } = useToast();
 
   const handleStartCoaching = () => {
     setCallStartTime(Date.now());
-    startListening(selectedCallType);
+    startListening(selectedCallType, selectedAudioSource);
   };
 
   const handleStopCall = () => {
@@ -250,6 +255,21 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               </select>
             </div>
 
+            {/* Audio Source Selection */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Audio:</span>
+              <select 
+                value={selectedAudioSource}
+                onChange={(e) => setSelectedAudioSource(e.target.value as any)}
+                className="px-3 py-1 border rounded-md text-sm"
+                disabled={isListening}
+              >
+                <option value="microphone">Microphone Only</option>
+                <option value="tab">Tab Audio Only</option>
+                <option value="both">Microphone + Tab</option>
+              </select>
+            </div>
+
             {/* Control Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               {!isListening ? (
@@ -297,6 +317,33 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 <Brain className="h-4 w-4 mr-1" />
                 Request Coaching
               </Button>
+
+              {/* Audio Level Indicators */}
+              {isListening && (audioSource === 'microphone' || audioSource === 'both') && (
+                <div className="flex items-center gap-1">
+                  <Mic className="h-3 w-3 text-blue-500" />
+                  <div className="w-12 h-2 bg-gray-200 rounded">
+                    <div 
+                      className="h-full bg-blue-500 rounded transition-all duration-100"
+                      style={{ width: `${Math.min(micLevel * 2, 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500">{Math.round(micLevel)}</span>
+                </div>
+              )}
+
+              {isListening && (audioSource === 'tab' || audioSource === 'both') && (
+                <div className="flex items-center gap-1">
+                  <PhoneCall className="h-3 w-3 text-green-500" />
+                  <div className="w-12 h-2 bg-gray-200 rounded">
+                    <div 
+                      className="h-full bg-green-500 rounded transition-all duration-100"
+                      style={{ width: `${Math.min(tabLevel * 2, 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500">{Math.round(tabLevel)}</span>
+                </div>
+              )}
               
               <Button 
                 onClick={saveTranscript} 

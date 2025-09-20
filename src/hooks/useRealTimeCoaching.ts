@@ -51,6 +51,15 @@ interface TranscriptionSegment {
   confidence: number;
 }
 
+interface AudioSource {
+  type: 'microphone' | 'tab' | 'both';
+  micStream?: MediaStream;
+  tabStream?: MediaStream;
+  audioContext?: AudioContext;
+  micAnalyser?: AnalyserNode;
+  tabAnalyser?: AnalyserNode;
+}
+
 interface CoachingState {
   isListening: boolean;
   isProcessing: boolean;
@@ -61,6 +70,10 @@ interface CoachingState {
   conversationLength: number;
   lastSuggestionTime: number;
   isDemoMode: boolean;
+  audioSource: AudioSource['type'];
+  micLevel: number;
+  tabLevel: number;
+  isTabAudioAvailable: boolean;
 }
 
 export function useRealTimeCoaching() {
@@ -73,11 +86,17 @@ export function useRealTimeCoaching() {
     callType: 'general',
     conversationLength: 0,
     lastSuggestionTime: 0,
-    isDemoMode: false
+    isDemoMode: false,
+    audioSource: 'microphone',
+    micLevel: 0,
+    tabLevel: 0,
+    isTabAudioAvailable: false
   });
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioSourceRef = useRef<AudioSource>({ type: 'microphone' });
+  const audioLevelIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -105,7 +124,10 @@ export function useRealTimeCoaching() {
           if (transcript.length > 0) {
             setState(prev => {
               const lastSegment = prev.transcription[prev.transcription.length - 1];
-              const currentSpeaker = prev.currentTurn || 'user';
+              
+              // Smart speaker detection based on audio levels
+              const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
+              const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
               
           // Smart consolidation: merge with previous segment if same speaker and within 2 seconds
           if (lastSegment && 
@@ -161,6 +183,131 @@ export function useRealTimeCoaching() {
       };
     }
   }, [state.currentTurn, state.callType]);
+
+  // Enhanced audio capture functions
+  const detectSpeaker = (micLevel: number, tabLevel: number, audioSource: AudioSource['type']): 'user' | 'customer' | null => {
+    if (audioSource === 'microphone') return 'user';
+    if (audioSource === 'tab') return 'customer';
+    if (audioSource === 'both') {
+      // If both sources active, determine speaker by audio levels
+      if (micLevel > tabLevel + 10) return 'user';
+      if (tabLevel > micLevel + 10) return 'customer';
+    }
+    return null;
+  };
+
+  const startAudioLevelMonitoring = useCallback(() => {
+    if (!audioSourceRef.current.audioContext) return;
+
+    const updateAudioLevels = () => {
+      let micLevel = 0;
+      let tabLevel = 0;
+
+      if (audioSourceRef.current.micAnalyser) {
+        const micData = new Uint8Array(audioSourceRef.current.micAnalyser.frequencyBinCount);
+        audioSourceRef.current.micAnalyser.getByteFrequencyData(micData);
+        micLevel = micData.reduce((sum, value) => sum + value, 0) / micData.length;
+      }
+
+      if (audioSourceRef.current.tabAnalyser) {
+        const tabData = new Uint8Array(audioSourceRef.current.tabAnalyser.frequencyBinCount);
+        audioSourceRef.current.tabAnalyser.getByteFrequencyData(tabData);
+        tabLevel = tabData.reduce((sum, value) => sum + value, 0) / tabData.length;
+      }
+
+      setState(prev => ({ ...prev, micLevel, tabLevel }));
+    };
+
+    audioLevelIntervalRef.current = setInterval(updateAudioLevels, 100);
+  }, []);
+
+  const stopAudioLevelMonitoring = useCallback(() => {
+    if (audioLevelIntervalRef.current) {
+      clearInterval(audioLevelIntervalRef.current);
+      audioLevelIntervalRef.current = null;
+    }
+  }, []);
+
+  const setupAudioAnalysis = useCallback(async (stream: MediaStream, type: 'mic' | 'tab') => {
+    if (!audioSourceRef.current.audioContext) {
+      audioSourceRef.current.audioContext = new AudioContext();
+    }
+
+    const source = audioSourceRef.current.audioContext.createMediaStreamSource(stream);
+    const analyser = audioSourceRef.current.audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+
+    if (type === 'mic') {
+      audioSourceRef.current.micAnalyser = analyser;
+    } else {
+      audioSourceRef.current.tabAnalyser = analyser;
+    }
+  }, []);
+
+  const requestTabAudio = useCallback(async (): Promise<MediaStream | null> => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } as any,
+        video: false
+      });
+      
+      // Check if audio track is available
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        console.warn('No audio track available in tab capture');
+        return null;
+      }
+
+      setState(prev => ({ ...prev, isTabAudioAvailable: true }));
+      await setupAudioAnalysis(stream, 'tab');
+      audioSourceRef.current.tabStream = stream;
+      return stream;
+    } catch (error) {
+      console.error('Tab audio capture failed:', error);
+      setState(prev => ({ ...prev, isTabAudioAvailable: false }));
+      return null;
+    }
+  }, [setupAudioAnalysis]);
+
+  const requestMicrophoneAudio = useCallback(async (): Promise<MediaStream | null> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      await setupAudioAnalysis(stream, 'mic');
+      audioSourceRef.current.micStream = stream;
+      return stream;
+    } catch (error) {
+      console.error('Microphone access failed:', error);
+      return null;
+    }
+  }, [setupAudioAnalysis]);
+
+  const stopAllAudioStreams = useCallback(() => {
+    if (audioSourceRef.current.micStream) {
+      audioSourceRef.current.micStream.getTracks().forEach(track => track.stop());
+      audioSourceRef.current.micStream = undefined;
+    }
+    if (audioSourceRef.current.tabStream) {
+      audioSourceRef.current.tabStream.getTracks().forEach(track => track.stop());
+      audioSourceRef.current.tabStream = undefined;
+    }
+    if (audioSourceRef.current.audioContext) {
+      audioSourceRef.current.audioContext.close();
+      audioSourceRef.current.audioContext = undefined;
+    }
+    stopAudioLevelMonitoring();
+  }, [stopAudioLevelMonitoring]);
 
   // Smart filtering function to prevent suggestion overload
   const shouldGenerateSuggestion = (transcript: string, currentState: CoachingState): boolean => {
@@ -380,27 +527,39 @@ If no clear trigger, respond with: {"suggestions": []}`;
     URL.revokeObjectURL(url);
   }, [state.transcription, state.suggestions, state.callType, state.conversationLength]);
 
-  const startListening = useCallback((callType: CoachingState['callType'] = 'general') => {
+  const startListening = useCallback(async (callType: CoachingState['callType'] = 'general', audioSource: AudioSource['type'] = 'microphone') => {
     if (recognitionRef.current) {
+      // Setup audio streams based on selected source
+      if (audioSource === 'microphone' || audioSource === 'both') {
+        await requestMicrophoneAudio();
+      }
+      if (audioSource === 'tab' || audioSource === 'both') {
+        await requestTabAudio();
+      }
+
       setState(prev => ({ 
         ...prev, 
         callType,
+        audioSource,
         transcription: [],
         suggestions: [],
-        currentTurn: 'customer',
+        currentTurn: audioSource === 'tab' ? 'customer' : 'user',
         conversationLength: 0,
         lastSuggestionTime: 0
       }));
+
+      startAudioLevelMonitoring();
       recognitionRef.current.start();
     }
-  }, []);
+  }, [requestMicrophoneAudio, requestTabAudio, startAudioLevelMonitoring]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && state.isListening) {
       recognitionRef.current.stop();
+      stopAllAudioStreams();
       setState(prev => ({ ...prev, isListening: false, isProcessing: false }));
     }
-  }, [state.isListening]);
+  }, [state.isListening, stopAllAudioStreams]);
 
   const toggleSpeaker = useCallback(() => {
     setState(prev => ({ 
@@ -449,6 +608,9 @@ If no clear trigger, respond with: {"suggestions": []}`;
     requestCoaching,
     saveTranscript,
     exportTranscriptData,
+    requestTabAudio,
+    requestMicrophoneAudio,
+    stopAllAudioStreams,
     isAvailable: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
   };
 }
