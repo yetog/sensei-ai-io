@@ -69,9 +69,12 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const handleStopCall = () => {
     stopListening();
     
-    // Show post-call summary if we have meaningful data
-    if (transcription.length > 0 && callStartTime) {
+    // Show post-call summary if we have any transcription data
+    if (transcription.length > 0) {
+      console.log('Showing post-call summary with', transcription.length, 'segments');
       setShowPostCallSummary(true);
+    } else {
+      console.log('No transcription data, not showing summary');
     }
     setCallStartTime(null);
   };
@@ -118,7 +121,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
 
   const handleSaveToHistory = (summary: any, email?: string) => {
     try {
+      // Save to call history service
       callHistoryService.saveCall({
+        ...summary,
+        followUpEmail: email
+      });
+      
+      // Also save to call summary storage
+      const { callSummaryStorage } = require('@/services/callSummaryStorage');
+      callSummaryStorage.saveCallSummary({
         ...summary,
         followUpEmail: email
       });

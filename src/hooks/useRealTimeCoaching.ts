@@ -305,8 +305,7 @@ Response format (ONLY if clear trigger detected):
     {
       "type": "objection|product_pitch|closing|retention|general",
       "analysis": "Brief 1-2 line analysis of what customer said",
-      "suggestion1": "First actionable response",
-      "suggestion2": "Second actionable response", 
+      "suggestion": "Single actionable response",
       "confidence": 0.9
     }
   ]
@@ -322,19 +321,16 @@ If no clear trigger, respond with: {"suggestions": []}`;
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return parsed.suggestions?.map((suggestion: any) => {
-          // Build suggestion text with only valid parts
-          const suggestionParts = [
-            suggestion.suggestion1,
-            suggestion.suggestion2
-          ].filter(part => part && part !== 'undefined' && part.trim().length > 0);
+          // Use only the first suggestion to avoid undefined issues
+          const suggestionText = suggestion.suggestion1 || suggestion.suggestion || '';
           
-          if (suggestionParts.length === 0) return null;
+          if (!suggestionText || suggestionText.trim().length === 0) return null;
           
           return {
             id: `${Date.now()}_${Math.random()}`,
             type: suggestion.type || 'general',
             context: suggestion.analysis || context,
-            suggestion: suggestionParts.join('\n\n'),
+            suggestion: suggestionText,
             confidence: suggestion.confidence || 0.7,
             timestamp: Date.now()
           };
