@@ -314,7 +314,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               <Mic className="h-4 w-4" />
               Live Conversation
               {isDemoMode && (
-                <Badge variant="outline" className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300">DEMO MODE</Badge>
+                <Badge variant="outline" className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300 animate-pulse">🎯 DEMO MODE</Badge>
               )}
             </CardTitle>
             <div className="flex items-center gap-2 pt-2">
@@ -365,7 +365,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                           {new Date(segment.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p className="text-lg text-foreground font-medium leading-relaxed tracking-wide">{segment.text}</p>
+                      <p className="text-xl text-foreground font-medium leading-relaxed tracking-wide antialiased">{segment.text}</p>
                     </div>
                   ))}
                 </div>
@@ -459,20 +459,21 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                         </div>
                       </div>
                       
-                      {suggestion.context && (
-                        <>
-                          <div className="p-3 rounded-lg bg-background/70 mb-4 border border-border/50">
-                            <p className="text-base text-foreground font-medium leading-relaxed">
-                              <strong className="text-foreground/90">Analysis:</strong> {suggestion.context}
-                            </p>
-                          </div>
-                        </>
-                      )}
+                      <div className="mb-4">
+                        <p className="text-sm text-muted-foreground font-medium mb-2">Analysis:</p>
+                        <p className="text-base text-foreground leading-relaxed font-medium bg-background/50 p-3 rounded-lg border">{suggestion.context}</p>
+                      </div>
                       
-                      <div className="bg-foreground/5 p-4 rounded-lg border border-border/30">
-                        <p className="text-lg font-semibold leading-relaxed text-foreground tracking-wide">
-                          {suggestion.suggestion}
-                        </p>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-medium mb-2">Suggestions:</p>
+                        <div className="space-y-3">
+                          {suggestion.suggestion.split('\n\n').filter(s => s.trim()).map((sug, idx) => (
+                            <div key={idx} className="flex items-start gap-3 p-3 bg-background/70 rounded-lg border-l-4 border-l-primary">
+                              <Badge variant="secondary" className="text-xs font-bold mt-1">{idx + 1}</Badge>
+                              <p className="text-base text-foreground font-medium leading-relaxed">{sug.trim()}</p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                       
                       <div className="flex items-center justify-between mt-4">

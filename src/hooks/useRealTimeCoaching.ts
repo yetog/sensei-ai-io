@@ -103,19 +103,45 @@ export function useRealTimeCoaching() {
           const confidence = latestResult[0].confidence;
           
           if (transcript.length > 0) {
-            const newSegment: TranscriptionSegment = {
-              id: Date.now().toString(),
-              speaker: state.currentTurn || 'user',
-              text: transcript,
-              timestamp: Date.now(),
-              confidence: confidence || 0.8
-            };
+            setState(prev => {
+              const lastSegment = prev.transcription[prev.transcription.length - 1];
+              const currentSpeaker = prev.currentTurn || 'user';
+              
+              // Smart consolidation: merge with previous segment if same speaker and within 3 seconds
+              if (lastSegment && 
+                  lastSegment.speaker === currentSpeaker && 
+                  Date.now() - lastSegment.timestamp < 3000) {
+                
+                // Update the last segment instead of creating new one
+                const updatedTranscription = [...prev.transcription];
+                updatedTranscription[updatedTranscription.length - 1] = {
+                  ...lastSegment,
+                  text: lastSegment.text + ' ' + transcript,
+                  confidence: Math.max(lastSegment.confidence, confidence || 0.8)
+                };
+                
+                return {
+                  ...prev,
+                  transcription: updatedTranscription,
+                  conversationLength: prev.conversationLength + transcript.length
+                };
+              } else {
+                // Create new segment
+                const newSegment: TranscriptionSegment = {
+                  id: Date.now().toString(),
+                  speaker: currentSpeaker,
+                  text: transcript,
+                  timestamp: Date.now(),
+                  confidence: confidence || 0.8
+                };
 
-            setState(prev => ({
-              ...prev,
-              transcription: [...prev.transcription, newSegment],
-              conversationLength: prev.conversationLength + transcript.length
-            }));
+                return {
+                  ...prev,
+                  transcription: [...prev.transcription, newSegment],
+                  conversationLength: prev.conversationLength + transcript.length
+                };
+              }
+            });
 
             // Smart suggestion filtering - only process if conditions are met
             if (shouldGenerateSuggestion(transcript, state)) {
@@ -295,24 +321,14 @@ If no clear trigger, respond with: {"suggestions": []}`;
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.suggestions?.flatMap((suggestion: any) => [
-          {
-            id: `${Date.now()}_1`,
-            type: suggestion.type || 'general',
-            context: suggestion.analysis || context,
-            suggestion: suggestion.suggestion1 || '',
-            confidence: suggestion.confidence || 0.7,
-            timestamp: Date.now()
-          },
-          {
-            id: `${Date.now()}_2`,
-            type: suggestion.type || 'general',
-            context: suggestion.analysis || context,
-            suggestion: suggestion.suggestion2 || '',
-            confidence: suggestion.confidence || 0.7,
-            timestamp: Date.now()
-          }
-        ]).filter(s => s.suggestion.length > 0) || [];
+        return parsed.suggestions?.map((suggestion: any) => ({
+          id: `${Date.now()}_${Math.random()}`,
+          type: suggestion.type || 'general',
+          context: suggestion.analysis || context,
+          suggestion: `${suggestion.suggestion1}\n\n${suggestion.suggestion2}`,
+          confidence: suggestion.confidence || 0.7,
+          timestamp: Date.now()
+        })).filter((s: any) => s.suggestion.length > 0) || [];
       }
     } catch (error) {
       console.error('Error parsing coaching response:', error);
