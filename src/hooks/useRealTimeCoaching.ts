@@ -41,6 +41,13 @@ interface CoachingSuggestion {
   confidence: number;
   sourceDocument?: string;
   timestamp: number;
+  userFeedback?: SuggestionFeedback;
+}
+
+interface SuggestionFeedback {
+  rating: 'helpful' | 'not_helpful';
+  timestamp: number;
+  reason?: string;
 }
 
 interface TranscriptionSegment {
@@ -74,6 +81,15 @@ interface CoachingState {
   micLevel: number;
   tabLevel: number;
   isTabAudioAvailable: boolean;
+  error: CoachingError | null;
+  sessionStatus: 'active' | 'paused' | 'stopped' | 'error';
+}
+
+interface CoachingError {
+  type: 'audio_failure' | 'speech_recognition_error' | 'ai_service_error' | 'permission_denied';
+  message: string;
+  canRecover: boolean;
+  timestamp: number;
 }
 
 export function useRealTimeCoaching() {
@@ -90,7 +106,9 @@ export function useRealTimeCoaching() {
     audioSource: 'microphone',
     micLevel: 0,
     tabLevel: 0,
-    isTabAudioAvailable: false
+    isTabAudioAvailable: false,
+    error: null,
+    sessionStatus: 'stopped'
   });
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -165,8 +183,8 @@ export function useRealTimeCoaching() {
               }
             });
 
-            // Smart suggestion filtering - only process if conditions are met
-            if (shouldGenerateSuggestion(transcript, state)) {
+            // Process for coaching suggestions if enabled
+            if (shouldGenerateSuggestion(transcript, state.suggestions, Date.now() - state.lastSuggestionTime)) {
               processTranscriptionForCoaching(transcript, state.callType);
             }
           }
@@ -247,44 +265,78 @@ export function useRealTimeCoaching() {
 
   const requestTabAudio = useCallback(async (): Promise<MediaStream | null> => {
     try {
-      // Request ENTIRE SCREEN capture to get system audio (YouTube, Meet, etc.)
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      console.log('Requesting system audio capture...');
+      
+      // Enhanced system audio capture with better browser compatibility
+      const constraints = {
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
-          channelCount: 2,
-          sampleRate: 48000
+          channelCount: { ideal: 2 },
+          sampleRate: { ideal: 48000 },
+          suppressLocalAudioPlayback: false
         } as any,
-        video: true // Enable video for screen capture (we'll stop it after getting audio)
-      });
+        video: {
+          width: { ideal: 1 },
+          height: { ideal: 1 },
+          frameRate: { ideal: 1 }
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
       
       // Check if audio track is available
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
-        console.warn('No system audio captured. Make sure to:');
-        console.log('1. Select "Entire Screen" when prompted');
-        console.log('2. Check "Share audio" checkbox');
-        console.log('3. Allow audio sharing for system sounds');
+        handleCoachingError('audio_failure', 'No system audio captured. Please select "Entire Screen" and check "Share audio"', true);
         return null;
       }
 
-      console.log('System audio capture successful - all computer audio (YouTube, Meet, etc.) should now be captured');
-      setState(prev => ({ ...prev, isTabAudioAvailable: true }));
+      // Validate audio track settings
+      const audioTrack = audioTracks[0];
+      const settings = audioTrack.getSettings();
+      console.log('System audio captured:', settings);
+      
+      if (!settings.echoCancellation === false) {
+        console.warn('Echo cancellation not disabled - may affect system audio quality');
+      }
+
+      setState(prev => ({ 
+        ...prev, 
+        isTabAudioAvailable: true,
+        error: null 
+      }));
+      
       await setupAudioAnalysis(stream, 'tab');
       audioSourceRef.current.tabStream = stream;
       
-      // Stop video track since we only need audio
+      // Stop video track since we only need audio (keep minimal video to maintain audio)
       const videoTracks = stream.getVideoTracks();
-      videoTracks.forEach(track => track.stop());
+      videoTracks.forEach(track => {
+        track.enabled = false; // Disable but don't stop to maintain audio
+      });
+      
+      // Monitor audio track for interruptions
+      audioTrack.onended = () => {
+        console.log('System audio track ended');
+        handleCoachingError('audio_failure', 'System audio capture was interrupted', true);
+      };
       
       return stream;
-    } catch (error) {
-      console.error('System audio capture failed:', error);
-      console.log('IMPORTANT: For system audio capture:');
-      console.log('1. Select "Entire Screen" (not just a tab)');
-      console.log('2. Make sure "Share audio" is checked');
-      console.log('3. This will capture ALL system audio (YouTube, Meet, music, etc.)');
+    } catch (error: any) {
+      console.error('Error requesting system audio:', error);
+      let errorMessage = 'Failed to capture system audio';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Permission denied for screen capture';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = 'Browser does not support system audio capture';
+      } else if (error.name === 'AbortError') {
+        errorMessage = 'User cancelled screen capture';
+      }
+      
+      handleCoachingError('permission_denied', errorMessage, false);
       setState(prev => ({ ...prev, isTabAudioAvailable: false }));
       return null;
     }
@@ -326,25 +378,24 @@ export function useRealTimeCoaching() {
   }, [stopAudioLevelMonitoring]);
 
   // Smart filtering function to prevent suggestion overload
-  const shouldGenerateSuggestion = (transcript: string, currentState: CoachingState): boolean => {
+  const shouldGenerateSuggestion = (transcript: string, currentSuggestions: CoachingSuggestion[], timeSinceLastSuggestion: number): boolean => {
     // Skip if in demo mode and user is talking about the system
-    if (currentState.isDemoMode && transcript.toLowerCase().includes('coaching')) {
+    if (state.isDemoMode && transcript.toLowerCase().includes('coaching')) {
       return false;
     }
 
     // Minimum conversation length threshold (at least 100 characters)
-    if (currentState.conversationLength < 100) {
+    if (state.conversationLength < 100) {
       return false;
     }
 
     // Time throttling - wait at least 15 seconds between suggestions
-    const timeSinceLastSuggestion = Date.now() - currentState.lastSuggestionTime;
     if (timeSinceLastSuggestion < 15000) {
       return false;
     }
 
     // Limit total active suggestions to 2 for better readability
-    if (currentState.suggestions.length >= 2) {
+    if (currentSuggestions.length >= 2) {
       return false;
     }
 
@@ -602,6 +653,55 @@ If no clear trigger, respond with: {"suggestions": []}`;
     }));
   }, []);
 
+  const rateSuggestion = useCallback((suggestionId: string, rating: 'helpful' | 'not_helpful', reason?: string) => {
+    setState(prev => ({
+      ...prev,
+      suggestions: prev.suggestions.map(suggestion => 
+        suggestion.id === suggestionId 
+          ? {
+              ...suggestion,
+              userFeedback: {
+                rating,
+                timestamp: Date.now(),
+                reason
+              }
+            }
+          : suggestion
+      )
+    }));
+  }, []);
+
+  const handleCoachingError = useCallback((type: CoachingError['type'], message: string, canRecover: boolean) => {
+    setState(prev => ({
+      ...prev,
+      error: {
+        type,
+        message,
+        canRecover,
+        timestamp: Date.now()
+      },
+      sessionStatus: 'error'
+    }));
+  }, []);
+
+  const clearError = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      error: null,
+      sessionStatus: 'stopped'
+    }));
+  }, []);
+
+  const retryOperation = useCallback(() => {
+    if (state.error?.canRecover) {
+      clearError();
+      // Attempt to restart based on error type
+      if (state.error.type === 'speech_recognition_error' || state.error.type === 'audio_failure') {
+        startListening(state.callType, state.audioSource);
+      }
+    }
+  }, [state.error, state.callType, state.audioSource]);
+
   const toggleDemoMode = useCallback(() => {
     setState(prev => ({ ...prev, isDemoMode: !prev.isDemoMode }));
   }, []);
@@ -620,6 +720,7 @@ If no clear trigger, respond with: {"suggestions": []}`;
     toggleSpeaker,
     clearSession,
     dismissSuggestion,
+    rateSuggestion,
     toggleDemoMode,
     requestCoaching,
     saveTranscript,
@@ -627,6 +728,9 @@ If no clear trigger, respond with: {"suggestions": []}`;
     requestTabAudio,
     requestMicrophoneAudio,
     stopAllAudioStreams,
+    handleCoachingError,
+    clearError,
+    retryOperation,
     isAvailable: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
   };
 }
