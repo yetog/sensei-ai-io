@@ -83,6 +83,7 @@ interface CoachingState {
   isTabAudioAvailable: boolean;
   error: CoachingError | null;
   sessionStatus: 'active' | 'paused' | 'stopped' | 'error';
+  selectedAgentId?: string | null;
 }
 
 interface CoachingError {
@@ -108,7 +109,8 @@ export function useRealTimeCoaching() {
     tabLevel: 0,
     isTabAudioAvailable: false,
     error: null,
-    sessionStatus: 'stopped'
+    sessionStatus: 'stopped',
+    selectedAgentId: null
   });
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -263,20 +265,22 @@ export function useRealTimeCoaching() {
     }
   }, []);
 
+  const getBrowserType = (): 'chrome' | 'safari' | 'firefox' | 'other' => {
+    const userAgent = navigator.userAgent;
+    if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) return 'chrome';
+    if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) return 'safari';
+    if (userAgent.includes('Firefox')) return 'firefox';
+    return 'other';
+  };
+
   const requestTabAudio = useCallback(async (): Promise<MediaStream | null> => {
     try {
       console.log('Requesting system audio capture...');
       
-      // Enhanced system audio capture with better browser compatibility
-      const constraints = {
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: { ideal: 2 },
-          sampleRate: { ideal: 48000 },
-          suppressLocalAudioPlayback: false
-        } as any,
+      const browserType = getBrowserType();
+      
+      // Browser-specific optimized constraints
+      let constraints: any = {
         video: {
           width: { ideal: 1 },
           height: { ideal: 1 },
@@ -284,12 +288,58 @@ export function useRealTimeCoaching() {
         }
       };
 
+      // Chrome/Edge specific audio constraints (best compatibility)
+      if (browserType === 'chrome') {
+        constraints.audio = {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: { ideal: 2 },
+          sampleRate: { ideal: 48000 },
+          suppressLocalAudioPlayback: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false
+        };
+      }
+      // Safari specific constraints
+      else if (browserType === 'safari') {
+        constraints.audio = {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: { ideal: 2 }
+        };
+      }
+      // Firefox and other browsers
+      else {
+        constraints.audio = {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        };
+      }
+
       const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
       
       // Check if audio track is available
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
-        handleCoachingError('audio_failure', 'No system audio captured. Please select "Entire Screen" and check "Share audio"', true);
+        const browserType = getBrowserType();
+        let errorMsg = 'No system audio captured. ';
+        
+        if (browserType === 'chrome') {
+          errorMsg += 'In Chrome: Select "Entire Screen" → Check "Share audio" → Click Share.';
+        } else if (browserType === 'safari') {
+          errorMsg += 'In Safari: Select "Entire Screen" → Enable "Include Audio" → Click Share.';
+        } else if (browserType === 'firefox') {
+          errorMsg += 'Firefox may not support system audio. Try Chrome for best results.';
+        } else {
+          errorMsg += 'Please select "Entire Screen" and enable audio sharing.';
+        }
+        
+        handleCoachingError('audio_failure', errorMsg, true);
         return null;
       }
 
@@ -440,7 +490,7 @@ export function useRealTimeCoaching() {
 
     try {
       // Create coaching prompt based on call type and context
-      const coachingPrompt = createCoachingPrompt(text, callType, state.transcription);
+      const coachingPrompt = createCoachingPrompt(text, callType, state.transcription, state.selectedAgentId);
       
       const response = await ionosAI.sendMessage([
         { role: 'user', content: coachingPrompt }
@@ -475,12 +525,22 @@ export function useRealTimeCoaching() {
     }
   }, [state.transcription]);
 
-  const createCoachingPrompt = (currentText: string, callType: string, history: TranscriptionSegment[]): string => {
+  const createCoachingPrompt = (currentText: string, callType: string, history: TranscriptionSegment[], agentId?: string | null): string => {
     const context = history.slice(-3).map(seg => `${seg.speaker}: ${seg.text}`).join('\n');
     
     // Detect conversation phase
     const conversationPhase = detectConversationPhase(history, currentText);
     
+    // Get agent-specific instructions if agent is selected
+    let agentContext = '';
+    if (agentId) {
+      const { agentService } = require('@/services/agentService');
+      const agent = agentService.get(agentId);
+      if (agent) {
+        agentContext = `\n\nSPECIALIZED AGENT CONTEXT:\nAgent: ${agent.name}\nExpertise: ${agent.systemPrompt.substring(0, 200)}...\nUse this agent's expertise to provide targeted coaching.`;
+      }
+    }
+
     const callTypeInstructions = {
       incoming_sales: "Focus ONLY on clear buying signals, direct objections, and urgent closing opportunities.",
       retention: "Focus ONLY on cancellation reasons and immediate retention opportunities.",
@@ -488,7 +548,7 @@ export function useRealTimeCoaching() {
       general: "Focus ONLY on clear coaching moments - objections, buying signals, or closing."
     };
 
-    return `You are an expert sales coach providing CONSERVATIVE, high-value coaching suggestions for a live ${callType} call.
+    return `You are an expert sales coach providing CONSERVATIVE, high-value coaching suggestions for a live ${callType} call.${agentContext}
 
 CRITICAL INSTRUCTIONS:
 - ONLY provide suggestions for CLEAR coaching moments (objections, buying signals, pricing concerns)
@@ -594,7 +654,7 @@ If no clear trigger, respond with: {"suggestions": []}`;
     URL.revokeObjectURL(url);
   }, [state.transcription, state.suggestions, state.callType, state.conversationLength]);
 
-  const startListening = useCallback(async (callType: CoachingState['callType'] = 'general', audioSource: AudioSource['type'] = 'microphone') => {
+  const startListening = useCallback(async (callType: CoachingState['callType'] = 'general', audioSource: AudioSource['type'] = 'microphone', selectedAgentId?: string | null) => {
     if (recognitionRef.current) {
       // Setup audio streams based on selected source
       if (audioSource === 'microphone' || audioSource === 'both') {
@@ -612,7 +672,10 @@ If no clear trigger, respond with: {"suggestions": []}`;
         suggestions: [],
         currentTurn: audioSource === 'tab' ? 'customer' : 'user',
         conversationLength: 0,
-        lastSuggestionTime: 0
+        lastSuggestionTime: 0,
+        selectedAgentId,
+        error: null,
+        sessionStatus: 'active'
       }));
 
       startAudioLevelMonitoring();

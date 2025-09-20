@@ -29,9 +29,13 @@ import { PostCallSummary } from '@/components/PostCallSummary';
 import { GoogleMeetInstructions } from '@/components/GoogleMeetInstructions';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { SuggestionCard } from '@/components/SuggestionCard';
+import { AgentSelector } from '@/components/AgentSelector';
+import { BrowserAudioTest } from '@/components/BrowserAudioTest';
+import { DemoScenarios } from '@/components/DemoScenarios';
 import { callHistoryService } from '@/services/callHistoryService';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import '@/services/demoAgentSetup';
 
 interface LiveCoachingDashboardProps {
   onClose?: () => void;
@@ -72,11 +76,14 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [showPostCallSummary, setShowPostCallSummary] = useState(false);
   const [selectedAudioSource, setSelectedAudioSource] = useState<'microphone' | 'tab' | 'both'>('microphone');
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [showAudioTest, setShowAudioTest] = useState(false);
+  const [showDemoScenarios, setShowDemoScenarios] = useState(false);
   const { toast } = useToast();
 
   const handleStartCoaching = () => {
     setCallStartTime(Date.now());
-    startListening(selectedCallType, selectedAudioSource);
+    startListening(selectedCallType, selectedAudioSource, selectedAgentId);
   };
 
   const handleStopCall = () => {
@@ -289,6 +296,26 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               </select>
             </div>
 
+            {/* Audio Test Button */}
+            <Button 
+              onClick={() => setShowAudioTest(!showAudioTest)} 
+              variant="outline" 
+              size="sm"
+              disabled={isListening}
+            >
+              {showAudioTest ? 'Hide' : 'Audio Test'}
+            </Button>
+
+            {/* Demo Scenarios Button */}
+            <Button 
+              onClick={() => setShowDemoScenarios(!showDemoScenarios)} 
+              variant="outline" 
+              size="sm"
+              disabled={isListening}
+            >
+              {showDemoScenarios ? 'Hide' : 'Demo Scenarios'}
+            </Button>
+
             {/* Audio Source Selection */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Audio:</span>
@@ -396,6 +423,41 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Audio Test Panel */}
+      {showAudioTest && (
+        <BrowserAudioTest onTestComplete={(success) => {
+          if (success) {
+            setShowAudioTest(false);
+          }
+        }} />
+      )}
+
+      {/* Demo Scenarios Panel */}
+      {showDemoScenarios && (
+        <DemoScenarios 
+          onSelectScenario={(scenario) => {
+            setSelectedCallType(scenario.callType);
+            setShowDemoScenarios(false);
+            if (!isDemoMode) {
+              toggleDemoMode();
+            }
+            toast({
+              title: "Demo Scenario Selected",
+              description: `Practice with: ${scenario.title}. Use Demo Mode to simulate customer responses.`
+            });
+          }}
+          isListening={isListening}
+        />
+      )}
+
+      {/* Agent Selection */}
+      <AgentSelector 
+        selectedAgentId={selectedAgentId}
+        onAgentSelect={setSelectedAgentId}
+        callType={selectedCallType}
+        isListening={isListening}
+      />
 
       {/* Main Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
