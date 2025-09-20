@@ -344,7 +344,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 </div>
               ) : (
                  <div className="space-y-3">
-                  {transcription.slice(-15).map((segment) => (
+                  {transcription.slice(-20).map((segment) => (
                     <div
                       key={segment.id}
                       className={cn(
@@ -365,7 +365,9 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                           {new Date(segment.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p className="text-lg text-foreground font-medium leading-relaxed tracking-wide antialiased">{segment.text}</p>
+                      <p className="text-base text-foreground font-medium leading-relaxed tracking-wide antialiased break-words">
+                        {segment.text.length > 200 ? `${segment.text.substring(0, 200)}...` : segment.text}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -431,9 +433,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                           >
                             {suggestion.type.replace('_', ' ').toUpperCase()}
                           </Badge>
-                          <span className="text-sm text-foreground font-semibold">
-                            {Math.round(suggestion.confidence * 100)}%
-                          </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Button

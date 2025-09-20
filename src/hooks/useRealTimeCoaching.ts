@@ -107,10 +107,10 @@ export function useRealTimeCoaching() {
               const lastSegment = prev.transcription[prev.transcription.length - 1];
               const currentSpeaker = prev.currentTurn || 'user';
               
-              // Smart consolidation: merge with previous segment if same speaker and within 5 seconds
-              if (lastSegment && 
-                  lastSegment.speaker === currentSpeaker && 
-                  Date.now() - lastSegment.timestamp < 5000) {
+          // Smart consolidation: merge with previous segment if same speaker and within 2 seconds
+          if (lastSegment && 
+              lastSegment.speaker === currentSpeaker && 
+              Date.now() - lastSegment.timestamp < 2000) {
                 
                 // Update the last segment instead of creating new one
                 const updatedTranscription = [...prev.transcription];
@@ -321,14 +321,24 @@ If no clear trigger, respond with: {"suggestions": []}`;
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.suggestions?.map((suggestion: any) => ({
-          id: `${Date.now()}_${Math.random()}`,
-          type: suggestion.type || 'general',
-          context: suggestion.analysis || context,
-          suggestion: `${suggestion.suggestion1}\n\n${suggestion.suggestion2}`,
-          confidence: suggestion.confidence || 0.7,
-          timestamp: Date.now()
-        })).filter((s: any) => s.suggestion.length > 0) || [];
+        return parsed.suggestions?.map((suggestion: any) => {
+          // Build suggestion text with only valid parts
+          const suggestionParts = [
+            suggestion.suggestion1,
+            suggestion.suggestion2
+          ].filter(part => part && part !== 'undefined' && part.trim().length > 0);
+          
+          if (suggestionParts.length === 0) return null;
+          
+          return {
+            id: `${Date.now()}_${Math.random()}`,
+            type: suggestion.type || 'general',
+            context: suggestion.analysis || context,
+            suggestion: suggestionParts.join('\n\n'),
+            confidence: suggestion.confidence || 0.7,
+            timestamp: Date.now()
+          };
+        }).filter((s: any) => s !== null) || [];
       }
     } catch (error) {
       console.error('Error parsing coaching response:', error);
