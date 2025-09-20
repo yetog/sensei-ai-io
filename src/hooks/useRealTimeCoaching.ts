@@ -247,11 +247,14 @@ export function useRealTimeCoaching() {
 
   const requestTabAudio = useCallback(async (): Promise<MediaStream | null> => {
     try {
+      // Enhanced configuration for Google Meet tab capture
       const stream = await navigator.mediaDevices.getDisplayMedia({
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+          echoCancellation: false, // Disable to capture raw Google Meet audio
+          noiseSuppression: false, // Disable to capture customer voice clearly
+          autoGainControl: false,   // Disable to maintain original audio levels
+          channelCount: 2,          // Stereo capture for better audio quality
+          sampleRate: 48000         // High sample rate for clear speech
         } as any,
         video: false
       });
@@ -259,16 +262,20 @@ export function useRealTimeCoaching() {
       // Check if audio track is available
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
-        console.warn('No audio track available in tab capture');
+        console.warn('No audio track available in tab capture - make sure to select "Share audio" when choosing the Google Meet tab');
         return null;
       }
 
+      console.log('Tab audio capture successful - Google Meet audio should now be captured');
       setState(prev => ({ ...prev, isTabAudioAvailable: true }));
       await setupAudioAnalysis(stream, 'tab');
       audioSourceRef.current.tabStream = stream;
       return stream;
     } catch (error) {
       console.error('Tab audio capture failed:', error);
+      console.log('Tip: When selecting screen share, make sure to:');
+      console.log('1. Choose the correct browser tab with Google Meet');
+      console.log('2. Check "Share audio" option in the screen share dialog');
       setState(prev => ({ ...prev, isTabAudioAvailable: false }));
       return null;
     }

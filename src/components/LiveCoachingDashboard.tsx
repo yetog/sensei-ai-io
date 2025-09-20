@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
 import { PostCallSummary } from '@/components/PostCallSummary';
+import { GoogleMeetInstructions } from '@/components/GoogleMeetInstructions';
 import { callHistoryService } from '@/services/callHistoryService';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -77,7 +78,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     // Show post-call summary if we have any transcription data
     if (transcription.length > 0) {
       console.log('Showing post-call summary with', transcription.length, 'segments');
-      setShowPostCallSummary(true);
+      setTimeout(() => setShowPostCallSummary(true), 100); // Small delay to ensure clean state
     } else {
       console.log('No transcription data, not showing summary');
     }
@@ -594,11 +595,25 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         </Card>
       )}
 
+      {/* Google Meet Testing Instructions */}
+      {(selectedAudioSource === 'tab' || selectedAudioSource === 'both') && (
+        <GoogleMeetInstructions
+          audioSource={selectedAudioSource}
+          isListening={isListening}
+          tabLevel={tabLevel}
+          micLevel={micLevel}
+          isTabAudioAvailable={isTabAudioAvailable}
+        />
+      )}
+
       {/* Post-Call Summary Modal */}
       {showPostCallSummary && (
         <PostCallSummary
           callSummary={generateCallSummary()}
-          onClose={() => setShowPostCallSummary(false)}
+          onClose={() => {
+            console.log('Closing post-call summary');
+            setShowPostCallSummary(false);
+          }}
           onSaveToHistory={handleSaveToHistory}
         />
       )}

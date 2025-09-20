@@ -18,7 +18,8 @@ import {
   FileText,
   Users,
   TrendingUp,
-  History
+  History,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -342,7 +343,7 @@ Generate a personalized follow-up email using the extracted conversation data.
         </CardHeader>
 
         <CardContent className="p-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 h-[600px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 h-[550px]">
             {/* Call Summary */}
             <div className="border-r">
               <ScrollArea className="h-full p-6">
@@ -543,7 +544,7 @@ Generate a personalized follow-up email using the extracted conversation data.
                     <Textarea
                       value={customEmail || fillTemplate(selectedTemplate.body)}
                       onChange={(e) => setCustomEmail(e.target.value)}
-                      className="min-h-[300px] text-sm"
+                      className="min-h-[180px] text-sm resize-none"
                       placeholder="Email content will appear here..."
                     />
                   </div>
@@ -582,7 +583,14 @@ Generate a personalized follow-up email using the extracted conversation data.
           {/* Actions */}
           <div className="border-t p-6 bg-muted/50">
             <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={onClose}>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  console.log('Close button clicked');
+                  onClose();
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
                 Close
               </Button>
               <div className="flex items-center gap-2">
