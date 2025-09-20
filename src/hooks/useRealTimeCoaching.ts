@@ -58,6 +58,9 @@ interface CoachingState {
   suggestions: CoachingSuggestion[];
   currentTurn: 'user' | 'customer' | null;
   callType: 'incoming_sales' | 'retention' | 'outbound' | 'general';
+  conversationLength: number;
+  lastSuggestionTime: number;
+  isDemoMode: boolean;
 }
 
 export function useRealTimeCoaching() {
@@ -67,7 +70,10 @@ export function useRealTimeCoaching() {
     transcription: [],
     suggestions: [],
     currentTurn: null,
-    callType: 'general'
+    callType: 'general',
+    conversationLength: 0,
+    lastSuggestionTime: 0,
+    isDemoMode: false
   });
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -107,11 +113,14 @@ export function useRealTimeCoaching() {
 
             setState(prev => ({
               ...prev,
-              transcription: [...prev.transcription, newSegment]
+              transcription: [...prev.transcription, newSegment],
+              conversationLength: prev.conversationLength + transcript.length
             }));
 
-            // Process the transcription for coaching suggestions
-            processTranscriptionForCoaching(transcript, state.callType);
+            // Smart suggestion filtering - only process if conditions are met
+            if (shouldGenerateSuggestion(transcript, state)) {
+              processTranscriptionForCoaching(transcript, state.callType);
+            }
           }
         }
       };
@@ -127,6 +136,65 @@ export function useRealTimeCoaching() {
     }
   }, [state.currentTurn, state.callType]);
 
+  // Smart filtering function to prevent suggestion overload
+  const shouldGenerateSuggestion = (transcript: string, currentState: CoachingState): boolean => {
+    // Skip if in demo mode and user is talking about the system
+    if (currentState.isDemoMode && transcript.toLowerCase().includes('coaching')) {
+      return false;
+    }
+
+    // Minimum conversation length threshold (at least 100 characters)
+    if (currentState.conversationLength < 100) {
+      return false;
+    }
+
+    // Time throttling - wait at least 15 seconds between suggestions
+    const timeSinceLastSuggestion = Date.now() - currentState.lastSuggestionTime;
+    if (timeSinceLastSuggestion < 15000) {
+      return false;
+    }
+
+    // Limit total active suggestions to 3
+    if (currentState.suggestions.length >= 3) {
+      return false;
+    }
+
+    // Only suggest on customer statements longer than 20 characters
+    if (transcript.length < 20) {
+      return false;
+    }
+
+    // Look for trigger words/phrases that indicate coaching opportunities
+    const triggers = [
+      'price', 'cost', 'expensive', 'budget', 'think about it', 'not sure',
+      'maybe', 'hesitant', 'compare', 'competition', 'other options',
+      'decision', 'when', 'timeline', 'ready', 'interested'
+    ];
+    
+    const hasCoachingTrigger = triggers.some(trigger => 
+      transcript.toLowerCase().includes(trigger)
+    );
+
+    return hasCoachingTrigger;
+  };
+
+  const detectConversationPhase = (history: TranscriptionSegment[], currentText: string): string => {
+    const fullConversation = history.map(h => h.text).join(' ') + ' ' + currentText;
+    const text = fullConversation.toLowerCase();
+    
+    if (text.includes('price') || text.includes('cost') || text.includes('budget')) {
+      return 'pricing_discussion';
+    } else if (text.includes('when') || text.includes('timeline') || text.includes('start')) {
+      return 'closing_phase';
+    } else if (text.includes('feature') || text.includes('demo') || text.includes('how')) {
+      return 'product_discussion';
+    } else if (history.length < 3) {
+      return 'opening_phase';
+    } else {
+      return 'discovery_phase';
+    }
+  };
+
   const processTranscriptionForCoaching = useCallback(async (text: string, callType: string) => {
     setState(prev => ({ ...prev, isProcessing: true }));
 
@@ -141,11 +209,25 @@ export function useRealTimeCoaching() {
       // Parse AI response for suggestions
       const suggestions = parseCoachingResponse(response, text);
       
+      // Filter high-confidence suggestions only
+      const filteredSuggestions = suggestions.filter(s => s.confidence >= 0.8);
+      
       setState(prev => ({
         ...prev,
-        suggestions: [...prev.suggestions, ...suggestions],
-        isProcessing: false
+        suggestions: [...prev.suggestions, ...filteredSuggestions],
+        isProcessing: false,
+        lastSuggestionTime: Date.now()
       }));
+
+      // Auto-cleanup old suggestions after 3 minutes
+      setTimeout(() => {
+        setState(prev => ({
+          ...prev,
+          suggestions: prev.suggestions.filter(s => 
+            Date.now() - s.timestamp < 180000
+          )
+        }));
+      }, 180000);
 
     } catch (error) {
       console.error('Error processing coaching suggestions:', error);
@@ -154,44 +236,56 @@ export function useRealTimeCoaching() {
   }, [state.transcription]);
 
   const createCoachingPrompt = (currentText: string, callType: string, history: TranscriptionSegment[]): string => {
-    const context = history.slice(-5).map(seg => `${seg.speaker}: ${seg.text}`).join('\n');
+    const context = history.slice(-3).map(seg => `${seg.speaker}: ${seg.text}`).join('\n');
+    
+    // Detect conversation phase
+    const conversationPhase = detectConversationPhase(history, currentText);
     
     const callTypeInstructions = {
-      incoming_sales: "Focus on identifying buying signals, objections, and opportunities to present product benefits.",
-      retention: "Focus on understanding cancellation reasons and providing retention offers or solutions.",
-      outbound: "Focus on building rapport, qualifying prospects, and moving toward a sales conversation.",
-      general: "Provide general sales coaching and conversation guidance."
+      incoming_sales: "Focus ONLY on clear buying signals, direct objections, and urgent closing opportunities.",
+      retention: "Focus ONLY on cancellation reasons and immediate retention opportunities.",
+      outbound: "Focus ONLY on qualification questions and scheduling opportunities.",
+      general: "Focus ONLY on clear coaching moments - objections, buying signals, or closing."
     };
 
-    return `You are a real-time sales coaching assistant analyzing a live ${callType} call. Analyze this conversation and provide specific, actionable coaching suggestions.
+    return `You are an expert sales coach providing CONSERVATIVE, high-value coaching suggestions for a live ${callType} call.
 
+CRITICAL INSTRUCTIONS:
+- ONLY provide suggestions for CLEAR coaching moments (objections, buying signals, pricing concerns)
+- DO NOT coach on casual conversation, system discussions, or general chat
+- Maximum 1 suggestion per analysis
+- Confidence must be 85% or higher
+- Focus on immediate, actionable responses
+
+Call Phase: ${conversationPhase}
 Call Type: ${callType}
-Instructions: ${callTypeInstructions[callType as keyof typeof callTypeInstructions]}
+Focus: ${callTypeInstructions[callType as keyof typeof callTypeInstructions]}
 
-Recent Conversation History:
+Recent Context (last 3 exchanges):
 ${context}
 
 Current Customer Statement: "${currentText}"
 
-ANALYSIS FOCUS:
-- Detect objections, buying signals, hesitation, pricing concerns
-- Identify opportunities for product demos, features, benefits
-- Recognize closing moments and urgency indicators
-- Note emotional state and rapport-building opportunities
+ONLY suggest if you detect:
+1. Direct objection to price/features/timing
+2. Clear buying signal or interest
+3. Request for information/demo
+4. Closing opportunity
+5. Retention risk indicator
 
-Provide 1-3 immediate coaching suggestions in this JSON format:
+Response format (ONLY if clear trigger detected):
 {
   "suggestions": [
     {
       "type": "objection|product_pitch|closing|retention|general",
-      "context": "What customer behavior/words triggered this suggestion",
-      "suggestion": "Exact phrase or approach the sales rep should use RIGHT NOW",
+      "context": "Specific trigger detected in customer statement",
+      "suggestion": "Exact response to use immediately",
       "confidence": 0.9
     }
   ]
 }
 
-Make suggestions conversational, natural, and ready to use immediately. Focus on what to say next, not general advice.`;
+If no clear trigger, respond with: {"suggestions": []}`;
   };
 
   const parseCoachingResponse = (response: string, context: string): CoachingSuggestion[] => {
@@ -213,15 +307,8 @@ Make suggestions conversational, natural, and ready to use immediately. Focus on
       console.error('Error parsing coaching response:', error);
     }
 
-    // Fallback: create a general suggestion from the response
-    return [{
-      id: Date.now().toString(),
-      type: 'general',
-      context: context.substring(0, 100),
-      suggestion: response.substring(0, 200),
-      confidence: 0.6,
-      timestamp: Date.now()
-    }];
+    // Return empty array if no clear suggestions
+    return [];
   };
 
   const startListening = useCallback((callType: CoachingState['callType'] = 'general') => {
@@ -231,7 +318,9 @@ Make suggestions conversational, natural, and ready to use immediately. Focus on
         callType,
         transcription: [],
         suggestions: [],
-        currentTurn: 'customer'
+        currentTurn: 'customer',
+        conversationLength: 0,
+        lastSuggestionTime: 0
       }));
       recognitionRef.current.start();
     }
@@ -256,7 +345,9 @@ Make suggestions conversational, natural, and ready to use immediately. Focus on
       ...prev,
       transcription: [],
       suggestions: [],
-      currentTurn: null
+      currentTurn: null,
+      conversationLength: 0,
+      lastSuggestionTime: 0
     }));
   }, []);
 
@@ -267,6 +358,17 @@ Make suggestions conversational, natural, and ready to use immediately. Focus on
     }));
   }, []);
 
+  const toggleDemoMode = useCallback(() => {
+    setState(prev => ({ ...prev, isDemoMode: !prev.isDemoMode }));
+  }, []);
+
+  const requestCoaching = useCallback(() => {
+    if (state.transcription.length > 0) {
+      const lastSegment = state.transcription[state.transcription.length - 1];
+      processTranscriptionForCoaching(lastSegment.text, state.callType);
+    }
+  }, [state.transcription, state.callType]);
+
   return {
     ...state,
     startListening,
@@ -274,6 +376,8 @@ Make suggestions conversational, natural, and ready to use immediately. Focus on
     toggleSpeaker,
     clearSession,
     dismissSuggestion,
+    toggleDemoMode,
+    requestCoaching,
     isAvailable: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
   };
 }

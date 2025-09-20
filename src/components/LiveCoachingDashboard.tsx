@@ -34,11 +34,14 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     suggestions,
     currentTurn,
     callType,
+    isDemoMode,
     startListening,
     stopListening,
     toggleSpeaker,
     clearSession,
     dismissSuggestion,
+    toggleDemoMode,
+    requestCoaching,
     isAvailable
   } = useRealTimeCoaching();
 
@@ -153,7 +156,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             </div>
 
             {/* Control Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {!isListening ? (
                 <Button onClick={handleStartCoaching} className="flex items-center gap-2">
                   <Mic className="h-4 w-4" />
@@ -182,6 +185,24 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 </Button>
               )}
               
+              <Button 
+                onClick={toggleDemoMode} 
+                variant={isDemoMode ? "default" : "outline"} 
+                size="sm"
+              >
+                {isDemoMode ? "Demo Mode ON" : "Demo Mode"}
+              </Button>
+              
+              <Button 
+                onClick={requestCoaching} 
+                variant="secondary" 
+                size="sm"
+                disabled={transcription.length === 0}
+              >
+                <Brain className="h-4 w-4 mr-1" />
+                Request Coaching
+              </Button>
+              
               <Button onClick={clearSession} variant="outline" size="sm">
                 Clear Session
               </Button>
@@ -193,46 +214,52 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       {/* Main Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Live Transcription */}
-        <Card className="h-[500px]">
+        <Card className="h-[600px]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mic className="h-4 w-4" />
               Live Conversation
+              {isDemoMode && (
+                <Badge variant="secondary" className="text-xs">Demo Mode</Badge>
+              )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-[400px]">
+          <CardContent className="h-[500px]">
             <ScrollArea className="h-full">
               {transcription.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   <div className="text-center">
                     <PhoneCall className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Start coaching to see live transcription</p>
+                    <p className="text-base">Start coaching to see live transcription</p>
                   </div>
                 </div>
               ) : (
-                 <div className="space-y-3">
-                  {transcription.map((segment) => (
+                 <div className="space-y-4">
+                  {transcription.slice(-10).map((segment) => (
                     <div
                       key={segment.id}
                       className={cn(
-                        "p-4 rounded-lg border-l-4",
+                        "p-4 rounded-lg border-l-4 transition-all duration-200",
                         segment.speaker === 'user' 
-                          ? "bg-primary/10 border-l-primary text-foreground" 
-                          : "bg-accent/10 border-l-accent text-foreground"
+                          ? "bg-primary/20 border-l-primary" 
+                          : "bg-accent/20 border-l-accent"
                       )}
                     >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant={segment.speaker === 'user' ? 'default' : 'secondary'} className="text-xs font-medium">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge 
+                          variant={segment.speaker === 'user' ? 'default' : 'secondary'} 
+                          className="text-sm font-semibold px-3 py-1"
+                        >
                           {segment.speaker === 'user' ? 'You' : 'Customer'}
                         </Badge>
-                        <span className="text-xs text-foreground/80 font-medium">
+                        <span className="text-sm text-foreground/90 font-medium">
                           {new Date(segment.timestamp).toLocaleTimeString()}
                         </span>
-                        <span className="text-xs text-foreground/80 font-medium">
+                        <span className="text-sm text-foreground/90 font-medium">
                           {Math.round(segment.confidence * 100)}% confidence
                         </span>
                       </div>
-                      <p className="text-sm text-foreground font-medium leading-relaxed">{segment.text}</p>
+                      <p className="text-base text-foreground font-medium leading-relaxed">{segment.text}</p>
                     </div>
                   ))}
                 </div>
@@ -242,11 +269,14 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         </Card>
 
         {/* AI Suggestions */}
-        <Card className="h-[500px]">
+        <Card className="h-[600px]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
               AI Coaching Suggestions
+              <Badge variant="secondary" className="text-xs">
+                {suggestions.length}/3 active
+              </Badge>
               {isProcessing && (
                 <div className="flex items-center gap-1 text-sm text-amber-600">
                   <Clock className="h-3 w-3 animate-spin" />
@@ -255,37 +285,48 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-[400px]">
+          <CardContent className="h-[500px]">
             <ScrollArea className="h-full">
               {suggestions.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   <div className="text-center">
                     <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>AI suggestions will appear here</p>
+                    <p className="text-base mb-2">Intelligent coaching suggestions</p>
+                    <p className="text-sm">Will appear when specific triggers are detected</p>
                   </div>
                 </div>
               ) : (
-                 <div className="space-y-3">
-                  {suggestions.slice().reverse().map((suggestion) => (
+                 <div className="space-y-4">
+                  {suggestions.slice().reverse().slice(0, 3).map((suggestion) => (
                     <div
                       key={suggestion.id}
                       className={cn(
-                        "p-4 rounded-lg border-2 transition-all duration-200 bg-card text-foreground shadow-lg",
-                        suggestion.type === 'objection' && "border-red-500/50 bg-red-500/10",
-                        suggestion.type === 'product_pitch' && "border-blue-500/50 bg-blue-500/10",
-                        suggestion.type === 'closing' && "border-green-500/50 bg-green-500/10",
-                        suggestion.type === 'retention' && "border-purple-500/50 bg-purple-500/10",
-                        suggestion.type === 'general' && "border-primary/50 bg-primary/10"
+                        "p-5 rounded-lg border-2 transition-all duration-200 shadow-lg",
+                        suggestion.type === 'objection' && "border-red-500/60 bg-red-500/15",
+                        suggestion.type === 'product_pitch' && "border-blue-500/60 bg-blue-500/15",
+                        suggestion.type === 'closing' && "border-green-500/60 bg-green-500/15",
+                        suggestion.type === 'retention' && "border-purple-500/60 bg-purple-500/15",
+                        suggestion.type === 'general' && "border-primary/60 bg-primary/15"
                       )}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2">
                           {getSuggestionIcon(suggestion.type)}
-                          <Badge variant="outline" className="text-xs font-medium bg-foreground text-background">
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-sm font-semibold px-2 py-1",
+                              suggestion.type === 'objection' && "border-red-500 text-red-700 bg-red-50",
+                              suggestion.type === 'product_pitch' && "border-blue-500 text-blue-700 bg-blue-50",
+                              suggestion.type === 'closing' && "border-green-500 text-green-700 bg-green-50",
+                              suggestion.type === 'retention' && "border-purple-500 text-purple-700 bg-purple-50",
+                              suggestion.type === 'general' && "border-primary text-primary bg-primary/10"
+                            )}
+                          >
                             {suggestion.type.replace('_', ' ').toUpperCase()}
                           </Badge>
-                          <span className="text-xs text-foreground/80 font-medium">
-                            {Math.round(suggestion.confidence * 100)}% confidence
+                          <span className="text-sm text-foreground font-semibold">
+                            {Math.round(suggestion.confidence * 100)}%
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
@@ -293,40 +334,41 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                             size="sm"
                             variant="ghost"
                             onClick={() => handleCopySuggestion(suggestion.suggestion, suggestion.id)}
-                            className="h-6 w-6 p-0"
+                            className="h-8 w-8 p-0 hover:bg-background/50"
                           >
                             {copiedSuggestionId === suggestion.id ? (
-                              <CheckCircle className="h-3 w-3 text-green-600" />
+                              <CheckCircle className="h-4 w-4 text-green-600" />
                             ) : (
-                              <Copy className="h-3 w-3" />
+                              <Copy className="h-4 w-4" />
                             )}
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => dismissSuggestion(suggestion.id)}
-                            className="h-6 w-6 p-0"
+                            className="h-8 w-8 p-0 hover:bg-background/50"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
                       
                       {suggestion.context && (
                         <>
-                          <p className="text-xs text-foreground/80 mb-2 font-medium">
-                            Context: {suggestion.context}
-                          </p>
-                          <Separator className="my-2" />
+                          <div className="p-2 rounded bg-background/50 mb-3">
+                            <p className="text-sm text-foreground/80 font-medium">
+                              <strong>Trigger:</strong> {suggestion.context}
+                            </p>
+                          </div>
                         </>
                       )}
                       
-                      <p className="text-base font-semibold leading-relaxed text-foreground">
+                      <p className="text-lg font-semibold leading-relaxed text-foreground">
                         {suggestion.suggestion}
                       </p>
                       
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-xs text-foreground/70 font-medium">
+                      <div className="flex items-center justify-between mt-4">
+                        <span className="text-sm text-foreground/70 font-medium">
                           {new Date(suggestion.timestamp).toLocaleTimeString()}
                         </span>
                         {suggestion.sourceDocument && (
