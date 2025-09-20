@@ -247,35 +247,44 @@ export function useRealTimeCoaching() {
 
   const requestTabAudio = useCallback(async (): Promise<MediaStream | null> => {
     try {
-      // Enhanced configuration for Google Meet tab capture
+      // Request ENTIRE SCREEN capture to get system audio (YouTube, Meet, etc.)
       const stream = await navigator.mediaDevices.getDisplayMedia({
         audio: {
-          echoCancellation: false, // Disable to capture raw Google Meet audio
-          noiseSuppression: false, // Disable to capture customer voice clearly
-          autoGainControl: false,   // Disable to maintain original audio levels
-          channelCount: 2,          // Stereo capture for better audio quality
-          sampleRate: 48000         // High sample rate for clear speech
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 48000
         } as any,
-        video: false
+        video: true // Enable video for screen capture (we'll stop it after getting audio)
       });
       
       // Check if audio track is available
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
-        console.warn('No audio track available in tab capture - make sure to select "Share audio" when choosing the Google Meet tab');
+        console.warn('No system audio captured. Make sure to:');
+        console.log('1. Select "Entire Screen" when prompted');
+        console.log('2. Check "Share audio" checkbox');
+        console.log('3. Allow audio sharing for system sounds');
         return null;
       }
 
-      console.log('Tab audio capture successful - Google Meet audio should now be captured');
+      console.log('System audio capture successful - all computer audio (YouTube, Meet, etc.) should now be captured');
       setState(prev => ({ ...prev, isTabAudioAvailable: true }));
       await setupAudioAnalysis(stream, 'tab');
       audioSourceRef.current.tabStream = stream;
+      
+      // Stop video track since we only need audio
+      const videoTracks = stream.getVideoTracks();
+      videoTracks.forEach(track => track.stop());
+      
       return stream;
     } catch (error) {
-      console.error('Tab audio capture failed:', error);
-      console.log('Tip: When selecting screen share, make sure to:');
-      console.log('1. Choose the correct browser tab with Google Meet');
-      console.log('2. Check "Share audio" option in the screen share dialog');
+      console.error('System audio capture failed:', error);
+      console.log('IMPORTANT: For system audio capture:');
+      console.log('1. Select "Entire Screen" (not just a tab)');
+      console.log('2. Make sure "Share audio" is checked');
+      console.log('3. This will capture ALL system audio (YouTube, Meet, music, etc.)');
       setState(prev => ({ ...prev, isTabAudioAvailable: false }));
       return null;
     }

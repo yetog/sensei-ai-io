@@ -125,26 +125,43 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     };
   };
 
-  const handleSaveToHistory = (summary: any, email?: string) => {
+  const handleSaveToHistory = async (summary: any, email?: string) => {
     try {
-      // Save to call history service
-      callHistoryService.saveCall({
-        ...summary,
+      console.log('Saving call to history:', {
+        duration: summary.duration,
+        callType: selectedCallType,
+        keyPoints: summary.keyPoints,
+        objections: summary.objections,
+        nextSteps: summary.nextSteps,
+        outcome: summary.outcome,
+        transcriptHighlights: summary.transcriptHighlights,
         followUpEmail: email
+      });
+
+      const savedCall = callHistoryService.saveCall({
+        duration: summary.duration,
+        callType: selectedCallType,
+        keyPoints: summary.keyPoints || [],
+        objections: summary.objections || [],
+        nextSteps: summary.nextSteps || [],
+        outcome: summary.outcome || 'follow_up',
+        transcriptHighlights: summary.transcriptHighlights || [],
+        followUpEmail: email,
+        customerName: summary.customerName,
+        notes: `Call conducted on ${new Date().toLocaleDateString()}`
       });
       
-      // Also save to call summary storage
-      const { callSummaryStorage } = require('@/services/callSummaryStorage');
-      callSummaryStorage.saveCallSummary({
-        ...summary,
-        followUpEmail: email
-      });
+      console.log('Call saved successfully with ID:', savedCall.id);
       
       toast({
         title: "Call Saved",
         description: "Call summary saved to history successfully."
       });
+      
+      // Close the modal after successful save
+      setShowPostCallSummary(false);
     } catch (error) {
+      console.error('Failed to save call to history:', error);
       toast({
         title: "Save Failed",
         description: "Failed to save call to history.",
@@ -266,8 +283,8 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 disabled={isListening}
               >
                 <option value="microphone">Microphone Only</option>
-                <option value="tab">Tab Audio Only</option>
-                <option value="both">Microphone + Tab</option>
+                <option value="tab">System Audio Only</option>
+                <option value="both">Microphone + System</option>
               </select>
             </div>
 

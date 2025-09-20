@@ -55,7 +55,7 @@ export function GoogleMeetInstructions({
           </div>
           <div className="text-center p-2 border rounded">
             <PhoneCall className="h-4 w-4 mx-auto mb-1" />
-            <div className="font-medium">Tab Level</div>
+            <div className="font-medium">System Level</div>
             <div className="text-muted-foreground">{Math.round(tabLevel)}</div>
           </div>
         </div>
@@ -64,13 +64,14 @@ export function GoogleMeetInstructions({
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription className="text-sm">
-            <strong>For Google Meet Testing:</strong>
+            <strong>For System Audio Testing (YouTube, Meet, etc.):</strong>
             <ol className="list-decimal list-inside mt-2 space-y-1">
-              <li>Open Google Meet in a separate browser tab</li>
-              <li>Select "Tab Audio" or "Microphone + Tab" for audio source</li>
-              <li>Click "Start Coaching" and choose "Share audio" when prompted</li>
-              <li>Select the Google Meet tab to capture both voices</li>
-              <li>Test by speaking - you should see audio levels change</li>
+              <li>Click "System Audio" button to capture ALL computer sounds</li>
+              <li>When prompted, select "Entire Screen" (not just a tab)</li>
+              <li>✅ Make sure "Share audio" checkbox is checked</li>
+              <li>This captures YouTube videos, Google Meet audio, music, etc.</li>
+              <li>Use "Microphone" button to also capture your voice</li>
+              <li>Test by playing audio - you should see system audio levels change</li>
             </ol>
           </AlertDescription>
         </Alert>
@@ -90,7 +91,7 @@ export function GoogleMeetInstructions({
                 {audioSource !== 'microphone' && (
                   <Badge variant={tabLevel > 5 ? "default" : "outline"} className="flex items-center gap-1">
                     <PhoneCall className="h-3 w-3" />
-                    Customer Voice {tabLevel > 5 ? <CheckCircle className="h-3 w-3" /> : ''}
+                    System Audio {tabLevel > 5 ? <CheckCircle className="h-3 w-3" /> : ''}
                   </Badge>
                 )}
               </div>
