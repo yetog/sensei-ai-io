@@ -296,11 +296,7 @@ export function useRealTimeCoaching() {
           autoGainControl: false,
           channelCount: { ideal: 2 },
           sampleRate: { ideal: 48000 },
-          suppressLocalAudioPlayback: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false
+          suppressLocalAudioPlayback: false
         };
       }
       // Safari specific constraints
@@ -348,7 +344,7 @@ export function useRealTimeCoaching() {
       const settings = audioTrack.getSettings();
       console.log('System audio captured:', settings);
       
-      if (!settings.echoCancellation === false) {
+      if (settings.echoCancellation !== false) {
         console.warn('Echo cancellation not disabled - may affect system audio quality');
       }
 
@@ -361,10 +357,17 @@ export function useRealTimeCoaching() {
       await setupAudioAnalysis(stream, 'tab');
       audioSourceRef.current.tabStream = stream;
       
-      // Stop video track since we only need audio (keep minimal video to maintain audio)
+      // Keep minimal video track to maintain audio capture
       const videoTracks = stream.getVideoTracks();
       videoTracks.forEach(track => {
-        track.enabled = false; // Disable but don't stop to maintain audio
+        track.enabled = false;
+      });
+      
+      // Log system audio success
+      console.log('✅ System audio captured successfully:', {
+        audioTracks: audioTracks.length,
+        sampleRate: settings.sampleRate,
+        channelCount: settings.channelCount
       });
       
       // Monitor audio track for interruptions

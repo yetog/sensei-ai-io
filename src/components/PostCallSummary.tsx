@@ -154,16 +154,39 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
   useEffect(() => {
     if (callSummary.transcriptHighlights?.length > 0) {
       analyzeConversationData();
+    } else {
+      // Set fallback data if no transcript available
+      setConversationData({
+        customerName: callSummary.customerName || '',
+        companyName: '',
+        keyPain: 'General business challenges',
+        desiredOutcome: 'Improved efficiency and growth'
+      });
     }
   }, [callSummary]);
 
   const analyzeConversationData = async () => {
     try {
       const transcriptText = callSummary.transcriptHighlights.join(' ');
+      
+      // Don't analyze if transcript is too short
+      if (transcriptText.length < 50) {
+        console.log('Transcript too short for analysis, using fallback data');
+        setConversationData({
+          customerName: callSummary.customerName || '',
+          companyName: '',
+          keyPain: 'Business optimization needs',
+          desiredOutcome: 'Improved efficiency and growth'
+        });
+        return;
+      }
+      
       const analysisPrompt = `
 Analyze this sales conversation and extract key information:
 
 Transcript: "${transcriptText}"
+Call Type: "${callSummary.callType}"
+Key Points: ${callSummary.keyPoints.join(', ')}
 
 Extract and return ONLY a JSON object with:
 {
@@ -173,7 +196,7 @@ Extract and return ONLY a JSON object with:
   "desiredOutcome": "what customer wants to achieve"
 }
 
-If any field is not clearly mentioned, use empty string.
+If any field is not clearly mentioned, use relevant fallback based on call context.
       `;
 
       const response = await ionosAI.sendMessage([
