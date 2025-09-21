@@ -19,6 +19,8 @@ import {
 import { callSummaryStorage, type StoredCallSummary } from '@/services/callSummaryStorage';
 import { useToast } from '@/hooks/use-toast';
 import { PostCallSummary } from '@/components/PostCallSummary';
+import { PerformanceDashboard } from '@/components/PerformanceDashboard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function CallHistory() {
   const [summaries, setSummaries] = useState<StoredCallSummary[]>([]);
@@ -129,13 +131,21 @@ ${summary.followUpEmail || 'No email generated'}
             Call History
           </h1>
           <p className="text-muted-foreground mt-2">
-            View and manage your sales call summaries and follow-ups
+            View and manage your sales call summaries and performance analytics
           </p>
         </div>
         <Badge variant="outline" className="text-lg px-3 py-1">
           {summaries.length} Total Calls
         </Badge>
       </div>
+
+      <Tabs defaultValue="history" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="history">Call History</TabsTrigger>
+          <TabsTrigger value="performance">Performance Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="history" className="space-y-6">
 
       <Card>
         <CardHeader>
@@ -273,6 +283,15 @@ ${summary.followUpEmail || 'No email generated'}
           }}
         />
       )}
+        </TabsContent>
+
+        <TabsContent value="performance" className="space-y-6">
+          <PerformanceDashboard 
+            isVisible={true}
+            onClose={() => {}}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

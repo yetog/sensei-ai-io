@@ -628,13 +628,8 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         </Card>
       )}
 
-      {/* Performance & AI Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <PerformanceMonitor 
-          stats={getPerformanceStats()}
-          isUsingWhisper={isUsingWhisper}
-          onLogReport={logPerformanceReport}
-        />
+      {/* AI Status Only */}
+      <div className="flex justify-end">
         <HybridAIStatus />
       </div>
 

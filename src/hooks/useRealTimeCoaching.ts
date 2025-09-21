@@ -881,12 +881,42 @@ Provide 1-2 specific, actionable suggestions in JSON format:
   };
 
   const rateSuggestion = (suggestionId: string, rating: 'helpful' | 'not_helpful', reason?: string) => {
-    setState(prev => ({
-      ...prev,
-      suggestions: prev.suggestions.map(s => 
-        s.id === suggestionId ? { ...s, rating, ratingReason: reason } : s
-      )
-    }));
+    setState(prev => {
+      const updated = {
+        ...prev,
+        suggestions: prev.suggestions.map(s => 
+          s.id === suggestionId ? { 
+            ...s, 
+            userFeedback: {
+              rating,
+              timestamp: Date.now(),
+              reason
+            }
+          } : s
+        )
+      };
+      
+      // Store feedback in localStorage for analytics
+      try {
+        const feedbackData = {
+          suggestionId,
+          rating,
+          timestamp: Date.now(),
+          suggestionType: updated.suggestions.find(s => s.id === suggestionId)?.type,
+          reason
+        };
+        
+        const existingFeedback = JSON.parse(localStorage.getItem('suggestion_feedback') || '[]');
+        existingFeedback.push(feedbackData);
+        localStorage.setItem('suggestion_feedback', JSON.stringify(existingFeedback));
+        
+        console.log('✅ Suggestion feedback saved:', feedbackData);
+      } catch (error) {
+        console.error('❌ Failed to save suggestion feedback:', error);
+      }
+      
+      return updated;
+    });
   };
 
   const clearError = () => {
