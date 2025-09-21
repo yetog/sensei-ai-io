@@ -110,6 +110,38 @@ interface CoachingError {
   timestamp: number;
 }
 
+// Enhanced text processing utilities
+const cleanTranscriptText = (text: string): string => {
+  return text
+    .trim()
+    .replace(/\s+/g, ' ') // normalize whitespace
+    .replace(/[.,!?]+\s*$/, '') // remove trailing punctuation
+    .toLowerCase();
+};
+
+// Calculate text similarity to detect duplicates
+const calculateTextSimilarity = (text1: string, text2: string): number => {
+  const clean1 = cleanTranscriptText(text1);
+  const clean2 = cleanTranscriptText(text2);
+  
+  if (clean1 === clean2) return 1.0;
+  if (clean1.length === 0 || clean2.length === 0) return 0;
+  
+  // Simple word-based similarity
+  const words1 = clean1.split(' ');
+  const words2 = clean2.split(' ');
+  const allWords = new Set([...words1, ...words2]);
+  
+  let commonWords = 0;
+  for (const word of allWords) {
+    if (words1.includes(word) && words2.includes(word)) {
+      commonWords++;
+    }
+  }
+  
+  return (commonWords * 2) / (words1.length + words2.length);
+};
+
 export function useRealTimeCoaching() {
   const [state, setState] = useState<CoachingState>({
     isListening: false,
@@ -286,26 +318,51 @@ export function useRealTimeCoaching() {
                 const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
                 const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
                 
-                // Enhanced consolidation logic
+                // Enhanced consolidation logic with duplicate detection
                 const timeSinceLastSegment = lastSegment ? currentTime - lastSegment.timestamp : Infinity;
+                
+                // Check for text similarity to prevent duplicates
+                const textSimilarity = lastSegment ? calculateTextSimilarity(lastSegment.text, transcript) : 0;
+                const isDuplicate = textSimilarity > 0.7; // 70% similarity threshold
+                
                 const shouldMerge = lastSegment && 
+                  !isDuplicate &&
                   lastSegment.speaker === currentSpeaker && 
-                  (timeSinceLastSegment < 10000 || // Extended to 10 seconds
-                   (timeSinceLastSegment < 5000 && lastSegment.text.length < 300)); // Longer text merging
+                  (timeSinceLastSegment < 8000 || // Reduced to 8 seconds for cleaner segments
+                   (timeSinceLastSegment < 4000 && lastSegment.text.length < 200)); // Shorter text merging
                 
                 // Calculate transcript quality
                 const qualityScore = Math.round((confidence * 100 + (transcript.length > 10 ? 20 : 0)) / 1.2);
                 
                 if (shouldMerge) {
-                  // Smart merging with punctuation
+                  // Smart merging with punctuation and duplicate prevention
                   const updatedTranscription = [...prev.transcription];
                   const lastText = lastSegment.text.trimEnd();
+                  const cleanedTranscript = transcript.trim();
+                  
+                  // Check if the new text would create a duplicate phrase
+                  const combinedText = lastText + ' ' + cleanedTranscript;
+                  const words = combinedText.split(' ');
+                  const deduplicatedWords = [];
+                  
+                  for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    // Check for repeated phrases (3+ consecutive words)
+                    const isRepeatedPhrase = i >= 3 && 
+                      words.slice(i-3, i).join(' ') === words.slice(i, i+3).join(' ');
+                    
+                    if (!isRepeatedPhrase) {
+                      deduplicatedWords.push(word);
+                    }
+                  }
+                  
                   const needsPunctuation = !lastText.match(/[.!?]$/) && timeSinceLastSegment > 2000;
                   const connector = needsPunctuation ? '. ' : ' ';
+                  const finalText = deduplicatedWords.join(' ');
                   
                   updatedTranscription[updatedTranscription.length - 1] = {
                     ...lastSegment,
-                    text: lastText + connector + transcript,
+                    text: finalText,
                     confidence: Math.max(lastSegment.confidence, confidence || 0.6),
                     isConsolidated: true,
                     duration: currentTime - lastSegment.timestamp

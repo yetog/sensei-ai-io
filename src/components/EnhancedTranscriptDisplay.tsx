@@ -40,11 +40,10 @@ interface EnhancedTranscriptDisplayProps {
 // Move detectTopic outside the component to avoid initialization issues
 const detectTopic = (text: string): string => {
   const keywords = {
-    'pricing': ['price', 'cost', 'expensive', 'budget', 'affordable'],
-    'features': ['feature', 'functionality', 'capabilities', 'can it', 'does it'],
-    'support': ['help', 'support', 'assistance', 'problem', 'issue'],
-    'closing': ['decision', 'sign up', 'purchase', 'buy', 'contract'],
-    'objection': ['but', 'however', 'concern', 'worried', 'not sure']
+    'pricing': ['price', 'cost', 'expensive', 'budget', 'affordable', 'money', 'fee', 'rate'],
+    'features': ['feature', 'functionality', 'capabilities', 'can it', 'does it', 'how does', 'what can'],
+    'support': ['help', 'support', 'assistance', 'problem', 'issue', 'trouble', 'error'],
+    'retention': ['but', 'however', 'concern', 'worried', 'not sure', 'objection', 'decision', 'sign up', 'purchase', 'buy', 'contract', 'think about', 'hesitant', 'doubt']
   };
 
   const lowerText = text.toLowerCase();
