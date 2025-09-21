@@ -3,6 +3,9 @@ import { ionosAI } from '@/services/ionosAI';
 import { whisperService } from '@/services/whisperTranscriptionService';
 import { hybridAI } from '@/services/hybridAI';
 import { usePerformanceMetrics } from './usePerformanceMetrics';
+import { smartCache } from '@/services/smartCache';
+import { performanceProfiler } from '@/services/performanceProfiler';
+import { callSummaryStorage } from '@/services/callSummaryStorage';
 
 // Types and interfaces
 interface SpeechRecognitionResult {
@@ -193,11 +196,15 @@ export const useRealTimeCoaching = () => {
 
   // Whisper transcription handler
   const handleWhisperTranscription = useCallback((result: { text: string; confidence: number; timestamp: number; isPartial: boolean }) => {
-    startTiming('transcription_processing');
+    const profileId = performanceProfiler.startProfile('whisper_transcription', 'transcription', {
+      textLength: result.text.length,
+      confidence: result.confidence,
+      isPartial: result.isPartial
+    });
     
     const transcript = cleanTranscriptText(result.text);
     if (transcript.length < 2) {
-      endTiming('transcription_processing');
+      performanceProfiler.endProfile(profileId);
       return;
     }
 
@@ -242,7 +249,7 @@ export const useRealTimeCoaching = () => {
       return updatedState;
     });
 
-    endTiming('transcription_processing');
+    performanceProfiler.endProfile(profileId, { segmentCount: state.transcription.length });
   }, [state.micLevel, state.tabLevel, state.audioSource, state.currentTurn, state.suggestions, state.lastSuggestionTime]);
 
   // Async coaching processing queue
@@ -253,11 +260,45 @@ export const useRealTimeCoaching = () => {
     const transcript = processingQueue.current.shift();
     
     if (transcript) {
-      startTiming('ai_processing');
+      const profileId = performanceProfiler.startProfile('coaching_ai_processing', 'ai_processing', {
+        transcriptLength: transcript.length,
+        callType: state.callType,
+        queueLength: processingQueue.current.length
+      });
+
       try {
-        await processTranscriptionForCoaching(transcript, state.callType);
+        // Check cache first for pattern-based responses
+        const cacheKey = `coaching_${state.callType}_${transcript.substring(0, 50).replace(/\W/g, '_')}`;
+        let cachedResponse = smartCache.get(cacheKey);
+        
+        if (!cachedResponse) {
+          cachedResponse = smartCache.predictResponse(transcript);
+        }
+
+        if (cachedResponse) {
+          console.log('🎯 Using cached coaching response');
+          setState(prev => ({
+            ...prev,
+            suggestions: [...prev.suggestions, {
+              id: Date.now().toString(),
+              type: 'general' as const,
+              title: 'Cached Suggestion',
+              suggestion: String(cachedResponse),
+              context: transcript.substring(0, 100),
+              confidence: 0.8,
+              timestamp: Date.now(),
+              priority: 'medium' as const
+            }],
+            lastSuggestionTime: Date.now(),
+            suggestionCount: prev.suggestionCount + 1
+          }));
+        } else {
+          await processTranscriptionForCoaching(transcript, state.callType);
+        }
       } finally {
-        endTiming('ai_processing');
+        performanceProfiler.endProfile(profileId, { 
+          suggestionsGenerated: state.suggestions.length 
+        });
         setIsProcessing(false);
         
         // Process next item if queue has more
@@ -268,7 +309,7 @@ export const useRealTimeCoaching = () => {
     } else {
       setIsProcessing(false);
     }
-  }, [isProcessing, state.callType]);
+  }, [isProcessing, state.callType, state.suggestions]);
 
   // Auto-backup functionality
   const startAutoBackup = useCallback(() => {

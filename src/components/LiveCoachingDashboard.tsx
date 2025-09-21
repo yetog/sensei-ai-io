@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,8 @@ import {
   History,
   Download,
   FileText,
-  Save
+  Save,
+  Activity
 } from 'lucide-react';
 import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
 import { PostCallSummary } from '@/components/PostCallSummary';
@@ -34,7 +35,11 @@ import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDispla
 import { DemoScenarios } from '@/components/DemoScenarios';
 import { PerformanceMonitor } from '@/components/PerformanceMonitor';
 import { HybridAIStatus } from '@/components/HybridAIStatus';
+import { PerformanceDashboard } from '@/components/PerformanceDashboard';
+import { TranscriptDebugger } from '@/components/TranscriptDebugger';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
+import { smartCache } from '@/services/smartCache';
+import { performanceProfiler } from '@/services/performanceProfiler';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import '@/services/demoAgentSetup';
@@ -86,7 +91,17 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showDemoScenarios, setShowDemoScenarios] = useState(false);
+  const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(false);
+  const [showDebugger, setShowDebugger] = useState(false);
   const { toast } = useToast();
+
+  // Initialize smart cache and performance profiler
+  useEffect(() => {
+    smartCache.initialize().then(() => {
+      smartCache.preCacheCommonResponses();
+      console.log('✅ Smart cache initialized and pre-cached');
+    }).catch(console.warn);
+  }, []);
 
   const handleStartCoaching = () => {
     setCallStartTime(Date.now());
@@ -153,8 +168,13 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   };
 
   const handleSaveToHistory = async (summary: any, email?: string) => {
+    const profileId = performanceProfiler.startProfile('save_call_history', 'cache', {
+      summarySize: JSON.stringify(summary).length,
+      hasEmail: !!email
+    });
+
     try {
-      console.log('Saving call to history:', {
+      console.log('💾 Saving call to history:', {
         duration: summary.duration,
         callType: selectedCallType,
         keyPoints: summary.keyPoints,
@@ -178,22 +198,33 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         companyName: summary.companyName
       });
       
-      console.log('Call saved successfully with ID:', savedCallId);
+      console.log('✅ Call saved successfully with ID:', savedCallId);
+      
+      // Cache successful patterns for future use
+      if (summary.keyPoints?.length > 0) {
+        const cacheKey = `call_pattern_${selectedCallType}_${Date.now()}`;
+        await smartCache.set(cacheKey, {
+          keyPoints: summary.keyPoints,
+          outcome: summary.outcome,
+          nextSteps: summary.nextSteps
+        }, `successful ${selectedCallType} call pattern`);
+      }
       
       toast({
         title: "Call Saved",
         description: "Call summary saved to history successfully."
       });
       
-      // Close the modal after successful save
       setShowPostCallSummary(false);
     } catch (error) {
-      console.error('Failed to save call to history:', error);
+      console.error('❌ Failed to save call to history:', error);
       toast({
         title: "Save Failed",
-        description: "Failed to save call to history.",
+        description: "Failed to save call to history. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      performanceProfiler.endProfile(profileId, { success: true });
     }
   };
 
@@ -410,6 +441,24 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               >
                 <Target className="h-4 w-4 mr-1" />
                 Demo Scenarios
+              </Button>
+
+              <Button 
+                onClick={() => setShowPerformanceDashboard(true)} 
+                variant="outline" 
+                size="sm"
+              >
+                <Activity className="h-4 w-4 mr-1" />
+                Performance
+              </Button>
+
+              <Button 
+                onClick={() => setShowDebugger(true)} 
+                variant="outline" 
+                size="sm"
+              >
+                <Settings className="h-4 w-4 mr-1" />
+                Debug
               </Button>
               
               <Button onClick={clearSession} variant="outline" size="sm">
