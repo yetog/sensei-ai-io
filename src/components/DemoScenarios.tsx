@@ -118,18 +118,15 @@ const getCallTypeIcon = (callType: string) => {
 
 export function DemoScenarios({ onSelectScenario, isListening }: DemoScenariosProps) {
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Play className="h-5 w-5" />
-          Demo Scenarios
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Practice with realistic customer scenarios to test coaching quality
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Play className="h-5 w-5 text-primary" />
+        <h3 className="text-lg font-semibold">Demo Scenarios</h3>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Practice with realistic customer scenarios to test coaching quality
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {demoScenarios.map((scenario) => (
             <Card key={scenario.id} className="relative">
               <CardHeader className="pb-3">
@@ -188,17 +185,16 @@ export function DemoScenarios({ onSelectScenario, isListening }: DemoScenariosPr
               </CardContent>
             </Card>
           ))}
-        </div>
+      </div>
 
-        {isListening && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded">
-            <p className="text-sm text-amber-700">
-              🎯 <strong>Demo Mode Active:</strong> Simulate customer responses by speaking the provided lines, 
-              then respond as yourself to test the AI coaching suggestions.
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {isListening && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-700">
+            🎯 <strong>Demo Mode Active:</strong> Simulate customer responses by speaking the provided lines, 
+            then respond as yourself to test the AI coaching suggestions.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

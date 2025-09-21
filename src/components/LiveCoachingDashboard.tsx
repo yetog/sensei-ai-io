@@ -434,7 +434,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 Save Transcript
               </Button>
               
-              <Button 
+               <Button 
                 onClick={() => setShowDemoScenarios(true)} 
                 variant="outline" 
                 size="sm"
@@ -443,24 +443,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 Demo Scenarios
               </Button>
 
-              <Button 
-                onClick={() => setShowPerformanceDashboard(true)} 
-                variant="outline" 
-                size="sm"
-              >
-                <Activity className="h-4 w-4 mr-1" />
-                Performance
-              </Button>
-
-              <Button 
-                onClick={() => setShowDebugger(true)} 
-                variant="outline" 
-                size="sm"
-              >
-                <Settings className="h-4 w-4 mr-1" />
-                Debug
-              </Button>
-              
               <Button onClick={clearSession} variant="outline" size="sm">
                 Clear Session
               </Button>
@@ -469,15 +451,10 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         </CardContent>
       </Card>
 
-
-
-      {/* Agent Selection */}
-      <AgentSelector 
-        selectedAgentId={selectedAgentId}
-        onAgentSelect={setSelectedAgentId}
-        callType={selectedCallType}
-        isListening={isListening}
-      />
+      {/* Simple Agent Status */}
+      <div className="text-xs text-muted-foreground">
+        Agent: {selectedAgentId ? 'Specialized' : 'Generic'} Coaching
+      </div>
 
       {/* Main Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -656,25 +633,20 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         />
       )}
 
-      {/* Demo Scenarios Modal */}
+      {/* Demo Scenarios Inline */}
       {showDemoScenarios && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Practice Scenarios</h3>
-              <Button 
-                onClick={() => setShowDemoScenarios(false)} 
-                variant="ghost" 
-                size="sm"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <DemoScenarios 
-              onSelectScenario={handleSelectScenario} 
-              isListening={isListening} 
-            />
-          </div>
+        <div className="mt-6 animate-fade-in">
+          <DemoScenarios 
+            onSelectScenario={(scenario) => {
+              handleStartCoaching();
+              setShowDemoScenarios(false);
+              toast({
+                title: "Demo Started",
+                description: `Started "${scenario.title}" scenario. Follow the customer lines to test coaching.`
+              });
+            }}
+            isListening={isListening} 
+          />
         </div>
       )}
     </div>

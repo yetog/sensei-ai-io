@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
   Mail, 
@@ -326,12 +325,6 @@ Generate a personalized follow-up email using the extracted conversation data.
       .replace(/{{yourName}}/g, '[Your Name]');
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose();
@@ -344,276 +337,265 @@ Generate a personalized follow-up email using the extracted conversation data.
   }, [onClose]);
 
   return (
-    <div 
-      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-    >
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <CardHeader className="border-b bg-muted/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PhoneCall className="h-5 w-5 text-primary" />
-              <CardTitle>Call Summary & Follow-up</CardTitle>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {callSummary.duration}
-              </Badge>
-              <Badge variant="secondary">{callSummary.callType}</Badge>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={onClose}
-                className="h-8 w-8 p-0 ml-2"
-                aria-label="Close dialog"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+    <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 overflow-y-auto">
+      <div className="min-h-screen flex flex-col">
+        {/* Header */}
+        <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b z-10">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <PhoneCall className="h-6 w-6 text-primary" />
+                <div>
+                  <h1 className="text-xl font-semibold">Call Summary & Follow-up</h1>
+                  <p className="text-sm text-muted-foreground">Review your call and create follow-up actions</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {callSummary.duration}
+                </Badge>
+                <Badge variant="secondary">{callSummary.callType}</Badge>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={onClose}
+                  className="h-9 w-9 p-0"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="p-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 h-[600px]">
-            {/* Call Summary */}
-            <div className="border-r">
-              <ScrollArea className="h-full p-6">
-                <div className="space-y-6">
-                  {/* Key Metrics */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card>
-                      <CardContent className="p-4 text-center">
-                        <Target className="h-8 w-8 text-primary mx-auto mb-2" />
-                        <div className="text-2xl font-bold">{callSummary.keyPoints.length}</div>
-                        <div className="text-sm text-muted-foreground">Key Points</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-4 text-center">
-                        <MessageSquare className="h-8 w-8 text-destructive mx-auto mb-2" />
-                        <div className="text-2xl font-bold">{callSummary.objections.length}</div>
-                        <div className="text-sm text-muted-foreground">Objections</div>
-                      </CardContent>
-                    </Card>
-                  </div>
+        {/* Content */}
+        <div className="flex-1">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Call Summary */}
+              <div className="space-y-6">
+                {/* Key Metrics */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <Target className="h-10 w-10 text-primary mx-auto mb-3" />
+                      <div className="text-3xl font-bold">{callSummary.keyPoints.length}</div>
+                      <div className="text-sm text-muted-foreground">Key Points</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <MessageSquare className="h-10 w-10 text-destructive mx-auto mb-3" />
+                      <div className="text-3xl font-bold">{callSummary.objections.length}</div>
+                      <div className="text-sm text-muted-foreground">Objections</div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-                  {/* Key Points */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" />
-                        Key Discussion Points
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(callSummary.keyPoints.join('\n'), 'Key Points')}
-                      >
-                        {copiedField === 'Key Points' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
+                {/* Key Points */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Key Discussion Points
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(callSummary.keyPoints.join('\n'), 'Key Points')}
+                    >
+                      {copiedField === 'Key Points' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
                       {callSummary.keyPoints.map((point, index) => (
-                        <div key={index} className="flex items-start gap-2 text-sm">
-                          <Badge variant="outline" className="text-xs mt-1">{index + 1}</Badge>
-                          <span>{point}</span>
+                        <div key={index} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                          <Badge variant="outline" className="text-xs mt-0.5">{index + 1}</Badge>
+                          <span className="text-sm leading-relaxed">{point}</span>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <Separator />
-
-                  {/* Objections */}
-                  {callSummary.objections.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-sm flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          Objections Handled
-                        </h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(callSummary.objections.join('\n'), 'Objections')}
-                        >
-                          {copiedField === 'Objections' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
+                {/* Objections */}
+                {callSummary.objections.length > 0 && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Objections Handled
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(callSummary.objections.join('\n'), 'Objections')}
+                      >
+                        {copiedField === 'Objections' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
                         {callSummary.objections.map((objection, index) => (
-                          <div key={index} className="flex items-start gap-2 text-sm">
-                            <Badge variant="destructive" className="text-xs mt-1">{index + 1}</Badge>
-                            <span>{objection}</span>
+                          <div key={index} className="flex items-start gap-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                            <Badge variant="destructive" className="text-xs mt-0.5">{index + 1}</Badge>
+                            <span className="text-sm leading-relaxed">{objection}</span>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                  <Separator />
-
-                  {/* Next Steps */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Next Steps
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(callSummary.nextSteps.join('\n'), 'Next Steps')}
-                      >
-                        {copiedField === 'Next Steps' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
+                {/* Next Steps */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Next Steps
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(callSummary.nextSteps.join('\n'), 'Next Steps')}
+                    >
+                      {copiedField === 'Next Steps' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
                       {callSummary.nextSteps.map((step, index) => (
-                        <div key={index} className="flex items-start gap-2 text-sm">
-                          <Badge variant="secondary" className="text-xs mt-1">{index + 1}</Badge>
-                          <span>{step}</span>
+                        <div key={index} className="flex items-start gap-3 p-3 bg-secondary/30 rounded-lg">
+                          <Badge variant="secondary" className="text-xs mt-0.5">{index + 1}</Badge>
+                          <span className="text-sm leading-relaxed">{step}</span>
                         </div>
                       ))}
                     </div>
-                  </div>
-                </div>
-              </ScrollArea>
-            </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-            {/* Email Generation */}
-            <div>
-              <ScrollArea className="h-full p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold flex items-center gap-2">
+              {/* Email Generation */}
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
                       <Mail className="h-4 w-4" />
                       Follow-up Email
-                    </h3>
+                    </CardTitle>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={generateAIEmail}
                       disabled={isGeneratingEmail}
                     >
-                      {isGeneratingEmail ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                          Generating...
-                        </div>
-                      ) : (
-                        <>
-                          <FileText className="h-4 w-4 mr-2" />
-                          AI Generate
-                        </>
-                      )}
+                      {isGeneratingEmail ? 'Generating...' : 'AI Generate'}
                     </Button>
-                  </div>
-
-                  {/* Auto-detected Conversation Data */}
-                  {(conversationData.customerName || conversationData.companyName || conversationData.keyPain) && (
-                    <div className="space-y-2 p-3 bg-muted/50 rounded-lg border">
-                      <label className="text-sm font-medium">Auto-detected Information</label>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {conversationData.customerName && (
-                          <div><span className="font-medium">Customer:</span> {conversationData.customerName}</div>
-                        )}
-                        {conversationData.companyName && (
-                          <div><span className="font-medium">Company:</span> {conversationData.companyName}</div>
-                        )}
-                        {conversationData.keyPain && (
-                          <div className="col-span-2"><span className="font-medium">Key Pain:</span> {conversationData.keyPain}</div>
-                        )}
-                        {conversationData.desiredOutcome && (
-                          <div className="col-span-2"><span className="font-medium">Desired Outcome:</span> {conversationData.desiredOutcome}</div>
-                        )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Auto-detected Info */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="font-medium text-muted-foreground">Customer:</span>
+                        <p className="mt-1">{conversationData.customerName || 'Not detected'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-muted-foreground">Company:</span>
+                        <p className="mt-1">{conversationData.companyName || 'Not detected'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-muted-foreground">Key Pain:</span>
+                        <p className="mt-1">{conversationData.keyPain || 'General challenges'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-muted-foreground">Desired Outcome:</span>
+                        <p className="mt-1">{conversationData.desiredOutcome || 'Improved efficiency'}</p>
                       </div>
                     </div>
-                  )}
 
-                  {/* Template Selection */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Email Template</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {EMAIL_TEMPLATES.map((template) => (
-                        <Button
-                          key={template.id}
-                          variant={selectedTemplate.id === template.id ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            setSelectedTemplate(template);
-                            setCustomEmail('');
-                          }}
-                          className="text-xs"
-                        >
-                          {template.name}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
+                    <Separator />
 
-                  {/* Email Subject */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Subject Line</label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 p-2 border rounded-md bg-muted text-sm">
-                        {selectedTemplate.subject}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(selectedTemplate.subject, 'Subject')}
+                    {/* Template Selection */}
+                    <div>
+                      <label className="text-sm font-medium">Email Template:</label>
+                      <select 
+                        value={selectedTemplate.id}
+                        onChange={(e) => {
+                          const template = EMAIL_TEMPLATES.find(t => t.id === e.target.value);
+                          if (template) setSelectedTemplate(template);
+                        }}
+                        className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
                       >
-                        {copiedField === 'Subject' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {EMAIL_TEMPLATES.map(template => (
+                          <option key={template.id} value={template.id}>
+                            {template.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Subject Line */}
+                    <div>
+                      <label className="text-sm font-medium">Subject:</label>
+                      <p className="mt-1 px-3 py-2 bg-muted rounded-md text-sm">
+                        {selectedTemplate.subject}
+                      </p>
+                    </div>
+
+                    {/* Email Body */}
+                    <div>
+                      <label className="text-sm font-medium">Email Content:</label>
+                      <Textarea
+                        value={customEmail || fillTemplate(selectedTemplate.body)}
+                        onChange={(e) => setCustomEmail(e.target.value)}
+                        placeholder="Email content will appear here..."
+                        className="mt-1 min-h-[300px] text-sm"
+                      />
+                    </div>
+
+                    {/* Email Actions */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(customEmail || fillTemplate(selectedTemplate.body), 'Email')}
+                        className="flex-1"
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const emailContent = customEmail || fillTemplate(selectedTemplate.body);
+                          const blob = new Blob([emailContent], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = 'follow-up-email.txt';
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="flex-1"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
                       </Button>
                     </div>
-                  </div>
-
-                   {/* Email Body */}
-                   <div className="space-y-2">
-                     <label className="text-sm font-medium">Email Body</label>
-                     <Textarea
-                       value={customEmail || fillTemplate(selectedTemplate.body)}
-                       onChange={(e) => setCustomEmail(e.target.value)}
-                       className="min-h-[120px] max-h-[150px] text-sm resize-none"
-                       placeholder="Email content will appear here..."
-                     />
-                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => copyToClipboard(customEmail || fillTemplate(selectedTemplate.body), 'Email')}
-                      className="flex-1"
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy Email
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const emailContent = `Subject: ${selectedTemplate.subject}\n\n${customEmail || fillTemplate(selectedTemplate.body)}`;
-                        const blob = new Blob([emailContent], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'follow-up-email.txt';
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
-                  </div>
-                </div>
-              </ScrollArea>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="border-t p-4 bg-muted/50 flex-shrink-0">
+        {/* Actions */}
+        <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t">
+          <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <Button 
                 variant="outline" 
@@ -634,8 +616,8 @@ Generate a personalized follow-up email using the extracted conversation data.
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
