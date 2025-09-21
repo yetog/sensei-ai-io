@@ -147,6 +147,7 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
     keyPain: '',
     desiredOutcome: ''
   });
+  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const { toast } = useToast();
 
   // Auto-analyze conversation data on mount
@@ -244,13 +245,13 @@ Call Summary:
 - Next Steps: ${callSummary.nextSteps.join(', ')}
 - Outcome: ${callSummary.outcome}
 
-Generate a personalized follow-up email using the extracted conversation data.
+Generate a personalized follow-up email using the user-edited template fields. Use the specific values provided for customer name, company, key pain points, and desired outcomes to create a highly personalized email.
       `;
 
       const emailContent = await ionosAI.sendMessage([
         {
           role: 'system',
-          content: 'You are an expert sales professional. Generate a professional, personalized follow-up email using the conversation data provided. Make it specific and actionable.'
+          content: 'You are an expert sales professional. Generate a professional, personalized follow-up email using the conversation data and user-edited template fields provided. Make it highly specific and actionable based on the provided customer information.'
         },
         {
           role: 'user',
@@ -261,7 +262,7 @@ Generate a personalized follow-up email using the extracted conversation data.
       setCustomEmail(emailContent);
       toast({
         title: "Email Generated",
-        description: "AI-powered follow-up email has been generated successfully."
+        description: "AI-powered follow-up email has been generated using your template fields."
       });
     } catch (error) {
       toast({
@@ -496,24 +497,82 @@ Generate a personalized follow-up email using the extracted conversation data.
                     </Button>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Auto-detected Info */}
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <span className="font-medium text-muted-foreground">Customer:</span>
-                        <p className="mt-1">{conversationData.customerName || 'Not detected'}</p>
+                    {/* Editable Template Fields */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium">Email Template Fields</label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsEditingTemplate(!isEditingTemplate)}
+                        >
+                          {isEditingTemplate ? 'Save Changes' : 'Edit Fields'}
+                        </Button>
                       </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">Company:</span>
-                        <p className="mt-1">{conversationData.companyName || 'Not detected'}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">Key Pain:</span>
-                        <p className="mt-1">{conversationData.keyPain || 'General challenges'}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">Desired Outcome:</span>
-                        <p className="mt-1">{conversationData.desiredOutcome || 'Improved efficiency'}</p>
-                      </div>
+                      
+                      {isEditingTemplate ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Customer Name</label>
+                            <input
+                              type="text"
+                              value={conversationData.customerName}
+                              onChange={(e) => setConversationData(prev => ({ ...prev, customerName: e.target.value }))}
+                              placeholder="Customer's first name"
+                              className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Company Name</label>
+                            <input
+                              type="text"
+                              value={conversationData.companyName}
+                              onChange={(e) => setConversationData(prev => ({ ...prev, companyName: e.target.value }))}
+                              placeholder="Company name"
+                              className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">Key Pain Point</label>
+                            <input
+                              type="text"
+                              value={conversationData.keyPain}
+                              onChange={(e) => setConversationData(prev => ({ ...prev, keyPain: e.target.value }))}
+                              placeholder="Main challenge or pain point"
+                              className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">Desired Outcome</label>
+                            <input
+                              type="text"
+                              value={conversationData.desiredOutcome}
+                              onChange={(e) => setConversationData(prev => ({ ...prev, desiredOutcome: e.target.value }))}
+                              placeholder="What they want to achieve"
+                              className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="font-medium text-muted-foreground">Customer:</span>
+                            <p className="mt-1">{conversationData.customerName || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Company:</span>
+                            <p className="mt-1">{conversationData.companyName || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Key Pain:</span>
+                            <p className="mt-1">{conversationData.keyPain || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Desired Outcome:</span>
+                            <p className="mt-1">{conversationData.desiredOutcome || 'Not set'}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <Separator />

@@ -96,6 +96,7 @@ interface CoachingState {
   transcriptQuality: number;
   lastTranscriptTime: number;
   selectedAgentId: string | null;
+  coachingMode: 'live' | 'manual';
 }
 
 interface CoachingError {
@@ -159,6 +160,7 @@ export const useRealTimeCoaching = () => {
     transcriptQuality: 0,
     lastTranscriptTime: 0,
     selectedAgentId: null,
+    coachingMode: 'manual',
   });
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -186,7 +188,9 @@ export const useRealTimeCoaching = () => {
     return null;
   };
 
-  const shouldGenerateSuggestion = (transcript: string, suggestions: CoachingSuggestion[], lastSuggestionTime: number): boolean => {
+  const shouldGenerateSuggestion = (transcript: string, suggestions: CoachingSuggestion[], lastSuggestionTime: number, coachingMode: 'live' | 'manual'): boolean => {
+    if (coachingMode === 'manual') return false; // Only generate on manual request
+    
     const timeSinceLastSuggestion = Date.now() - lastSuggestionTime;
     const minInterval = 15000;
     
@@ -241,8 +245,8 @@ export const useRealTimeCoaching = () => {
         interimTranscript: ''
       };
 
-      // Queue for async coaching processing
-      if (shouldGenerateSuggestion(transcript, prev.suggestions, prev.lastSuggestionTime)) {
+      // Queue for async coaching processing (only in live mode)
+      if (shouldGenerateSuggestion(transcript, prev.suggestions, prev.lastSuggestionTime, prev.coachingMode)) {
         processingQueue.current.push(transcript);
         processCoachingQueue();
       }
@@ -529,7 +533,7 @@ export const useRealTimeCoaching = () => {
             });
             
             // Process for coaching suggestions
-            if (shouldGenerateSuggestion(transcript, state.suggestions, state.lastSuggestionTime)) {
+            if (shouldGenerateSuggestion(transcript, state.suggestions, state.lastSuggestionTime, state.coachingMode)) {
               processTranscriptionForCoaching(transcript, state.callType);
             }
           }
@@ -1050,6 +1054,10 @@ Suggestion: [Specific coaching advice]`;
     // Performance metrics
     getPerformanceStats: getStats,
     logPerformanceReport,
-    isUsingWhisper: isUsingWhisper.current
+    isUsingWhisper: isUsingWhisper.current,
+    
+    // Coaching mode
+    coachingMode: state.coachingMode,
+    setCoachingMode: (mode: 'live' | 'manual') => setState(prev => ({ ...prev, coachingMode: mode }))
   };
 };

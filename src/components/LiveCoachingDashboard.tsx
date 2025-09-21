@@ -81,7 +81,9 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     interimTranscript,
     getPerformanceStats,
     logPerformanceReport,
-    isUsingWhisper
+    isUsingWhisper,
+    coachingMode,
+    setCoachingMode
   } = useRealTimeCoaching();
 
   const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
@@ -356,6 +358,20 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               </select>
             </div>
 
+            {/* Coaching Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Coaching:</span>
+              <select 
+                value={coachingMode}
+                onChange={(e) => setCoachingMode(e.target.value as 'live' | 'manual')}
+                className="px-3 py-1 border rounded-md text-sm"
+                disabled={isListening}
+              >
+                <option value="live">Live Mode (Auto)</option>
+                <option value="manual">Manual Mode (Request)</option>
+              </select>
+            </div>
+
             {/* Control Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               {!isListening ? (
@@ -391,10 +407,11 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 onClick={requestCoaching} 
                 variant="secondary" 
                 size="sm"
-                disabled={transcription.length === 0}
+                disabled={transcription.length === 0 || (coachingMode === 'live' && isListening)}
+                className={coachingMode === 'live' ? 'opacity-50' : ''}
               >
                 <Brain className="h-4 w-4 mr-1" />
-                Request Coaching
+                {coachingMode === 'live' ? 'Auto Coaching' : 'Request Coaching'}
               </Button>
 
               {/* Audio Level Indicators */}
@@ -452,8 +469,16 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       </Card>
 
       {/* Simple Agent Status */}
-      <div className="text-xs text-muted-foreground">
-        Agent: {selectedAgentId ? 'Specialized' : 'Generic'} Coaching
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <span>Agent: {selectedAgentId ? 'Specialized' : 'Generic'} Coaching</span>
+        <span className="flex items-center gap-1">
+          Mode: <Badge variant={coachingMode === 'live' ? 'default' : 'secondary'} className="text-xs">
+            {coachingMode === 'live' ? '🔄 Live' : '👆 Manual'}
+          </Badge>
+          {coachingMode === 'live' && isListening && (
+            <span className="text-green-600 animate-pulse">● Auto-suggestions enabled</span>
+          )}
+        </span>
       </div>
 
       {/* Main Dashboard */}
