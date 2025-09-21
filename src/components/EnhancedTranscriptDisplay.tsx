@@ -37,6 +37,25 @@ interface EnhancedTranscriptDisplayProps {
   sessionDuration: number;
 }
 
+// Move detectTopic outside the component to avoid initialization issues
+const detectTopic = (text: string): string => {
+  const keywords = {
+    'pricing': ['price', 'cost', 'expensive', 'budget', 'affordable'],
+    'features': ['feature', 'functionality', 'capabilities', 'can it', 'does it'],
+    'support': ['help', 'support', 'assistance', 'problem', 'issue'],
+    'closing': ['decision', 'sign up', 'purchase', 'buy', 'contract'],
+    'objection': ['but', 'however', 'concern', 'worried', 'not sure']
+  };
+
+  const lowerText = text.toLowerCase();
+  for (const [topic, words] of Object.entries(keywords)) {
+    if (words.some(word => lowerText.includes(word))) {
+      return topic;
+    }
+  }
+  return 'general';
+};
+
 export function EnhancedTranscriptDisplay({
   segments,
   interimText = '',
@@ -95,24 +114,6 @@ export function EnhancedTranscriptDisplay({
       block.topic?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [conversationBlocks, searchQuery]);
-
-  const detectTopic = (text: string): string => {
-    const keywords = {
-      'pricing': ['price', 'cost', 'expensive', 'budget', 'affordable'],
-      'features': ['feature', 'functionality', 'capabilities', 'can it', 'does it'],
-      'support': ['help', 'support', 'assistance', 'problem', 'issue'],
-      'closing': ['decision', 'sign up', 'purchase', 'buy', 'contract'],
-      'objection': ['but', 'however', 'concern', 'worried', 'not sure']
-    };
-
-    const lowerText = text.toLowerCase();
-    for (const [topic, words] of Object.entries(keywords)) {
-      if (words.some(word => lowerText.includes(word))) {
-        return topic;
-      }
-    }
-    return 'general';
-  };
 
   const formatTime = (timestamp: number, startTime: number): string => {
     const elapsed = Math.floor((timestamp - startTime) / 1000);
