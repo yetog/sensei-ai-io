@@ -133,12 +133,12 @@ class LocalAIService {
     const context = conversationHistory.slice(-3).join('\n');
     
     const prompts = {
-      cold_call: `You are an expert sales coach. Based on this cold call transcript: "${transcript}", provide ONE specific coaching tip. Focus on building rapport, handling objections, or moving to next steps.`,
-      demo: `You are a demo expert coach. For this demo transcript: "${transcript}", suggest ONE improvement for product presentation, feature highlighting, or customer engagement.`,
-      closing: `You are a closing specialist coach. Based on: "${transcript}", provide ONE specific tip for overcoming hesitation, creating urgency, or securing commitment.`,
-      retention: `You are a customer success coach. For this retention call: "${transcript}", suggest ONE approach for addressing concerns, reinforcing value, or strengthening the relationship.`,
-      discovery: `You are a discovery call expert. Based on: "${transcript}", provide ONE tip for better questioning, uncovering needs, or qualifying the prospect.`,
-      general: `You are a sales coach. Based on: "${transcript}", provide ONE actionable coaching tip to improve the conversation.`
+      cold_call: `You are an expert sales coach. Based on this cold call transcript: "${transcript}", provide coaching feedback. Focus on building rapport, handling objections, or moving to next steps.`,
+      demo: `You are a demo expert coach. For this demo transcript: "${transcript}", provide coaching feedback for product presentation, feature highlighting, or customer engagement.`,
+      closing: `You are a closing specialist coach. Based on: "${transcript}", provide coaching feedback for overcoming hesitation, creating urgency, or securing commitment.`,
+      retention: `You are a customer success coach. For this retention call: "${transcript}", provide coaching feedback for addressing concerns, reinforcing value, or strengthening the relationship.`,
+      discovery: `You are a discovery call expert. Based on: "${transcript}", provide coaching feedback for better questioning, uncovering needs, or qualifying the prospect.`,
+      general: `You are a sales coach. Based on: "${transcript}", provide coaching feedback to improve the conversation.`
     };
 
     const basePrompt = prompts[callType as keyof typeof prompts] || prompts.general;
@@ -148,7 +148,13 @@ class LocalAIService {
 Context from conversation:
 ${context}
 
-Provide a brief, actionable coaching suggestion (max 2 sentences). Format: "SUGGESTION: [your tip]"`;
+Please provide your response in this exact format:
+
+Summary & Analysis:
+[Brief analysis of what happened in the conversation]
+
+Suggestion:
+[ONE specific, actionable coaching tip in 1-2 sentences]`;
   }
 
   private parseCoachingSuggestion(
@@ -157,23 +163,33 @@ Provide a brief, actionable coaching suggestion (max 2 sentences). Format: "SUGG
     callType: string,
     processingTime: number
   ): CoachingSuggestion {
-    // Extract suggestion from response
-    const suggestionMatch = response.match(/SUGGESTION:\s*(.+?)(?:\n|$)/i);
-    let suggestion = suggestionMatch ? suggestionMatch[1].trim() : response.trim();
+    // Parse the structured response with Summary & Analysis and Suggestion sections
+    const summaryAnalysisMatch = response.match(/Summary & Analysis:\s*\n?(.*?)(?=\n\s*Suggestion:|$)/is);
+    const suggestionMatch = response.match(/Suggestion:\s*\n?(.*?)$/is);
     
-    // Clean markdown formatting for better display
-    suggestion = this.cleanMarkdownFormatting(suggestion);
+    const summaryAnalysis = summaryAnalysisMatch ? summaryAnalysisMatch[1].trim() : '';
+    const suggestionText = suggestionMatch ? suggestionMatch[1].trim() : '';
+    
+    // Combine both sections for the suggestion field with proper formatting
+    let combinedSuggestion = '';
+    if (summaryAnalysis && suggestionText) {
+      combinedSuggestion = `Summary & Analysis:\n${this.cleanMarkdownFormatting(summaryAnalysis)}\n\nSuggestion:\n${this.cleanMarkdownFormatting(suggestionText)}`;
+    } else {
+      // Fallback to original parsing if format is not followed
+      const fallbackMatch = response.match(/SUGGESTION:\s*(.+?)(?:\n|$)/i);
+      combinedSuggestion = fallbackMatch ? this.cleanMarkdownFormatting(fallbackMatch[1].trim()) : this.cleanMarkdownFormatting(response.trim());
+    }
     
     // Determine suggestion type and priority based on content
-    const type = this.classifySuggestionType(suggestion, callType);
-    const priority = this.determinePriority(suggestion, transcript);
-    const confidence = this.calculateConfidence(suggestion, processingTime);
+    const type = this.classifySuggestionType(combinedSuggestion, callType);
+    const priority = this.determinePriority(combinedSuggestion, transcript);
+    const confidence = this.calculateConfidence(combinedSuggestion, processingTime);
 
     return {
       id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
       title: this.generateTitle(type, callType),
-      suggestion: suggestion,
+      suggestion: combinedSuggestion,
       context: transcript.substring(0, 100) + '...',
       confidence,
       timestamp: Date.now(),

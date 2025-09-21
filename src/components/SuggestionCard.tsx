@@ -163,15 +163,56 @@ export function SuggestionCard({
             </div>
           </div>
           
-          <div className="flex items-start gap-2 mt-3">
-            <Lightbulb className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-            <div>
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">AI Suggestion</span>
-              <p className="text-sm text-foreground font-medium mt-0.5 leading-relaxed">
-                {suggestion.suggestion}
-              </p>
-            </div>
-          </div>
+          {(() => {
+            // Parse the suggestion to extract Summary & Analysis and Suggestion sections
+            const suggestionText = suggestion.suggestion;
+            const summaryMatch = suggestionText.match(/Summary & Analysis:\s*\n?(.*?)(?=\n\s*Suggestion:|$)/is);
+            const suggestionMatch = suggestionText.match(/Suggestion:\s*\n?(.*?)$/is);
+            
+            const hasParsedFormat = summaryMatch && suggestionMatch;
+            
+            if (hasParsedFormat) {
+              const summaryText = summaryMatch[1].trim();
+              const suggestionOnlyText = suggestionMatch[1].trim();
+              
+              return (
+                <>
+                  <div className="flex items-start gap-2 mt-3">
+                    <AlertTriangle className="h-4 w-4 text-secondary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Summary & Analysis</span>
+                      <p className="text-sm text-foreground/90 mt-0.5 leading-relaxed">
+                        {summaryText}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2 mt-3">
+                    <Lightbulb className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Suggestion</span>
+                      <p className="text-sm text-foreground font-medium mt-0.5 leading-relaxed">
+                        {suggestionOnlyText}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              );
+            } else {
+              // Fallback to original display for backward compatibility
+              return (
+                <div className="flex items-start gap-2 mt-3">
+                  <Lightbulb className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">AI Suggestion</span>
+                    <p className="text-sm text-foreground font-medium mt-0.5 leading-relaxed">
+                      {suggestionText}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+          })()}
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t border-border/50">

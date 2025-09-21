@@ -153,22 +153,23 @@ class HybridAIService {
   ): string {
     const context = conversationHistory.slice(-3).join('\n');
     
-    return `As an expert sales coach, analyze this ${callType} conversation transcript and provide ONE specific, actionable coaching tip:
+    return `As an expert sales coach, analyze this ${callType} conversation transcript and provide coaching feedback.
 
 Transcript: "${transcript}"
 
 Recent conversation context:
 ${context}
 
-Please provide:
-1. A brief coaching suggestion (1-2 sentences)
-2. The suggestion type (objection, product_pitch, closing, retention, or general)
-3. Priority level (high, medium, low)
+Please provide your response in this exact format:
 
-Format your response as:
-SUGGESTION: [your coaching tip]
-TYPE: [suggestion type]
-PRIORITY: [priority level]`;
+Summary & Analysis:
+[Provide a brief analysis of what happened in the conversation and key observations]
+
+Suggestion:
+[Provide ONE specific, actionable coaching tip in 1-2 sentences]
+
+TYPE: [objection, product_pitch, closing, retention, or general]
+PRIORITY: [high, medium, low]`;
   }
 
   private parseCloudResponse(
@@ -176,15 +177,24 @@ PRIORITY: [priority level]`;
     transcript: string,
     callType: string
   ): Omit<CoachingSuggestion, 'source'> {
-    // Parse the structured response
-    const suggestionMatch = response.match(/SUGGESTION:\s*(.+?)(?:\n|TYPE:|$)/i);
+    // Parse the structured response with Summary & Analysis and Suggestion sections
+    const summaryAnalysisMatch = response.match(/Summary & Analysis:\s*\n?(.*?)(?=\n\s*Suggestion:|$)/is);
+    const suggestionMatch = response.match(/Suggestion:\s*\n?(.*?)(?=\n\s*TYPE:|$)/is);
     const typeMatch = response.match(/TYPE:\s*(\w+)/i);
     const priorityMatch = response.match(/PRIORITY:\s*(\w+)/i);
 
-    let suggestion = suggestionMatch ? suggestionMatch[1].trim() : response.trim();
+    const summaryAnalysis = summaryAnalysisMatch ? summaryAnalysisMatch[1].trim() : '';
+    const suggestionText = suggestionMatch ? suggestionMatch[1].trim() : '';
     
-    // Remove markdown formatting for clean display
-    suggestion = this.cleanMarkdownFormatting(suggestion);
+    // Combine both sections for the suggestion field with proper formatting
+    let combinedSuggestion = '';
+    if (summaryAnalysis && suggestionText) {
+      combinedSuggestion = `Summary & Analysis:\n${this.cleanMarkdownFormatting(summaryAnalysis)}\n\nSuggestion:\n${this.cleanMarkdownFormatting(suggestionText)}`;
+    } else {
+      // Fallback to original parsing if format is not followed
+      const fallbackMatch = response.match(/SUGGESTION:\s*(.+?)(?:\n|TYPE:|$)/i);
+      combinedSuggestion = fallbackMatch ? this.cleanMarkdownFormatting(fallbackMatch[1].trim()) : this.cleanMarkdownFormatting(response.trim());
+    }
     
     const type = this.validateType(typeMatch ? typeMatch[1].toLowerCase() : 'general');
     const priority = this.validatePriority(priorityMatch ? priorityMatch[1].toLowerCase() : 'medium');
@@ -193,7 +203,7 @@ PRIORITY: [priority level]`;
       id: `cloud_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
       title: this.generateTitle(type, callType),
-      suggestion,
+      suggestion: combinedSuggestion,
       context: transcript.substring(0, 100) + '...',
       confidence: 0.85, // Cloud AI typically more confident
       timestamp: Date.now(),
