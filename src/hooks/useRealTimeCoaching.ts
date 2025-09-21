@@ -588,38 +588,20 @@ Provide 1-2 specific, actionable suggestions in JSON format:
 
   const parseCoachingResponse = (response: string, context: string): CoachingSuggestion[] => {
     try {
-      // First try to parse as JSON
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.suggestions?.map((s: any) => ({
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          type: s.type || 'general',
-          title: s.title || 'Coaching Suggestion',
-          suggestion: s.suggestion,
-          context,
-          confidence: s.confidence || 0.7,
-          timestamp: Date.now(),
-          priority: s.priority || 'medium'
-        })) || [];
-      }
+      // Simple, fast parsing - just create a single suggestion from the response
+      const cleanResponse = response.trim();
+      if (!cleanResponse) return [];
       
-      // Fallback: parse as plain text
-      const lines = response.split('\n').filter(line => line.trim());
-      if (lines.length > 0) {
-        return [{
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          type: 'general',
-          title: 'AI Coaching Suggestion',
-          suggestion: lines.join(' ').trim(),
-          context,
-          confidence: 0.6,
-          timestamp: Date.now(),
-          priority: 'medium'
-        }];
-      }
-      
-      return [];
+      return [{
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        type: 'general',
+        title: 'AI Coaching Suggestion',
+        suggestion: cleanResponse,
+        context,
+        confidence: 0.8,
+        timestamp: Date.now(),
+        priority: 'medium'
+      }];
     } catch (error) {
       console.error('Error parsing coaching response:', error);
       return [];

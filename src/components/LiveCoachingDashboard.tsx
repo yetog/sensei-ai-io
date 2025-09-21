@@ -31,6 +31,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { SuggestionCard } from '@/components/SuggestionCard';
 import { AgentSelector } from '@/components/AgentSelector';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
+import { DemoScenarios } from '@/components/DemoScenarios';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -79,6 +80,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [selectedAudioSource, setSelectedAudioSource] = useState<'microphone' | 'tab' | 'both'>('microphone');
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [showDemoScenarios, setShowDemoScenarios] = useState(false);
   const { toast } = useToast();
 
   const handleStartCoaching = () => {
@@ -97,6 +99,12 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       console.log('No transcription data, not showing summary');
     }
     setCallStartTime(null);
+  };
+
+  const handleSelectScenario = (scenario: any) => {
+    setSelectedCallType(scenario.callType);
+    setShowDemoScenarios(false);
+    // Optionally start coaching immediately or let user start manually
   };
 
   const formatDuration = (milliseconds: number): string => {
@@ -390,6 +398,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 Save Transcript
               </Button>
               
+              <Button 
+                onClick={() => setShowDemoScenarios(true)} 
+                variant="outline" 
+                size="sm"
+              >
+                <Target className="h-4 w-4 mr-1" />
+                Demo Scenarios
+              </Button>
+              
               <Button onClick={clearSession} variant="outline" size="sm">
                 Clear Session
               </Button>
@@ -569,6 +586,28 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           }}
           onSaveToHistory={handleSaveToHistory}
         />
+      )}
+
+      {/* Demo Scenarios Modal */}
+      {showDemoScenarios && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Practice Scenarios</h3>
+              <Button 
+                onClick={() => setShowDemoScenarios(false)} 
+                variant="ghost" 
+                size="sm"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <DemoScenarios 
+              onSelectScenario={handleSelectScenario} 
+              isListening={isListening} 
+            />
+          </div>
+        </div>
       )}
     </div>
   );
