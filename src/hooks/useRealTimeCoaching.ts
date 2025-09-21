@@ -19,6 +19,7 @@ interface SpeechRecognitionResult {
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResult[];
+  timeStamp: number;
 }
 
 interface SpeechRecognition extends EventTarget {
@@ -183,6 +184,8 @@ export function useRealTimeCoaching() {
   const startTimeRef = useRef<number>(0);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const restartAttemptRef = useRef<number>(0);
+  const processedResults = useRef<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Production Features Implementation (defined early)
   const generateSessionId = () => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -272,6 +275,31 @@ export function useRealTimeCoaching() {
     }
   }, []);
 
+  // Add the attemptRecognitionRestart function before it's used
+  const attemptRecognitionRestart = useCallback(() => {
+    if (restartAttemptRef.current >= 5) {
+      console.log('Max restart attempts reached');
+      setState(prev => ({ ...prev, isListening: false }));
+      return;
+    }
+
+    restartAttemptRef.current += 1;
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        setTimeout(() => {
+          if (recognitionRef.current && state.isListening) {
+            recognitionRef.current.start();
+          }
+        }, 500);
+      } catch (error) {
+        console.error('Error restarting recognition:', error);
+        setState(prev => ({ ...prev, isListening: false }));
+      }
+    }
+  }, [state.isListening]);
+
   // Initialize speech recognition
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -289,27 +317,49 @@ export function useRealTimeCoaching() {
       };
 
       recognition.onresult = (event) => {
-        const results = Array.from(event.results);
+        setIsProcessing(true);
+        console.log('Speech recognition result received:', event);
         
-        // Process all results for better accuracy
-        for (let i = 0; i < results.length; i++) {
-          const result = results[i];
-          
+        // Track processed results to prevent duplicates
+        if (!processedResults.current) {
+          processedResults.current = new Set();
+        }
+        
+        // Only process the latest final result to prevent loops
+        let latestFinalResult = null;
+        let latestFinalIndex = -1;
+        
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
           if (result.isFinal) {
-            // Choose best transcript from alternatives
-            const alternatives: any[] = [];
-            const resultLength = (result as any).length || 1;
-            for (let j = 0; j < resultLength; j++) {
-              alternatives.push((result as any)[j]);
-            }
-            const bestTranscript = alternatives
-              .filter((alt: any) => alt.confidence > 0.6) // Lowered confidence threshold
-              .sort((a: any, b: any) => b.confidence - a.confidence)[0] || alternatives[0];
-            
-            const transcript = bestTranscript.transcript.trim();
-            const confidence = bestTranscript.confidence;
-            
-            if (transcript.length > 2) { // Allow shorter phrases
+            latestFinalResult = result;
+            latestFinalIndex = i;
+          }
+        }
+        
+        // Process only the latest final result
+        if (latestFinalResult) {
+          const resultId = `${event.timeStamp}_${latestFinalIndex}_final`;
+          
+          // Skip if we've already processed this exact result
+          if (processedResults.current.has(resultId)) {
+            setIsProcessing(false);
+            return;
+          }
+          processedResults.current.add(resultId);
+          
+          // Clean up old processed results (keep only last 10)
+          if (processedResults.current.size > 10) {
+            const oldIds = Array.from(processedResults.current).slice(0, -10);
+            oldIds.forEach(id => processedResults.current!.delete(id));
+          }
+          
+          // Get the best transcript
+          const bestTranscript = latestFinalResult[0];
+          const transcript = bestTranscript.transcript.trim();
+          const confidence = bestTranscript.confidence;
+          
+          if (transcript.length > 2) { // Allow shorter phrases
               setState(prev => {
                 const lastSegment = prev.transcription[prev.transcription.length - 1];
                 const currentTime = Date.now();
@@ -335,42 +385,35 @@ export function useRealTimeCoaching() {
                 const qualityScore = Math.round((confidence * 100 + (transcript.length > 10 ? 20 : 0)) / 1.2);
                 
                 if (shouldMerge) {
-                  // Smart merging with enhanced duplicate prevention
+                  // Simple and effective deduplication
                   const updatedTranscription = [...prev.transcription];
                   const lastText = lastSegment.text.trimEnd();
                   const cleanedTranscript = transcript.trim();
                   
-                  // Advanced duplicate detection and phrase cleaning
-                  const words = (lastText + ' ' + cleanedTranscript).split(' ');
-                  const cleanedWords = [];
-                  const seenPhrases = new Set();
-                  
-                  for (let i = 0; i < words.length; i++) {
-                    const word = words[i];
-                    
-                    // Check for repeated 3-5 word phrases
-                    for (let phraseLength = 3; phraseLength <= 5; phraseLength++) {
-                      if (i + phraseLength <= words.length) {
-                        const phrase = words.slice(i, i + phraseLength).join(' ').toLowerCase();
-                        
-                        // Skip if we've seen this exact phrase recently
-                        if (seenPhrases.has(phrase)) {
-                          i += phraseLength - 1; // Skip the repeated phrase
-                          break;
-                        } else if (i === words.length - phraseLength) {
-                          // Add phrase to seen set only if we're processing it
-                          seenPhrases.add(phrase);
-                        }
-                      }
-                    }
-                    
-                    // Add word if we didn't skip due to phrase repetition
-                    if (i < words.length) {
-                      cleanedWords.push(words[i]);
-                    }
+                  // Check if the new transcript is a substring of the last text (common duplicate case)
+                  if (lastText.includes(cleanedTranscript)) {
+                    // Don't add duplicate content
+                    return prev;
                   }
                   
-                  const finalText = cleanedWords.join(' ');
+                  // Check if the new transcript starts with the end of the last text (overlap case)
+                  const lastWords = lastText.split(' ').slice(-5).join(' ').toLowerCase();
+                  const newWords = cleanedTranscript.split(' ').slice(0, 5).join(' ').toLowerCase();
+                  
+                  let finalText = lastText;
+                  if (lastWords === newWords) {
+                    // Skip overlapping content
+                    const remainingNewText = cleanedTranscript.split(' ').slice(5).join(' ');
+                    if (remainingNewText.trim()) {
+                      finalText = lastText + ' ' + remainingNewText.trim();
+                    }
+                  } else {
+                    // Simple concatenation with proper spacing
+                    const needsPunctuation = !lastText.match(/[.!?]$/) && 
+                      lastSegment.timestamp && (Date.now() - lastSegment.timestamp > 2000);
+                    const connector = needsPunctuation ? '. ' : ' ';
+                    finalText = lastText + connector + cleanedTranscript;
+                  }
                   
                   updatedTranscription[updatedTranscription.length - 1] = {
                     ...lastSegment,
@@ -422,24 +465,17 @@ export function useRealTimeCoaching() {
                 processTranscriptionForCoaching(transcript, state.callType);
               }
             }
-          } else {
-            // Handle interim results for real-time feedback
-            const interimText = result[0].transcript;
-            setState(prev => ({ ...prev, interimTranscript: interimText }));
           }
         }
         
-        // Set silence detection timeout
-        if (silenceTimeoutRef.current) {
-          clearTimeout(silenceTimeoutRef.current);
+        // Handle interim results
+        const latestResult = event.results[event.results.length - 1];
+        if (!latestResult.isFinal && latestResult[0]) {
+          const interimText = latestResult[0].transcript;
+          setState(prev => ({ ...prev, interimTranscript: interimText }));
         }
-        silenceTimeoutRef.current = setTimeout(() => {
-          // Auto-restart recognition after 30 seconds of silence
-          if (recognitionRef.current && state.isListening) {
-            console.log('Restarting recognition due to silence...');
-            attemptRecognitionRestart();
-          }
-        }, 30000);
+        
+        setIsProcessing(false);
       };
 
       recognition.onerror = (event) => {
@@ -473,33 +509,7 @@ export function useRealTimeCoaching() {
         }
       };
     }
-  }, [state.currentTurn, state.callType]);
-
-  // Add the missing attemptRecognitionRestart function
-  const attemptRecognitionRestart = useCallback(() => {
-    if (restartAttemptRef.current >= 5) {
-      console.log('Max restart attempts reached');
-      setState(prev => ({ ...prev, isListening: false }));
-      return;
-    }
-
-    restartAttemptRef.current += 1;
-    
-    try {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        setTimeout(() => {
-          if (recognitionRef.current && state.isListening) {
-            recognitionRef.current.start();
-            setState(prev => ({ ...prev, recognitionRestarts: prev.recognitionRestarts + 1 }));
-          }
-        }, 500);
-      }
-    } catch (error) {
-      console.error('Failed to restart recognition:', error);
-      setState(prev => ({ ...prev, isListening: false }));
-    }
-  }, [state.isListening]);
+  }, [state.currentTurn, state.callType, attemptRecognitionRestart]);
 
   // Enhanced audio capture functions
   const detectSpeaker = (micLevel: number, tabLevel: number, audioSource: AudioSource['type']): 'user' | 'customer' | null => {
