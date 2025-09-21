@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ionosAI } from '@/services/ionosAI';
 import { whisperService } from '@/services/whisperTranscriptionService';
+import { hybridAI } from '@/services/hybridAI';
 import { usePerformanceMetrics } from './usePerformanceMetrics';
 
 // Types and interfaces
@@ -319,6 +320,17 @@ export const useRealTimeCoaching = () => {
   }, [state.isListening]);
 
   // Initialize speech recognition
+  // Initialize hybrid AI on component mount
+  useEffect(() => {
+    hybridAI.initialize().catch(error => {
+      console.warn('⚠️ Hybrid AI initialization failed:', error);
+    });
+    
+    return () => {
+      hybridAI.cleanup();
+    };
+  }, []);
+
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognitionClass = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
@@ -670,20 +682,33 @@ export const useRealTimeCoaching = () => {
     }));
   };
 
-  // AI coaching functions
+  // AI coaching functions - using hybrid local/cloud AI
   const processTranscriptionForCoaching = async (text: string, callType: string) => {
     try {
-      const prompt = createCoachingPrompt(text, callType, state.transcription);
-      const response = await ionosAI.sendMessage([{ role: 'user', content: prompt }]);
-      const suggestions = parseCoachingResponse(response, text);
+      startTiming('ai_coaching_generation');
       
-      setState(prev => ({
-        ...prev,
-        suggestions: [...prev.suggestions, ...suggestions],
-        lastSuggestionTime: Date.now(),
-        suggestionCount: prev.suggestionCount + suggestions.length
-      }));
+      // Get conversation history for context
+      const conversationHistory = state.transcription
+        .slice(-5)
+        .map(segment => `${segment.speaker}: ${segment.text}`);
+      
+      // Use hybrid AI service for coaching suggestions
+      const suggestion = await hybridAI.generateCoachingSuggestion(text, callType, conversationHistory);
+      
+      endTiming('ai_coaching_generation');
+      
+      if (suggestion) {
+        setState(prev => ({
+          ...prev,
+          suggestions: [...prev.suggestions, suggestion],
+          lastSuggestionTime: Date.now(),
+          suggestionCount: prev.suggestionCount + 1
+        }));
+        
+        console.log(`🎯 Coaching suggestion generated via ${suggestion.source} AI in ${suggestion.processingTime?.toFixed(2)}ms`);
+      }
     } catch (error) {
+      endTiming('ai_coaching_generation');
       console.error('Error processing coaching:', error);
     }
   };
