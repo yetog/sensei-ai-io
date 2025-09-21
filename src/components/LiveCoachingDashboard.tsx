@@ -33,7 +33,7 @@ import { AgentSelector } from '@/components/AgentSelector';
 import { BrowserAudioTest } from '@/components/BrowserAudioTest';
 import { DemoScenarios } from '@/components/DemoScenarios';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
-import { callHistoryService } from '@/services/callHistoryService';
+import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import '@/services/demoAgentSetup';
@@ -156,7 +156,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         followUpEmail: email
       });
 
-      const savedCall = callHistoryService.saveCall({
+      const savedCallId = callSummaryStorage.saveCallSummary({
         duration: summary.duration,
         callType: selectedCallType,
         keyPoints: summary.keyPoints || [],
@@ -166,10 +166,10 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         transcriptHighlights: summary.transcriptHighlights || [],
         followUpEmail: email,
         customerName: summary.customerName,
-        notes: `Call conducted on ${new Date().toLocaleDateString()}`
+        companyName: summary.companyName
       });
       
-      console.log('Call saved successfully with ID:', savedCall.id);
+      console.log('Call saved successfully with ID:', savedCallId);
       
       toast({
         title: "Call Saved",

@@ -335,30 +335,42 @@ export function useRealTimeCoaching() {
                 const qualityScore = Math.round((confidence * 100 + (transcript.length > 10 ? 20 : 0)) / 1.2);
                 
                 if (shouldMerge) {
-                  // Smart merging with punctuation and duplicate prevention
+                  // Smart merging with enhanced duplicate prevention
                   const updatedTranscription = [...prev.transcription];
                   const lastText = lastSegment.text.trimEnd();
                   const cleanedTranscript = transcript.trim();
                   
-                  // Check if the new text would create a duplicate phrase
-                  const combinedText = lastText + ' ' + cleanedTranscript;
-                  const words = combinedText.split(' ');
-                  const deduplicatedWords = [];
+                  // Advanced duplicate detection and phrase cleaning
+                  const words = (lastText + ' ' + cleanedTranscript).split(' ');
+                  const cleanedWords = [];
+                  const seenPhrases = new Set();
                   
                   for (let i = 0; i < words.length; i++) {
                     const word = words[i];
-                    // Check for repeated phrases (3+ consecutive words)
-                    const isRepeatedPhrase = i >= 3 && 
-                      words.slice(i-3, i).join(' ') === words.slice(i, i+3).join(' ');
                     
-                    if (!isRepeatedPhrase) {
-                      deduplicatedWords.push(word);
+                    // Check for repeated 3-5 word phrases
+                    for (let phraseLength = 3; phraseLength <= 5; phraseLength++) {
+                      if (i + phraseLength <= words.length) {
+                        const phrase = words.slice(i, i + phraseLength).join(' ').toLowerCase();
+                        
+                        // Skip if we've seen this exact phrase recently
+                        if (seenPhrases.has(phrase)) {
+                          i += phraseLength - 1; // Skip the repeated phrase
+                          break;
+                        } else if (i === words.length - phraseLength) {
+                          // Add phrase to seen set only if we're processing it
+                          seenPhrases.add(phrase);
+                        }
+                      }
+                    }
+                    
+                    // Add word if we didn't skip due to phrase repetition
+                    if (i < words.length) {
+                      cleanedWords.push(words[i]);
                     }
                   }
                   
-                  const needsPunctuation = !lastText.match(/[.!?]$/) && timeSinceLastSegment > 2000;
-                  const connector = needsPunctuation ? '. ' : ' ';
-                  const finalText = deduplicatedWords.join(' ');
+                  const finalText = cleanedWords.join(' ');
                   
                   updatedTranscription[updatedTranscription.length - 1] = {
                     ...lastSegment,
