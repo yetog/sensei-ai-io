@@ -112,10 +112,10 @@ export function SuggestionCard({
 
         <div className="space-y-2">
           <div className="text-sm font-medium">
-            Analysis: {suggestion.context}
+            <strong>Trigger:</strong> {suggestion.context}
           </div>
           <div className="text-sm">
-            <strong>Suggested Response:</strong> {suggestion.suggestion}
+            {suggestion.suggestion}
           </div>
         </div>
 

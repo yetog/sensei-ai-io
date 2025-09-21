@@ -588,23 +588,93 @@ Provide 1-2 specific, actionable suggestions in JSON format:
 
   const parseCoachingResponse = (response: string, context: string): CoachingSuggestion[] => {
     try {
-      // Simple, fast parsing - just create a single suggestion from the response
-      const cleanResponse = response.trim();
-      if (!cleanResponse) return [];
+      // First try to parse JSON structure from the response
+      const jsonMatch = response.match(/```json\s*\{[\s\S]*?\}\s*```/);
+      if (jsonMatch) {
+        const jsonStr = jsonMatch[0].replace(/```json\s*/, '').replace(/\s*```/, '');
+        const parsed = JSON.parse(jsonStr);
+        
+        if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
+          return parsed.suggestions.map((s: any) => ({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            type: (s.type || 'general') as 'objection' | 'product_pitch' | 'closing' | 'retention' | 'general',
+            title: s.title || 'AI Coaching Suggestion',
+            context: s.title || context,
+            suggestion: s.suggestion,
+            confidence: s.confidence || 0.8,
+            timestamp: Date.now(),
+            priority: (s.priority || 'medium') as 'high' | 'medium' | 'low'
+          }));
+        }
+      }
+
+      // Fallback: Parse structured text response
+      const lines = response.split('\n').filter(line => line.trim());
+      const suggestions: CoachingSuggestion[] = [];
       
+      // Look for Analysis/Trigger section
+      const analysisMatch = response.match(/Analysis:\s*(.+?)(?=\n|Suggested Response:|$)/s);
+      const suggestionMatch = response.match(/Suggested Response:\s*(.+)/s);
+      
+      if (analysisMatch && suggestionMatch) {
+        const analysisText = analysisMatch[1].trim();
+        const suggestionText = suggestionMatch[1].trim();
+        
+        // Try to determine type from content
+        let type: 'objection' | 'product_pitch' | 'closing' | 'retention' | 'general' = 'general';
+        let confidence = 0.8;
+        
+        if (suggestionText.toLowerCase().includes('retention') || analysisText.toLowerCase().includes('retention')) {
+          type = 'retention';
+          confidence = 0.92;
+        } else if (suggestionText.toLowerCase().includes('objection') || analysisText.toLowerCase().includes('objection')) {
+          type = 'objection';
+          confidence = 0.85;
+        } else if (suggestionText.toLowerCase().includes('closing') || analysisText.toLowerCase().includes('close')) {
+          type = 'closing';
+          confidence = 0.88;
+        } else if (suggestionText.toLowerCase().includes('product') || suggestionText.toLowerCase().includes('pitch')) {
+          type = 'product_pitch';
+          confidence = 0.82;
+        }
+        
+        suggestions.push({
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          type,
+          title: 'AI Coaching Suggestion',
+          context: analysisText,
+          suggestion: suggestionText,
+          confidence,
+          timestamp: Date.now(),
+          priority: 'medium'
+        });
+      } else {
+        // Simple fallback
+        suggestions.push({
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          type: 'general',
+          title: 'AI Coaching Suggestion',
+          context: context,
+          suggestion: response.trim(),
+          confidence: 0.75,
+          timestamp: Date.now(),
+          priority: 'medium'
+        });
+      }
+      
+      return suggestions;
+    } catch (error) {
+      console.error('Error parsing coaching response:', error);
       return [{
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         type: 'general',
         title: 'AI Coaching Suggestion',
-        suggestion: cleanResponse,
-        context,
-        confidence: 0.8,
+        context: context,
+        suggestion: response.trim(),
+        confidence: 0.6,
         timestamp: Date.now(),
         priority: 'medium'
       }];
-    } catch (error) {
-      console.error('Error parsing coaching response:', error);
-      return [];
     }
   };
 
