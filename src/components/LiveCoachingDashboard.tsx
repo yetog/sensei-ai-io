@@ -30,8 +30,6 @@ import { GoogleMeetInstructions } from '@/components/GoogleMeetInstructions';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { SuggestionCard } from '@/components/SuggestionCard';
 import { AgentSelector } from '@/components/AgentSelector';
-import { BrowserAudioTest } from '@/components/BrowserAudioTest';
-import { DemoScenarios } from '@/components/DemoScenarios';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { cn } from '@/lib/utils';
@@ -81,8 +79,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [selectedAudioSource, setSelectedAudioSource] = useState<'microphone' | 'tab' | 'both'>('microphone');
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [showAudioTest, setShowAudioTest] = useState(false);
-  const [showDemoScenarios, setShowDemoScenarios] = useState(false);
   const { toast } = useToast();
 
   const handleStartCoaching = () => {
@@ -300,25 +296,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               </select>
             </div>
 
-            {/* Audio Test Button */}
-            <Button 
-              onClick={() => setShowAudioTest(!showAudioTest)} 
-              variant="outline" 
-              size="sm"
-              disabled={isListening}
-            >
-              {showAudioTest ? 'Hide' : 'Audio Test'}
-            </Button>
-
-            {/* Demo Scenarios Button */}
-            <Button 
-              onClick={() => setShowDemoScenarios(!showDemoScenarios)} 
-              variant="outline" 
-              size="sm"
-              disabled={isListening}
-            >
-              {showDemoScenarios ? 'Hide' : 'Demo Scenarios'}
-            </Button>
 
             {/* Audio Source Selection */}
             <div className="flex items-center gap-2">
@@ -365,13 +342,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 </Button>
               )}
               
-              <Button 
-                onClick={toggleDemoMode} 
-                variant={isDemoMode ? "default" : "outline"} 
-                size="sm"
-              >
-                {isDemoMode ? "Demo Mode ON" : "Demo Mode"}
-              </Button>
               
               <Button 
                 onClick={requestCoaching} 
@@ -428,32 +398,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Audio Test Panel */}
-      {showAudioTest && (
-        <BrowserAudioTest onTestComplete={(success) => {
-          if (success) {
-            setShowAudioTest(false);
-          }
-        }} />
-      )}
 
-      {/* Demo Scenarios Panel */}
-      {showDemoScenarios && (
-        <DemoScenarios 
-          onSelectScenario={(scenario) => {
-            setSelectedCallType(scenario.callType);
-            setShowDemoScenarios(false);
-            if (!isDemoMode) {
-              toggleDemoMode();
-            }
-            toast({
-              title: "Demo Scenario Selected",
-              description: `Practice with: ${scenario.title}. Use Demo Mode to simulate customer responses.`
-            });
-          }}
-          isListening={isListening}
-        />
-      )}
 
       {/* Agent Selection */}
       <AgentSelector 

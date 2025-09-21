@@ -375,7 +375,7 @@ Generate a personalized follow-up email using the extracted conversation data.
         </CardHeader>
 
         <CardContent className="p-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 h-[500px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 h-[600px]">
             {/* Call Summary */}
             <div className="border-r">
               <ScrollArea className="h-full p-6">
@@ -613,7 +613,7 @@ Generate a personalized follow-up email using the extracted conversation data.
           </div>
 
           {/* Actions */}
-          <div className="border-t p-4 bg-muted/50">
+          <div className="border-t p-4 bg-muted/50 flex-shrink-0">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <Button 
                 variant="outline" 
@@ -627,9 +627,6 @@ Generate a personalized follow-up email using the extracted conversation data.
                 <Button variant="outline" onClick={handleViewHistory} className="min-w-[140px]">
                   <History className="h-4 w-4 mr-2" />
                   View in History
-                </Button>
-                <Button variant="outline" onClick={handleSaveAndClose} className="min-w-[120px]">
-                  Save to History
                 </Button>
                 <Button onClick={handleSaveAndClose} className="min-w-[120px]">
                   Save & Close
