@@ -361,12 +361,21 @@ Generate a personalized follow-up email using the extracted conversation data.
                 {callSummary.duration}
               </Badge>
               <Badge variant="secondary">{callSummary.callType}</Badge>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={onClose}
+                className="h-8 w-8 p-0 ml-2"
+                aria-label="Close dialog"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="p-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 h-[550px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 h-[500px]">
             {/* Call Summary */}
             <div className="border-r">
               <ScrollArea className="h-full p-6">
@@ -561,16 +570,16 @@ Generate a personalized follow-up email using the extracted conversation data.
                     </div>
                   </div>
 
-                  {/* Email Body */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Email Body</label>
-                    <Textarea
-                      value={customEmail || fillTemplate(selectedTemplate.body)}
-                      onChange={(e) => setCustomEmail(e.target.value)}
-                      className="min-h-[180px] text-sm resize-none"
-                      placeholder="Email content will appear here..."
-                    />
-                  </div>
+                   {/* Email Body */}
+                   <div className="space-y-2">
+                     <label className="text-sm font-medium">Email Body</label>
+                     <Textarea
+                       value={customEmail || fillTemplate(selectedTemplate.body)}
+                       onChange={(e) => setCustomEmail(e.target.value)}
+                       className="min-h-[120px] max-h-[150px] text-sm resize-none"
+                       placeholder="Email content will appear here..."
+                     />
+                   </div>
 
                   <div className="flex items-center gap-2">
                     <Button
@@ -604,27 +613,25 @@ Generate a personalized follow-up email using the extracted conversation data.
           </div>
 
           {/* Actions */}
-          <div className="border-t p-6 bg-muted/50">
-            <div className="flex items-center justify-between">
+          <div className="border-t p-4 bg-muted/50">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <Button 
                 variant="outline" 
-                onClick={() => {
-                  console.log('Close button clicked');
-                  onClose();
-                }}
+                onClick={onClose}
+                className="min-w-[100px]"
               >
                 <X className="h-4 w-4 mr-2" />
                 Close
               </Button>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={handleViewHistory}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button variant="outline" onClick={handleViewHistory} className="min-w-[140px]">
                   <History className="h-4 w-4 mr-2" />
                   View in History
                 </Button>
-                <Button variant="outline" onClick={handleSaveAndClose}>
+                <Button variant="outline" onClick={handleSaveAndClose} className="min-w-[120px]">
                   Save to History
                 </Button>
-                <Button onClick={handleSaveAndClose}>
+                <Button onClick={handleSaveAndClose} className="min-w-[120px]">
                   Save & Close
                 </Button>
               </div>
