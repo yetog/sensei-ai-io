@@ -84,6 +84,13 @@ interface CoachingState {
   error: CoachingError | null;
   sessionStatus: 'active' | 'paused' | 'stopped' | 'error';
   selectedAgentId?: string | null;
+  // Production Features
+  sessionDuration: number;
+  maxSessionDuration: number;
+  lastBackupTime: number;
+  sessionWarnings: string[];
+  sessionId: string;
+  isRecording: boolean;
 }
 
 interface CoachingError {
@@ -110,13 +117,111 @@ export function useRealTimeCoaching() {
     isTabAudioAvailable: false,
     error: null,
     sessionStatus: 'stopped',
-    selectedAgentId: null
+    selectedAgentId: null,
+    // Production Features
+    sessionDuration: 0,
+    maxSessionDuration: 30 * 60 * 1000, // 30 minutes default
+    lastBackupTime: 0,
+    sessionWarnings: [],
+    sessionId: '',
+    isRecording: false
   });
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const audioSourceRef = useRef<AudioSource>({ type: 'microphone' });
   const audioLevelIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const backupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  // Production Features Implementation (defined early)
+  const generateSessionId = () => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  const autoSaveSession = useCallback(() => {
+    const sessionData = {
+      sessionId: state.sessionId,
+      transcript: state.transcription,
+      suggestions: state.suggestions,
+      callType: state.callType,
+      duration: state.sessionDuration,
+      timestamp: new Date().toISOString(),
+      audioSource: state.audioSource
+    };
+    
+    // Save to localStorage for recovery
+    localStorage.setItem(`coaching_backup_${state.sessionId}`, JSON.stringify(sessionData));
+    
+    setState(prev => ({
+      ...prev,
+      lastBackupTime: Date.now()
+    }));
+    
+    console.log('Session auto-saved:', state.sessionId);
+  }, [state]);
+
+  const startSessionTimer = useCallback(() => {
+    startTimeRef.current = Date.now();
+    
+    // Update session duration every second
+    sessionTimerRef.current = setInterval(() => {
+      const currentTime = Date.now();
+      const duration = currentTime - startTimeRef.current;
+      
+      setState(prev => {
+        const warnings = [...prev.sessionWarnings];
+        
+        // Check for session warnings
+        const maxDuration = prev.maxSessionDuration;
+        const remainingTime = maxDuration - duration;
+        
+        // Warning at 5 minutes remaining
+        if (remainingTime <= 5 * 60 * 1000 && remainingTime > 4 * 60 * 1000 && !warnings.includes('5min')) {
+          warnings.push('5min');
+        }
+        
+        // Warning at 2 minutes remaining
+        if (remainingTime <= 2 * 60 * 1000 && remainingTime > 1 * 60 * 1000 && !warnings.includes('2min')) {
+          warnings.push('2min');
+        }
+        
+        // Auto-save and stop at max duration
+        if (duration >= maxDuration) {
+          autoSaveSession();
+          warnings.push('session_ended');
+        }
+        
+        return {
+          ...prev,
+          sessionDuration: duration,
+          sessionWarnings: warnings
+        };
+      });
+    }, 1000);
+  }, [autoSaveSession]);
+
+  const stopSessionTimer = useCallback(() => {
+    if (sessionTimerRef.current) {
+      clearInterval(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+  }, []);
+
+  const startAutoBackup = useCallback(() => {
+    // Auto-backup every 5 minutes
+    backupIntervalRef.current = setInterval(() => {
+      if (state.isListening && state.transcription.length > 0) {
+        autoSaveSession();
+      }
+    }, 5 * 60 * 1000);
+  }, [state.isListening, state.transcription.length, autoSaveSession]);
+
+  const stopAutoBackup = useCallback(() => {
+    if (backupIntervalRef.current) {
+      clearInterval(backupIntervalRef.current);
+      backupIntervalRef.current = null;
+    }
+  }, []);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -149,11 +254,14 @@ export function useRealTimeCoaching() {
               const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
               const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
               
-          // Smart consolidation: merge with previous segment if same speaker and within 2 seconds
-          if (lastSegment && 
-              lastSegment.speaker === currentSpeaker && 
-              Date.now() - lastSegment.timestamp < 2000) {
-                
+              // Enhanced consolidation: merge with previous segment if same speaker and within 5 seconds
+              // OR if the gap is less than 3 seconds (natural pauses)
+              const shouldMerge = lastSegment && 
+                lastSegment.speaker === currentSpeaker && 
+                (Date.now() - lastSegment.timestamp < 5000 || 
+                 (Date.now() - lastSegment.timestamp < 3000 && lastSegment.text.length < 200));
+              
+              if (shouldMerge) {
                 // Update the last segment instead of creating new one
                 const updatedTranscription = [...prev.transcription];
                 updatedTranscription[updatedTranscription.length - 1] = {
@@ -637,25 +745,36 @@ If no clear trigger, respond with: {"suggestions": []}`;
     URL.revokeObjectURL(url);
   }, [state.transcription]);
 
-  const exportTranscriptData = useCallback(() => {
-    const data = {
+  const exportSessionData = useCallback(() => {
+    const sessionData = {
+      sessionId: state.sessionId,
       transcript: state.transcription,
       suggestions: state.suggestions,
       callType: state.callType,
-      duration: state.conversationLength,
-      timestamp: new Date().toISOString()
+      duration: state.sessionDuration,
+      conversationLength: state.conversationLength,
+      audioSource: state.audioSource,
+      warnings: state.sessionWarnings,
+      timestamp: new Date().toISOString(),
+      quality: {
+        averageConfidence: state.transcription.length > 0 
+          ? state.transcription.reduce((sum, seg) => sum + seg.confidence, 0) / state.transcription.length 
+          : 0,
+        totalSegments: state.transcription.length,
+        totalSuggestions: state.suggestions.length
+      }
     };
     
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `coaching-session-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `coaching-session-${state.sessionId}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [state.transcription, state.suggestions, state.callType, state.conversationLength]);
+  }, [state]);
 
   const startListening = useCallback(async (callType: CoachingState['callType'] = 'general', audioSource: AudioSource['type'] = 'microphone', selectedAgentId?: string | null) => {
     if (recognitionRef.current) {
@@ -667,6 +786,8 @@ If no clear trigger, respond with: {"suggestions": []}`;
         await requestTabAudio();
       }
 
+      const sessionId = generateSessionId();
+      
       setState(prev => ({ 
         ...prev, 
         callType,
@@ -678,21 +799,44 @@ If no clear trigger, respond with: {"suggestions": []}`;
         lastSuggestionTime: 0,
         selectedAgentId,
         error: null,
-        sessionStatus: 'active'
+        sessionStatus: 'active',
+        sessionId,
+        sessionDuration: 0,
+        sessionWarnings: [],
+        isRecording: true
       }));
 
+      // Start production features
+      startSessionTimer();
+      startAutoBackup();
       startAudioLevelMonitoring();
       recognitionRef.current.start();
     }
-  }, [requestMicrophoneAudio, requestTabAudio, startAudioLevelMonitoring]);
+  }, [requestMicrophoneAudio, requestTabAudio, startAudioLevelMonitoring, startSessionTimer, startAutoBackup]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && state.isListening) {
       recognitionRef.current.stop();
       stopAllAudioStreams();
-      setState(prev => ({ ...prev, isListening: false, isProcessing: false }));
+      
+      // Stop production features
+      stopSessionTimer();
+      stopAutoBackup();
+      
+      // Final auto-save
+      if (state.transcription.length > 0) {
+        autoSaveSession();
+      }
+      
+      setState(prev => ({ 
+        ...prev, 
+        isListening: false, 
+        isProcessing: false,
+        sessionStatus: 'stopped',
+        isRecording: false
+      }));
     }
-  }, [state.isListening, stopAllAudioStreams]);
+  }, [state.isListening, stopAllAudioStreams, stopSessionTimer, stopAutoBackup, autoSaveSession, state.transcription.length]);
 
   const toggleSpeaker = useCallback(() => {
     setState(prev => ({ 
@@ -779,6 +923,53 @@ If no clear trigger, respond with: {"suggestions": []}`;
     }
   }, [state.transcription, state.callType]);
 
+  const pauseSession = useCallback(() => {
+    setState(prev => ({ ...prev, sessionStatus: 'paused' }));
+    stopSessionTimer();
+    if (recognitionRef.current && state.isListening) {
+      recognitionRef.current.stop();
+    }
+  }, [state.isListening]);
+
+  const resumeSession = useCallback(() => {
+    setState(prev => ({ ...prev, sessionStatus: 'active' }));
+    startSessionTimer();
+    if (recognitionRef.current && !state.isListening) {
+      recognitionRef.current.start();
+    }
+  }, [state.isListening]);
+
+  const setMaxSessionDuration = useCallback((minutes: number) => {
+    setState(prev => ({
+      ...prev,
+      maxSessionDuration: minutes * 60 * 1000,
+      sessionWarnings: [] // Reset warnings when duration changes
+    }));
+  }, []);
+
+  const recoverSession = useCallback(() => {
+    const backups = Object.keys(localStorage).filter(key => key.startsWith('coaching_backup_'));
+    if (backups.length > 0) {
+      const latestBackup = backups.sort().pop();
+      if (latestBackup) {
+        try {
+          const sessionData = JSON.parse(localStorage.getItem(latestBackup) || '{}');
+          setState(prev => ({
+            ...prev,
+            transcription: sessionData.transcript || [],
+            suggestions: sessionData.suggestions || [],
+            callType: sessionData.callType || 'general',
+            sessionId: sessionData.sessionId || generateSessionId()
+          }));
+          return true;
+        } catch (error) {
+          console.error('Failed to recover session:', error);
+        }
+      }
+    }
+    return false;
+  }, []);
+
   return {
     ...state,
     startListening,
@@ -790,13 +981,33 @@ If no clear trigger, respond with: {"suggestions": []}`;
     toggleDemoMode,
     requestCoaching,
     saveTranscript,
-    exportTranscriptData,
+    exportTranscriptData: exportSessionData,
     requestTabAudio,
     requestMicrophoneAudio,
     stopAllAudioStreams,
     handleCoachingError,
     clearError,
     retryOperation,
+    // Production Features
+    pauseSession,
+    resumeSession,
+    setMaxSessionDuration,
+    recoverSession,
+    autoSaveSession,
+    // Utility functions
+    formatSessionDuration: () => {
+      const minutes = Math.floor(state.sessionDuration / 60000);
+      const seconds = Math.floor((state.sessionDuration % 60000) / 1000);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    },
+    getRemainingTime: () => {
+      const remaining = state.maxSessionDuration - state.sessionDuration;
+      return Math.max(0, remaining);
+    },
+    getSessionQuality: () => {
+      if (state.transcription.length === 0) return 0;
+      return state.transcription.reduce((sum, seg) => sum + seg.confidence, 0) / state.transcription.length;
+    },
     isAvailable: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
   };
 }
