@@ -33,8 +33,8 @@ import { SuggestionCard } from '@/components/SuggestionCard';
 import { AgentSelector } from '@/components/AgentSelector';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
 import { DemoScenarios } from '@/components/DemoScenarios';
-import { PerformanceMonitor } from '@/components/PerformanceMonitor';
-import { HybridAIStatus } from '@/components/HybridAIStatus';
+
+
 import { PerformanceDashboard } from '@/components/PerformanceDashboard';
 import { TranscriptDebugger } from '@/components/TranscriptDebugger';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
@@ -553,14 +553,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           </CardContent>
         </Card>
 
-        {/* Performance Monitor */}
-        <div className="space-y-4">
-          <PerformanceMonitor
-            stats={getPerformanceStats()}
-            isUsingWhisper={isUsingWhisper}
-            onLogReport={logPerformanceReport}
-          />
-        </div>
       </div>
 
       {/* Session Stats */}
@@ -605,10 +597,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         </Card>
       )}
 
-      {/* AI Status Only */}
-      <div className="flex justify-end">
-        <HybridAIStatus />
-      </div>
 
       {/* Google Meet Testing Instructions */}
       {(selectedAudioSource === 'tab' || selectedAudioSource === 'both') && (
