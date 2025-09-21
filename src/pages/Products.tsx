@@ -6,12 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, ExternalLink, Edit, Trash2 } from 'lucide-react';
+import { Plus, ExternalLink, Edit, Trash2, FileText } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Map } from 'lucide-react';
 import { MindMap } from '@/components/MindMap';
+import { KnowledgeBaseManager } from '@/components/KnowledgeBaseManager';
 
 interface Product {
   id: string;
@@ -56,7 +57,7 @@ const Products = () => {
     category: ''
   });
 
-  const [activeView, setActiveView] = useState<'list' | 'mindmap'>('list');
+  const [activeView, setActiveView] = useState<'list' | 'mindmap' | 'knowledge'>('list');
   const [categories, setCategories] = useState<string[]>(['Web Services', 'Security', 'Cloud', 'AI/ML']);
 
   const handleSubmit = () => {
@@ -176,12 +177,16 @@ const Products = () => {
               </CardDescription>
             </div>
             <div className="flex items-center gap-3">
-              <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'list' | 'mindmap')} className="w-auto">
+              <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'list' | 'mindmap' | 'knowledge')} className="w-auto">
                 <TabsList>
                   <TabsTrigger value="list">List View</TabsTrigger>
                   <TabsTrigger value="mindmap" className="flex items-center gap-2">
                     <Map className="h-4 w-4" />
                     Mind Map
+                  </TabsTrigger>
+                  <TabsTrigger value="knowledge" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Knowledge Base
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -399,7 +404,7 @@ const Products = () => {
               </TableBody>
             </Table>
           </div>
-          ) : (
+          ) : activeView === 'mindmap' ? (
             <div className="space-y-6">
               <div className="text-center">
                 <h3 className="text-lg font-semibold mb-2">Product Mind Map</h3>
@@ -434,7 +439,9 @@ const Products = () => {
                 </div>
               )}
             </div>
-          )}
+          ) : activeView === 'knowledge' ? (
+            <KnowledgeBaseManager />
+          ) : null}
         </CardContent>
       </Card>
     </div>

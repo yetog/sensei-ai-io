@@ -123,7 +123,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
                 <Download className="h-4 w-4 mr-1" />
                 Export
               </Button>
-              <Button onClick={onClose} variant="ghost" size="sm">
+              <Button onClick={onClose} variant="ghost" size="sm" className="h-8 w-8 p-0">
                 ×
               </Button>
             </div>

@@ -181,7 +181,11 @@ PRIORITY: [priority level]`;
     const typeMatch = response.match(/TYPE:\s*(\w+)/i);
     const priorityMatch = response.match(/PRIORITY:\s*(\w+)/i);
 
-    const suggestion = suggestionMatch ? suggestionMatch[1].trim() : response.trim();
+    let suggestion = suggestionMatch ? suggestionMatch[1].trim() : response.trim();
+    
+    // Remove markdown formatting for clean display
+    suggestion = this.cleanMarkdownFormatting(suggestion);
+    
     const type = this.validateType(typeMatch ? typeMatch[1].toLowerCase() : 'general');
     const priority = this.validatePriority(priorityMatch ? priorityMatch[1].toLowerCase() : 'medium');
 
@@ -195,6 +199,19 @@ PRIORITY: [priority level]`;
       timestamp: Date.now(),
       priority
     };
+  }
+
+  private cleanMarkdownFormatting(text: string): string {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+      .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
+      .replace(/__(.*?)__/g, '$1')     // Remove __underline__
+      .replace(/_(.*?)_/g, '$1')       // Remove _underscore_
+      .replace(/`(.*?)`/g, '$1')       // Remove `code`
+      .replace(/#{1,6}\s*/g, '')       // Remove # headers
+      .replace(/\n\s*[-*+]\s*/g, '\n• ') // Convert bullets to bullet points
+      .replace(/^\s*\d+\.\s*/gm, '• ') // Convert numbered lists to bullets
+      .trim();
   }
 
   private validateType(type: string): CoachingSuggestion['type'] {

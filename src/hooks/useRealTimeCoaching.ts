@@ -6,6 +6,7 @@ import { usePerformanceMetrics } from './usePerformanceMetrics';
 import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
+import { feedbackLearning, type SuggestionFeedback as FeedbackData } from '@/services/feedbackLearning';
 
 // Types and interfaces
 interface SpeechRecognitionResult {
@@ -641,10 +642,30 @@ export const useRealTimeCoaching = () => {
 
       if (audioSource === 'microphone' || audioSource === 'both') {
         audioStream = await requestMicrophoneAudio();
+        if (!audioStream && audioSource === 'both') {
+          throw new Error('Microphone access failed - required for microphone + system audio mode');
+        }
       }
       if (audioSource === 'tab' || audioSource === 'both') {
         const tabStream = await requestTabAudio();
-        audioStream = audioStream || tabStream;
+        if (audioSource === 'both' && audioStream && tabStream) {
+          // Combine both streams for 'both' mode
+          const audioContext = new AudioContext();
+          const micSource = audioContext.createMediaStreamSource(audioStream);
+          const tabSource = audioContext.createMediaStreamSource(tabStream);
+          const destination = audioContext.createMediaStreamDestination();
+          
+          micSource.connect(destination);
+          tabSource.connect(destination);
+          
+          audioStream = destination.stream;
+        } else {
+          audioStream = audioStream || tabStream;
+        }
+        
+        if (!audioStream && audioSource === 'tab') {
+          throw new Error('System audio access failed');
+        }
       }
 
       if (audioStream) {
@@ -882,6 +903,9 @@ Provide 1-2 specific, actionable suggestions in JSON format:
 
   const rateSuggestion = (suggestionId: string, rating: 'helpful' | 'not_helpful', reason?: string) => {
     setState(prev => {
+      const suggestion = prev.suggestions.find(s => s.id === suggestionId);
+      if (!suggestion) return prev;
+      
       const updated = {
         ...prev,
         suggestions: prev.suggestions.map(s => 
@@ -896,21 +920,20 @@ Provide 1-2 specific, actionable suggestions in JSON format:
         )
       };
       
-      // Store feedback in localStorage for analytics
+      // Store feedback with learning service
       try {
-        const feedbackData = {
+        const feedbackData: FeedbackData = {
           suggestionId,
           rating,
+          suggestionType: suggestion.type,
+          suggestionText: suggestion.suggestion,
+          context: suggestion.context,
           timestamp: Date.now(),
-          suggestionType: updated.suggestions.find(s => s.id === suggestionId)?.type,
           reason
         };
         
-        const existingFeedback = JSON.parse(localStorage.getItem('suggestion_feedback') || '[]');
-        existingFeedback.push(feedbackData);
-        localStorage.setItem('suggestion_feedback', JSON.stringify(existingFeedback));
-        
-        console.log('✅ Suggestion feedback saved:', feedbackData);
+        feedbackLearning.storeFeedback(feedbackData);
+        console.log('✅ Suggestion feedback saved and learning updated:', rating);
       } catch (error) {
         console.error('❌ Failed to save suggestion feedback:', error);
       }
@@ -979,8 +1002,42 @@ Provide 1-2 specific, actionable suggestions in JSON format:
       
       try {
         setIsProcessing(true);
-        const currentTranscript = state.transcription.map(t => t.text).join(' ');
-        await processTranscriptionForCoaching(currentTranscript, state.callType);
+        
+        // Create comprehensive context for AI analysis
+        const fullTranscript = state.transcription.map(t => `${t.speaker}: ${t.text}`).join('\n');
+        const conversationSummary = state.transcription.length > 5 
+          ? state.transcription.slice(-10) // Last 10 exchanges for context
+          : state.transcription;
+        
+        const contextualPrompt = `Analyze this ${state.callType} conversation and provide coaching:
+
+Full Conversation:
+${fullTranscript}
+
+Recent Context:
+${conversationSummary.map(t => `${t.speaker}: ${t.text}`).join('\n')}
+
+Provide your response in this format:
+Summary & Analysis: [Your analysis]
+Suggestion: [Specific coaching advice]`;
+        
+        // Generate coaching suggestion using hybrid AI with full context
+        const suggestion = await hybridAI.generateCoachingSuggestion(
+          contextualPrompt, 
+          state.callType, 
+          conversationSummary.map(t => `${t.speaker}: ${t.text}`)
+        );
+        
+        if (suggestion) {
+          setState(prev => ({
+            ...prev,
+            suggestions: [...prev.suggestions, suggestion],
+            lastSuggestionTime: Date.now(),
+            suggestionCount: prev.suggestionCount + 1
+          }));
+          
+          console.log(`🎯 Manual coaching request processed via ${suggestion.source} AI`);
+        }
       } catch (error) {
         console.error('Error in requestCoaching:', error);
       } finally {

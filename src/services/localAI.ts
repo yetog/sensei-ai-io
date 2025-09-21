@@ -159,7 +159,10 @@ Provide a brief, actionable coaching suggestion (max 2 sentences). Format: "SUGG
   ): CoachingSuggestion {
     // Extract suggestion from response
     const suggestionMatch = response.match(/SUGGESTION:\s*(.+?)(?:\n|$)/i);
-    const suggestion = suggestionMatch ? suggestionMatch[1].trim() : response.trim();
+    let suggestion = suggestionMatch ? suggestionMatch[1].trim() : response.trim();
+    
+    // Clean markdown formatting for better display
+    suggestion = this.cleanMarkdownFormatting(suggestion);
     
     // Determine suggestion type and priority based on content
     const type = this.classifySuggestionType(suggestion, callType);
@@ -176,6 +179,19 @@ Provide a brief, actionable coaching suggestion (max 2 sentences). Format: "SUGG
       timestamp: Date.now(),
       priority
     };
+  }
+
+  private cleanMarkdownFormatting(text: string): string {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+      .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
+      .replace(/__(.*?)__/g, '$1')     // Remove __underline__
+      .replace(/_(.*?)_/g, '$1')       // Remove _underscore_
+      .replace(/`(.*?)`/g, '$1')       // Remove `code`
+      .replace(/#{1,6}\s*/g, '')       // Remove # headers
+      .replace(/\n\s*[-*+]\s*/g, '\n• ') // Convert bullets to bullet points
+      .replace(/^\s*\d+\.\s*/gm, '• ') // Convert numbered lists to bullets
+      .trim();
   }
 
   private classifySuggestionType(suggestion: string, callType: string): CoachingSuggestion['type'] {

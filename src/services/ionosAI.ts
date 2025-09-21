@@ -68,22 +68,18 @@ export class IONOSAIService {
     }
 
     const systemPrompt = agentName && agentName !== "AI Assistant" 
-      ? `You are ${agentName}, a specialized AI assistant. Maintain your role identity throughout the conversation and respond in a way that's consistent with your expertise. 
+      ? `You are ${agentName}, a specialized AI assistant. Maintain your role identity throughout the conversation and respond in a way that's consistent with your expertise.
 
-Format your responses with proper markdown for better readability:
-- Use **bold** for important points and headings
-- Use bullet points and numbered lists for organization
-- Use proper line breaks and spacing
-- Structure information clearly with headers when appropriate
+For coaching suggestions, provide responses in this exact format:
+Summary & Analysis: [Brief analysis of the conversation context]
+Suggestion: [Specific, actionable coaching advice in 2-3 lines]
 
 Provide concise, actionable advice based on your specialization.`
       : `You are a helpful AI assistant capable of helping with a wide range of business and professional tasks. You are knowledgeable, professional, and adaptable to any topic or industry.
 
-Format your responses with proper markdown for better readability:
-- Use **bold** for important points and headings  
-- Use bullet points and numbered lists for organization
-- Use proper line breaks and spacing
-- Structure information clearly with headers when appropriate
+For coaching suggestions, provide responses in this exact format:
+Summary & Analysis: [Brief analysis of the conversation context]
+Suggestion: [Specific, actionable coaching advice in 2-3 lines]
 
 You can assist with:
 - Business strategy and planning

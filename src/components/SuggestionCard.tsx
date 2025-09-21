@@ -137,7 +137,10 @@ export function SuggestionCard({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onDismiss(suggestion.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDismiss(suggestion.id);
+            }}
             className="h-7 w-7 p-0 opacity-60 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <X className="h-3 w-3" />
