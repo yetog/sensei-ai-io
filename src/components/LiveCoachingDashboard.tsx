@@ -32,6 +32,7 @@ import { SuggestionCard } from '@/components/SuggestionCard';
 import { AgentSelector } from '@/components/AgentSelector';
 import { BrowserAudioTest } from '@/components/BrowserAudioTest';
 import { DemoScenarios } from '@/components/DemoScenarios';
+import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
 import { callHistoryService } from '@/services/callHistoryService';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -68,7 +69,10 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     exportTranscriptData,
     clearError,
     retryOperation,
-    isAvailable
+    isAvailable,
+    sessionDuration,
+    transcriptQuality,
+    interimTranscript
   } = useRealTimeCoaching();
 
   const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
@@ -488,45 +492,26 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             </div>
           </CardHeader>
           <CardContent className="h-[500px]">
-            <ScrollArea className="h-full">
-              {transcription.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <div className="text-center">
-                    <PhoneCall className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-base">Start coaching to see live transcription</p>
-                  </div>
+            {transcription.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="text-center">
+                  <PhoneCall className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-base">Start coaching to see live transcription</p>
                 </div>
-              ) : (
-                 <div className="space-y-3">
-                  {transcription.slice(-20).map((segment) => (
-                    <div
-                      key={segment.id}
-                      className={cn(
-                        "p-4 rounded-xl border-l-4 transition-all duration-200 shadow-sm",
-                        segment.speaker === 'user' 
-                          ? "bg-primary/10 border-l-primary hover:bg-primary/15" 
-                          : "bg-accent/10 border-l-accent hover:bg-accent/15"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-3">
-                        <Badge 
-                          variant={segment.speaker === 'user' ? 'default' : 'secondary'} 
-                          className="text-sm font-bold px-3 py-1"
-                        >
-                          {segment.speaker === 'user' ? 'You' : 'Customer'}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {new Date(segment.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <p className="text-base text-foreground font-medium leading-relaxed tracking-wide antialiased break-words">
-                        {segment.text.length > 200 ? `${segment.text.substring(0, 200)}...` : segment.text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+              </div>
+            ) : (
+              <EnhancedTranscriptDisplay
+                segments={transcription}
+                interimText={interimTranscript}
+                transcriptQuality={transcriptQuality}
+                sessionDuration={sessionDuration}
+                onExportTranscript={exportTranscriptData}
+                onEditSegment={(segmentId, newText) => {
+                  // Handle transcript editing if needed in the future
+                  console.log('Edit segment:', segmentId, newText);
+                }}
+              />
+            )}
           </CardContent>
         </Card>
 

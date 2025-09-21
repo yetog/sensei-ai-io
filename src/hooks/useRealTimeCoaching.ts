@@ -25,8 +25,10 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  maxAlternatives: number;
   start(): void;
   stop(): void;
+  abort(): void;
   onstart: () => void;
   onresult: (event: SpeechRecognitionEvent) => void;
   onerror: (event: { error: string }) => void;
@@ -56,6 +58,9 @@ interface TranscriptionSegment {
   text: string;
   timestamp: number;
   confidence: number;
+  isConsolidated?: boolean;
+  segmentGroup?: string;
+  duration?: number;
 }
 
 interface AudioSource {
@@ -91,6 +96,11 @@ interface CoachingState {
   sessionWarnings: string[];
   sessionId: string;
   isRecording: boolean;
+  // Enhanced transcript features
+  transcriptQuality: number;
+  lastTranscriptTime: number;
+  interimTranscript: string;
+  recognitionRestarts: number;
 }
 
 interface CoachingError {
@@ -124,7 +134,12 @@ export function useRealTimeCoaching() {
     lastBackupTime: 0,
     sessionWarnings: [],
     sessionId: '',
-    isRecording: false
+    isRecording: false,
+    // Enhanced transcript features
+    transcriptQuality: 0,
+    lastTranscriptTime: 0,
+    interimTranscript: '',
+    recognitionRestarts: 0
   });
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -134,6 +149,8 @@ export function useRealTimeCoaching() {
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const backupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const restartAttemptRef = useRef<number>(0);
 
   // Production Features Implementation (defined early)
   const generateSessionId = () => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -233,6 +250,7 @@ export function useRealTimeCoaching() {
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
+      recognition.maxAlternatives = 3; // Get multiple transcript alternatives for better accuracy
 
       recognition.onstart = () => {
         setState(prev => ({ ...prev, isListening: true }));
@@ -240,77 +258,179 @@ export function useRealTimeCoaching() {
 
       recognition.onresult = (event) => {
         const results = Array.from(event.results);
-        const latestResult = results[results.length - 1];
         
-        if (latestResult.isFinal) {
-          const transcript = latestResult[0].transcript.trim();
-          const confidence = latestResult[0].confidence;
+        // Process all results for better accuracy
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i];
           
-          if (transcript.length > 0) {
-            setState(prev => {
-              const lastSegment = prev.transcription[prev.transcription.length - 1];
-              
-              // Smart speaker detection based on audio levels
-              const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
-              const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
-              
-              // Enhanced consolidation: merge with previous segment if same speaker and within 5 seconds
-              // OR if the gap is less than 3 seconds (natural pauses)
-              const shouldMerge = lastSegment && 
-                lastSegment.speaker === currentSpeaker && 
-                (Date.now() - lastSegment.timestamp < 5000 || 
-                 (Date.now() - lastSegment.timestamp < 3000 && lastSegment.text.length < 200));
-              
-              if (shouldMerge) {
-                // Update the last segment instead of creating new one
-                const updatedTranscription = [...prev.transcription];
-                updatedTranscription[updatedTranscription.length - 1] = {
-                  ...lastSegment,
-                  text: lastSegment.text + ' ' + transcript,
-                  confidence: Math.max(lastSegment.confidence, confidence || 0.8)
-                };
-                
-                return {
-                  ...prev,
-                  transcription: updatedTranscription,
-                  conversationLength: prev.conversationLength + transcript.length
-                };
-              } else {
-                // Create new segment
-                const newSegment: TranscriptionSegment = {
-                  id: Date.now().toString(),
-                  speaker: currentSpeaker,
-                  text: transcript,
-                  timestamp: Date.now(),
-                  confidence: confidence || 0.8
-                };
-
-                return {
-                  ...prev,
-                  transcription: [...prev.transcription, newSegment],
-                  conversationLength: prev.conversationLength + transcript.length
-                };
-              }
-            });
-
-            // Process for coaching suggestions if enabled
-            if (shouldGenerateSuggestion(transcript, state.suggestions, Date.now() - state.lastSuggestionTime)) {
-              processTranscriptionForCoaching(transcript, state.callType);
+          if (result.isFinal) {
+            // Choose best transcript from alternatives
+            const alternatives: any[] = [];
+            const resultLength = (result as any).length || 1;
+            for (let j = 0; j < resultLength; j++) {
+              alternatives.push((result as any)[j]);
             }
+            const bestTranscript = alternatives
+              .filter((alt: any) => alt.confidence > 0.6) // Lowered confidence threshold
+              .sort((a: any, b: any) => b.confidence - a.confidence)[0] || alternatives[0];
+            
+            const transcript = bestTranscript.transcript.trim();
+            const confidence = bestTranscript.confidence;
+            
+            if (transcript.length > 2) { // Allow shorter phrases
+              setState(prev => {
+                const lastSegment = prev.transcription[prev.transcription.length - 1];
+                const currentTime = Date.now();
+                
+                // Smart speaker detection
+                const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
+                const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
+                
+                // Enhanced consolidation logic
+                const timeSinceLastSegment = lastSegment ? currentTime - lastSegment.timestamp : Infinity;
+                const shouldMerge = lastSegment && 
+                  lastSegment.speaker === currentSpeaker && 
+                  (timeSinceLastSegment < 10000 || // Extended to 10 seconds
+                   (timeSinceLastSegment < 5000 && lastSegment.text.length < 300)); // Longer text merging
+                
+                // Calculate transcript quality
+                const qualityScore = Math.round((confidence * 100 + (transcript.length > 10 ? 20 : 0)) / 1.2);
+                
+                if (shouldMerge) {
+                  // Smart merging with punctuation
+                  const updatedTranscription = [...prev.transcription];
+                  const lastText = lastSegment.text.trimEnd();
+                  const needsPunctuation = !lastText.match(/[.!?]$/) && timeSinceLastSegment > 2000;
+                  const connector = needsPunctuation ? '. ' : ' ';
+                  
+                  updatedTranscription[updatedTranscription.length - 1] = {
+                    ...lastSegment,
+                    text: lastText + connector + transcript,
+                    confidence: Math.max(lastSegment.confidence, confidence || 0.6),
+                    isConsolidated: true,
+                    duration: currentTime - lastSegment.timestamp
+                  };
+                  
+                  return {
+                    ...prev,
+                    transcription: updatedTranscription,
+                    conversationLength: prev.conversationLength + transcript.length,
+                    transcriptQuality: Math.max(prev.transcriptQuality, qualityScore),
+                    lastTranscriptTime: currentTime,
+                    interimTranscript: ''
+                  };
+                } else {
+                  // Create new segment with group ID
+                  const groupId = `${currentSpeaker}_${Math.floor(currentTime / 30000)}`; // 30-second groups
+                  const newSegment: TranscriptionSegment = {
+                    id: currentTime.toString(),
+                    speaker: currentSpeaker,
+                    text: transcript,
+                    timestamp: currentTime,
+                    confidence: confidence || 0.6,
+                    segmentGroup: groupId,
+                    duration: 0
+                  };
+
+                  return {
+                    ...prev,
+                    transcription: [...prev.transcription, newSegment],
+                    conversationLength: prev.conversationLength + transcript.length,
+                    transcriptQuality: Math.max(prev.transcriptQuality, qualityScore),
+                    lastTranscriptTime: currentTime,
+                    interimTranscript: ''
+                  };
+                }
+              });
+
+              // Reset silence timeout
+              if (silenceTimeoutRef.current) {
+                clearTimeout(silenceTimeoutRef.current);
+              }
+              
+              // Process for coaching suggestions
+              if (shouldGenerateSuggestion(transcript, state.suggestions, Date.now() - state.lastSuggestionTime)) {
+                processTranscriptionForCoaching(transcript, state.callType);
+              }
+            }
+          } else {
+            // Handle interim results for real-time feedback
+            const interimText = result[0].transcript;
+            setState(prev => ({ ...prev, interimTranscript: interimText }));
           }
         }
+        
+        // Set silence detection timeout
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+        }
+        silenceTimeoutRef.current = setTimeout(() => {
+          // Auto-restart recognition after 30 seconds of silence
+          if (recognitionRef.current && state.isListening) {
+            console.log('Restarting recognition due to silence...');
+            attemptRecognitionRestart();
+          }
+        }, 30000);
       };
 
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
-        setState(prev => ({ ...prev, isListening: false }));
+        
+        // Handle different error types
+        if (event.error === 'network') {
+          console.log('Network error - attempting restart...');
+          attemptRecognitionRestart();
+        } else if (event.error === 'no-speech') {
+          console.log('No speech detected - continuing...');
+          // Don't stop for no-speech errors
+        } else {
+          setState(prev => ({ 
+            ...prev, 
+            isListening: false,
+            recognitionRestarts: prev.recognitionRestarts + 1
+          }));
+        }
       };
 
       recognition.onend = () => {
-        setState(prev => ({ ...prev, isListening: false }));
+        console.log('Speech recognition ended');
+        
+        // Auto-restart if we should still be listening
+        if (state.isListening && restartAttemptRef.current < 5) {
+          console.log('Auto-restarting speech recognition...');
+          setTimeout(() => attemptRecognitionRestart(), 1000);
+        } else {
+          setState(prev => ({ ...prev, isListening: false }));
+        }
       };
     }
   }, [state.currentTurn, state.callType]);
+
+  // Add the missing attemptRecognitionRestart function
+  const attemptRecognitionRestart = useCallback(() => {
+    if (restartAttemptRef.current >= 5) {
+      console.log('Max restart attempts reached');
+      setState(prev => ({ ...prev, isListening: false }));
+      return;
+    }
+
+    restartAttemptRef.current += 1;
+    
+    try {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        setTimeout(() => {
+          if (recognitionRef.current && state.isListening) {
+            recognitionRef.current.start();
+            setState(prev => ({ ...prev, recognitionRestarts: prev.recognitionRestarts + 1 }));
+          }
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Failed to restart recognition:', error);
+      setState(prev => ({ ...prev, isListening: false }));
+    }
+  }, [state.isListening]);
 
   // Enhanced audio capture functions
   const detectSpeaker = (micLevel: number, tabLevel: number, audioSource: AudioSource['type']): 'user' | 'customer' | null => {
@@ -1008,6 +1128,10 @@ If no clear trigger, respond with: {"suggestions": []}`;
       if (state.transcription.length === 0) return 0;
       return state.transcription.reduce((sum, seg) => sum + seg.confidence, 0) / state.transcription.length;
     },
-    isAvailable: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
+    isAvailable: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
+    // Enhanced transcript features
+    sessionDuration: state.sessionDuration,
+    transcriptQuality: state.transcriptQuality,
+    interimTranscript: state.interimTranscript
   };
 }
