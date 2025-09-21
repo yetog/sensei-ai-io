@@ -32,6 +32,7 @@ import { SuggestionCard } from '@/components/SuggestionCard';
 import { AgentSelector } from '@/components/AgentSelector';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
 import { DemoScenarios } from '@/components/DemoScenarios';
+import { PerformanceMonitor } from '@/components/PerformanceMonitor';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -71,7 +72,10 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     isAvailable,
     sessionDuration,
     transcriptQuality,
-    interimTranscript
+    interimTranscript,
+    getPerformanceStats,
+    logPerformanceReport,
+    isUsingWhisper
   } = useRealTimeCoaching();
 
   const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
@@ -521,6 +525,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             </ScrollArea>
           </CardContent>
         </Card>
+
+        {/* Performance Monitor */}
+        <div className="space-y-4">
+          <PerformanceMonitor
+            stats={getPerformanceStats()}
+            isUsingWhisper={isUsingWhisper}
+            onLogReport={logPerformanceReport}
+          />
+        </div>
       </div>
 
       {/* Session Stats */}

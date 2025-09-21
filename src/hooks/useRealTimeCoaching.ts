@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ionosAI } from '@/services/ionosAI';
+import { whisperService } from '@/services/whisperTranscriptionService';
+import { usePerformanceMetrics } from './usePerformanceMetrics';
 
 // Types and interfaces
 interface SpeechRecognitionResult {
@@ -124,6 +126,8 @@ function cleanTranscriptText(text: string): string {
 
 // Main hook
 export const useRealTimeCoaching = () => {
+  const { startTiming, endTiming, getStats, logPerformanceReport } = usePerformanceMetrics();
+  
   const [state, setState] = useState<CoachingState>({
     isListening: false,
     isProcessing: false,
@@ -163,6 +167,8 @@ export const useRealTimeCoaching = () => {
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processedResults = useRef<Set<string>>(new Set());
   const restartAttemptRef = useRef<number>(0);
+  const isUsingWhisper = useRef<boolean>(false);
+  const processingQueue = useRef<string[]>([]);
 
   // Helper functions
   const detectSpeaker = (micLevel: number, tabLevel: number, audioSource: AudioSource['type']): 'user' | 'customer' | null => {
@@ -183,6 +189,85 @@ export const useRealTimeCoaching = () => {
            timeSinceLastSuggestion > minInterval && 
            suggestions.length < 5;
   };
+
+  // Whisper transcription handler
+  const handleWhisperTranscription = useCallback((result: { text: string; confidence: number; timestamp: number; isPartial: boolean }) => {
+    startTiming('transcription_processing');
+    
+    const transcript = cleanTranscriptText(result.text);
+    if (transcript.length < 2) {
+      endTiming('transcription_processing');
+      return;
+    }
+
+    setState(prev => {
+      const currentTime = Date.now();
+      const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
+      const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
+
+      if (result.isPartial) {
+        // Update interim transcript for progressive display
+        return { ...prev, interimTranscript: transcript };
+      }
+
+      // Create new segment for final result
+      const newSegment: TranscriptionSegment = {
+        id: currentTime.toString(),
+        speaker: currentSpeaker,
+        text: transcript,
+        timestamp: currentTime,
+        confidence: result.confidence,
+        segmentGroup: `${currentSpeaker}_${Math.floor(currentTime / 30000)}`,
+        duration: 0
+      };
+
+      const updatedState = {
+        ...prev,
+        transcription: [...prev.transcription, newSegment],
+        conversationLength: prev.conversationLength + transcript.length,
+        totalExchanges: prev.totalExchanges + 1,
+        transcriptQuality: Math.max(prev.transcriptQuality, result.confidence),
+        lastTranscriptTime: currentTime,
+        currentTurn: currentSpeaker,
+        interimTranscript: ''
+      };
+
+      // Queue for async coaching processing
+      if (shouldGenerateSuggestion(transcript, prev.suggestions, prev.lastSuggestionTime)) {
+        processingQueue.current.push(transcript);
+        processCoachingQueue();
+      }
+
+      return updatedState;
+    });
+
+    endTiming('transcription_processing');
+  }, [state.micLevel, state.tabLevel, state.audioSource, state.currentTurn, state.suggestions, state.lastSuggestionTime]);
+
+  // Async coaching processing queue
+  const processCoachingQueue = useCallback(async () => {
+    if (processingQueue.current.length === 0 || isProcessing) return;
+
+    setIsProcessing(true);
+    const transcript = processingQueue.current.shift();
+    
+    if (transcript) {
+      startTiming('ai_processing');
+      try {
+        await processTranscriptionForCoaching(transcript, state.callType);
+      } finally {
+        endTiming('ai_processing');
+        setIsProcessing(false);
+        
+        // Process next item if queue has more
+        if (processingQueue.current.length > 0) {
+          setTimeout(processCoachingQueue, 100);
+        }
+      }
+    } else {
+      setIsProcessing(false);
+    }
+  }, [isProcessing, state.callType]);
 
   // Auto-backup functionality
   const startAutoBackup = useCallback(() => {
@@ -486,6 +571,8 @@ export const useRealTimeCoaching = () => {
   // Main functions
   const startListening = async (callType: CoachingState['callType'], audioSource: AudioSource['type'], selectedAgentId?: string | null) => {
     try {
+      startTiming('session_startup');
+      
       setState(prev => ({ 
         ...prev, 
         callType,
@@ -495,20 +582,44 @@ export const useRealTimeCoaching = () => {
         error: null
       }));
 
+      // Try to use Whisper first, fallback to browser speech recognition
+      let useWhisper = false;
+      let audioStream: MediaStream | null = null;
+
       if (audioSource === 'microphone' || audioSource === 'both') {
-        await requestMicrophoneAudio();
+        audioStream = await requestMicrophoneAudio();
       }
       if (audioSource === 'tab' || audioSource === 'both') {
-        await requestTabAudio();
+        const tabStream = await requestTabAudio();
+        audioStream = audioStream || tabStream;
       }
 
-      if (recognitionRef.current) {
+      if (audioStream) {
+        try {
+          // Try Whisper first for better performance
+          await whisperService.initialize();
+          whisperService.addListener(handleWhisperTranscription);
+          await whisperService.startTranscription(audioStream);
+          useWhisper = true;
+          isUsingWhisper.current = true;
+          console.log('🎤 Using Whisper for transcription (optimal performance)');
+        } catch (whisperError) {
+          console.warn('Whisper initialization failed, falling back to browser speech recognition:', whisperError);
+          useWhisper = false;
+          isUsingWhisper.current = false;
+        }
+      }
+
+      // Fallback to browser speech recognition if Whisper fails
+      if (!useWhisper && recognitionRef.current) {
+        console.log('🎤 Using browser speech recognition (fallback)');
         recognitionRef.current.start();
         restartAttemptRef.current = 0;
         processedResults.current = new Set();
       }
 
       startAutoBackup();
+      endTiming('session_startup');
       
     } catch (error) {
       console.error('Error starting listening:', error);
@@ -526,6 +637,14 @@ export const useRealTimeCoaching = () => {
   };
 
   const stopListening = () => {
+    // Stop Whisper transcription if active
+    if (isUsingWhisper.current) {
+      whisperService.removeListener(handleWhisperTranscription);
+      whisperService.stopTranscription();
+      isUsingWhisper.current = false;
+    }
+    
+    // Stop browser speech recognition
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
@@ -536,6 +655,13 @@ export const useRealTimeCoaching = () => {
     if (sessionTimerRef.current) {
       clearTimeout(sessionTimerRef.current);
     }
+    
+    // Clear processing queue
+    processingQueue.current = [];
+    setIsProcessing(false);
+    
+    // Log performance report
+    logPerformanceReport();
     
     setState(prev => ({ 
       ...prev, 
@@ -766,6 +892,11 @@ Provide 1-2 specific, actionable suggestions in JSON format:
       }
     },
     exportTranscriptData: exportSessionData,
-    retryOperation: () => {}
+    retryOperation: () => {},
+    
+    // Performance metrics
+    getPerformanceStats: getStats,
+    logPerformanceReport,
+    isUsingWhisper: isUsingWhisper.current
   };
 };
