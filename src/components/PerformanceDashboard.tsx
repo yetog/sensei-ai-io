@@ -14,7 +14,8 @@ import {
   Mic, 
   Wifi,
   Download,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { performanceProfiler } from '@/services/performanceProfiler';
 import { smartCache } from '@/services/smartCache';
@@ -124,7 +125,8 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
                 Export
               </Button>
               <Button onClick={onClose} variant="ghost" size="sm" className="h-8 w-8 p-0">
-                ×
+                <span className="sr-only">Close</span>
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
