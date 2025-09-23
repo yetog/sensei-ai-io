@@ -42,6 +42,7 @@ import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { NativeSelect } from '@/components/ui/native-select';
 import '@/services/demoAgentSetup';
 
 interface LiveCoachingDashboardProps {
@@ -332,47 +333,47 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             {/* Call Type Selection */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Call Type:</span>
-              <select 
+              <NativeSelect 
                 value={selectedCallType}
                 onChange={(e) => setSelectedCallType(e.target.value as any)}
-                className="px-3 py-1 border rounded-md text-sm"
+                className="w-auto"
                 disabled={isListening}
               >
                 <option value="incoming_sales">Incoming Sales</option>
                 <option value="retention">Retention</option>
                 <option value="outbound">Outbound</option>
                 <option value="general">General</option>
-              </select>
+              </NativeSelect>
             </div>
 
 
             {/* Audio Source Selection */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Audio:</span>
-              <select 
+              <NativeSelect 
                 value={selectedAudioSource}
                 onChange={(e) => setSelectedAudioSource(e.target.value as any)}
-                className="px-3 py-1 border rounded-md text-sm"
+                className="w-auto"
                 disabled={isListening}
               >
                 <option value="microphone">Microphone Only</option>
                 <option value="tab">System Audio Only</option>
                 <option value="both">Microphone + System</option>
-              </select>
+              </NativeSelect>
             </div>
 
             {/* Coaching Mode Toggle */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Coaching:</span>
-              <select 
+              <NativeSelect 
                 value={coachingMode}
                 onChange={(e) => setCoachingMode(e.target.value as 'live' | 'manual')}
-                className="px-3 py-1 border rounded-md text-sm"
+                className="w-auto"
                 disabled={isListening}
               >
                 <option value="live">Live Mode (Auto)</option>
                 <option value="manual">Manual Mode (Request)</option>
-              </select>
+              </NativeSelect>
             </div>
 
             {/* Control Buttons */}
