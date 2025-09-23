@@ -7,6 +7,15 @@ import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { feedbackLearning, type SuggestionFeedback as FeedbackData } from '@/services/feedbackLearning';
+import { 
+  generateContentHash, 
+  detectExactDuplicate, 
+  detectRepetitivePattern, 
+  isSubstringDuplicate, 
+  cleanupOldData,
+  type TranscriptEntry,
+  type PhraseData
+} from '@/utils/duplicateDetection';
 
 // Types and interfaces
 interface SpeechRecognitionResult {
@@ -176,6 +185,11 @@ export const useRealTimeCoaching = () => {
   const restartAttemptRef = useRef<number>(0);
   const isUsingWhisper = useRef<boolean>(false);
   const processingQueue = useRef<string[]>([]);
+  
+  // Enhanced duplicate detection refs
+  const contentHashSet = useRef<Set<string>>(new Set());
+  const recentTranscripts = useRef<TranscriptEntry[]>([]);
+  const phraseFrequency = useRef<Map<string, PhraseData>>(new Map());
 
   // Helper functions
   const detectSpeaker = (micLevel: number, tabLevel: number, audioSource: AudioSource['type']): 'user' | 'customer' | null => {
@@ -443,13 +457,49 @@ export const useRealTimeCoaching = () => {
               
               const timeSinceLastSegment = lastSegment ? currentTime - lastSegment.timestamp : Infinity;
               
-              // Check for text similarity to prevent duplicates (more precise threshold)
-              const textSimilarity = lastSegment ? calculateTextSimilarity(lastSegment.text, transcript) : 0;
-              const isDuplicate = textSimilarity > 0.95;
+              // ENHANCED DUPLICATE DETECTION
               
-              if (isDuplicate) {
-                console.log('Skipping duplicate transcript:', transcript);
+              // 1. Check for exact content duplicates
+              if (detectExactDuplicate(transcript, recentTranscripts.current)) {
+                console.log('🚫 Exact duplicate detected:', transcript.substring(0, 50) + '...');
                 return prev;
+              }
+              
+              // 2. Check for repetitive patterns
+              if (detectRepetitivePattern(transcript, phraseFrequency.current)) {
+                console.log('🚫 Repetitive pattern detected:', transcript.substring(0, 50) + '...');
+                return prev;
+              }
+              
+              // 3. Check for substring duplicates
+              if (isSubstringDuplicate(transcript, recentTranscripts.current)) {
+                console.log('🚫 Substring duplicate detected:', transcript.substring(0, 50) + '...');
+                return prev;
+              }
+              
+              // 4. Legacy similarity check as fallback
+              const textSimilarity = lastSegment ? calculateTextSimilarity(lastSegment.text, transcript) : 0;
+              if (textSimilarity > 0.98) {
+                console.log('🚫 High similarity duplicate detected:', transcript.substring(0, 50) + '...');
+                return prev;
+              }
+              
+              // Add to tracking systems
+              const contentHash = generateContentHash(transcript);
+              recentTranscripts.current.push({
+                content: transcript,
+                timestamp: currentTime,
+                hash: contentHash
+              });
+              contentHashSet.current.add(contentHash);
+              
+              // Cleanup old data every 10 segments
+              if (recentTranscripts.current.length % 10 === 0) {
+                cleanupOldData(
+                  recentTranscripts.current,
+                  phraseFrequency.current,
+                  contentHashSet.current
+                );
               }
               
               const shouldMerge = lastSegment && 
