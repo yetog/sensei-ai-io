@@ -866,15 +866,9 @@ export const useRealTimeCoaching = () => {
         } else {
           throw new Error('Browser speech recognition not supported');
         }
-        try {
-          recognitionRef.current.start();
-          restartAttemptRef.current = 0;
-          processedResults.current = new Set();
-          console.log('✅ Browser speech recognition started successfully');
-        } catch (speechError) {
-          console.error('❌ Failed to start browser speech recognition:', speechError);
-          throw new Error('Both Whisper and browser speech recognition failed to start');
-        }
+        // Speech recognition already started above - no duplicate start call needed
+        restartAttemptRef.current = 0;
+        processedResults.current = new Set();
       }
 
       if (!useWhisper && !recognitionRef.current) {

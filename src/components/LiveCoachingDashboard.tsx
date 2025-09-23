@@ -111,14 +111,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   };
 
   const handleStopCall = () => {
+    console.log('🛑 Stopping call, transcription segments:', transcription.length);
     stopListening();
     
     // Show post-call summary if we have any transcription data
     if (transcription.length > 0) {
-      console.log('Showing post-call summary with', transcription.length, 'segments');
-      setTimeout(() => setShowPostCallSummary(true), 100); // Small delay to ensure clean state
+      console.log('📊 Showing post-call summary with', transcription.length, 'segments');
+      setShowPostCallSummary(true); // Remove delay - immediate display
     } else {
-      console.log('No transcription data, not showing summary');
+      console.log('⚠️ No transcription data, not showing summary');
     }
     setCallStartTime(null);
   };
@@ -406,10 +407,13 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               
               
               <Button 
-                onClick={requestCoaching} 
+                onClick={() => {
+                  console.log('🎯 Manual coaching request triggered');
+                  requestCoaching();
+                }} 
                 variant="secondary" 
                 size="sm"
-                disabled={transcription.length === 0}
+                disabled={transcription.length === 0 || !transcription.some(t => t.text.trim())}
                 className=""
               >
                 <Brain className="h-4 w-4 mr-1" />
@@ -641,10 +645,14 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         <PostCallSummary
           callSummary={generateCallSummary()}
           onClose={() => {
-            console.log('Closing post-call summary');
+            console.log('❌ Closing post-call summary modal');
             setShowPostCallSummary(false);
           }}
-          onSaveToHistory={handleSaveToHistory}
+          onSaveToHistory={(summary) => {
+            console.log('💾 Saving call summary from modal:', summary);
+            handleSaveToHistory(summary);
+            setShowPostCallSummary(false);
+          }}
         />
       )}
 
