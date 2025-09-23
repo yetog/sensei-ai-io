@@ -30,9 +30,11 @@ import { PostCallSummary } from '@/components/PostCallSummary';
 import { GoogleMeetInstructions } from '@/components/GoogleMeetInstructions';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { SuggestionCard } from '@/components/SuggestionCard';
+import { AnimatedSuggestionCard } from '@/components/AnimatedSuggestionCard';
 import { AgentSelector } from '@/components/AgentSelector';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
-import { DemoScenarios } from '@/components/DemoScenarios';
+import { EnhancedDemoScenarios } from '@/components/EnhancedDemoScenarios';
+import { ProcessingIndicator } from '@/components/ProcessingIndicator';
 
 
 import { PerformanceDashboard } from '@/components/PerformanceDashboard';
@@ -316,10 +318,12 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             <CardTitle className="flex items-center gap-2">
               <PhoneCall className="h-5 w-5" />
               Live Sales Coaching
-              <div className={cn("h-3 w-3 rounded-full", getStatusColor())} />
-              <span className="text-sm font-normal text-muted-foreground">
-                {getStatusText()}
-              </span>
+               <ProcessingIndicator 
+                 isProcessing={isProcessing}
+                 isListening={isListening}
+                 micLevel={micLevel}
+                 className="ml-2"
+               />
             </CardTitle>
             {onClose && (
               <Button variant="ghost" size="sm" onClick={onClose}>
@@ -569,14 +573,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 </div>
               ) : (
                  <div className="space-y-4">
-                  {suggestions.slice().reverse().slice(0, 2).map((suggestion) => (
-                    <SuggestionCard
+                  {suggestions.slice().reverse().slice(0, 2).map((suggestion, index) => (
+                    <AnimatedSuggestionCard
                       key={suggestion.id}
                       suggestion={suggestion}
                       onCopy={(sug) => handleCopySuggestion(sug.suggestion, sug.id)}
                       onDismiss={dismissSuggestion}
                       onRate={rateSuggestion}
                       copiedId={copiedSuggestionId}
+                      isNew={index === 0 && suggestions.length > 0}
                     />
                   ))}
                 </div>
@@ -660,7 +665,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       {/* Demo Scenarios Inline */}
       {showDemoScenarios && (
         <div className="mt-6 animate-fade-in">
-          <DemoScenarios 
+          <EnhancedDemoScenarios 
             onSelectScenario={(scenario) => {
               handleStartCoaching();
               setShowDemoScenarios(false);
