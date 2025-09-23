@@ -56,21 +56,25 @@ class LocalAIService {
     try {
       console.log(`🔄 Initializing local AI model on ${this.device}...`);
       
-      // Use a lightweight model optimized for coaching tasks
-      const modelName = 'microsoft/DialoGPT-small'; // Fast, good for conversational tasks
+      // Temporarily disable local AI to fix the main transcription issue
+      console.log('⚠️ Local AI temporarily disabled - using cloud AI only');
+      throw new Error('Local AI temporarily disabled for troubleshooting');
       
-      this.model = await pipeline(
-        'text-generation',
-        modelName,
-        {
-          device: this.device,
-          dtype: this.device === 'webgpu' ? 'fp16' : 'fp32',
-          model_file_name: 'onnx/model.onnx'
-        }
-      );
+      // Use a lightweight model optimized for coaching tasks
+      // const modelName = 'microsoft/DialoGPT-small'; // Fast, good for conversational tasks
+      
+      // this.model = await pipeline(
+      //   'text-generation',
+      //   modelName,
+      //   {
+      //     device: this.device,
+      //     dtype: this.device === 'webgpu' ? 'fp16' : 'fp32',
+      //     model_file_name: 'onnx/model.onnx'
+      //   }
+      // );
 
-      this.isInitialized = true;
-      console.log(`✅ Local AI model initialized successfully on ${this.device}`);
+      // this.isInitialized = true;
+      // console.log(`✅ Local AI model initialized successfully on ${this.device}`);
       
     } catch (error) {
       console.error('❌ Failed to initialize local AI model:', error);

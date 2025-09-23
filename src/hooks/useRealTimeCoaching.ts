@@ -745,9 +745,127 @@ export const useRealTimeCoaching = () => {
         }
       }
 
-      // Fallback to browser speech recognition if Whisper fails
-      if (!useWhisper && recognitionRef.current) {
+      // Fallback to browser speech recognition if Whisper fails or no audio stream
+      if (!useWhisper) {
         console.log('🎙️ Starting browser speech recognition fallback...');
+        
+        // Create new speech recognition instance
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          recognitionRef.current = new SpeechRecognition();
+          
+          recognitionRef.current.continuous = true;
+          recognitionRef.current.interimResults = true;
+          recognitionRef.current.lang = 'en-US';
+          recognitionRef.current.maxAlternatives = 1;
+          
+          // Browser speech recognition handles its own audio capture
+          console.log('🎤 Browser speech recognition will use default microphone');
+          
+          recognitionRef.current.onresult = (event) => {
+            setIsProcessing(true);
+            console.log('Speech recognition result received:', event);
+            
+            if (!processedResults.current) {
+              processedResults.current = new Set();
+            }
+            
+            // Only process the latest final result
+            let latestFinalResult = null;
+            let latestFinalIndex = -1;
+            
+            for (let i = 0; i < event.results.length; i++) {
+              const result = event.results[i];
+              if (result.isFinal) {
+                latestFinalResult = result;
+                latestFinalIndex = i;
+              }
+            }
+            
+            if (latestFinalResult) {
+              const resultId = `${event.timeStamp}_${latestFinalIndex}_final`;
+              
+              if (processedResults.current.has(resultId)) {
+                setIsProcessing(false);
+                return;
+              }
+              processedResults.current.add(resultId);
+              
+              const bestTranscript = latestFinalResult[0];
+              const transcript = cleanTranscriptText(bestTranscript.transcript);
+              const confidence = bestTranscript.confidence || 0.7;
+              
+              if (transcript.length > 2) {
+                console.log('📝 Processing speech recognition transcript:', transcript);
+                
+                // Use the same processing logic as the existing speech recognition
+                setState(prev => {
+                  const lastSegment = prev.transcription[prev.transcription.length - 1];
+                  const currentTime = Date.now();
+                  
+                  const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
+                  const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
+                  
+                  const newSegment: TranscriptionSegment = {
+                    id: currentTime.toString(),
+                    speaker: currentSpeaker,
+                    text: transcript,
+                    timestamp: currentTime,
+                    confidence: confidence,
+                    segmentGroup: `${currentSpeaker}_${Math.floor(currentTime / 30000)}`,
+                    duration: 0
+                  };
+
+                  return {
+                    ...prev,
+                    transcription: [...prev.transcription, newSegment],
+                    conversationLength: prev.conversationLength + transcript.length,
+                    totalExchanges: prev.totalExchanges + 1,
+                    transcriptQuality: Math.max(prev.transcriptQuality, confidence),
+                    lastTranscriptTime: currentTime,
+                    currentTurn: currentSpeaker
+                  };
+                });
+              }
+            }
+            setIsProcessing(false);
+          };
+          
+          recognitionRef.current.onerror = (event: any) => {
+            console.error('❌ Speech recognition error:', event.error);
+            setState(prev => ({
+              ...prev,
+              error: {
+                type: 'speech_recognition_error',
+                message: `Speech recognition error: ${event.error}`,
+                timestamp: Date.now(),
+                isRecoverable: true,
+                canRecover: true
+              }
+            }));
+          };
+          
+          recognitionRef.current.onend = () => {
+            console.log('🔄 Speech recognition ended, restarting...');
+            if (state.isListening && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (restartError) {
+                console.error('❌ Speech recognition restart failed:', restartError);
+              }
+            }
+          };
+          
+          try {
+            recognitionRef.current.start();
+            console.log('✅ Browser speech recognition started successfully');
+          } catch (startError) {
+            console.error('❌ Browser speech recognition start failed:', startError);
+            throw new Error(`Speech recognition failed: ${startError}`);
+          }
+        } else {
+          throw new Error('Browser speech recognition not supported');
+        }
         try {
           recognitionRef.current.start();
           restartAttemptRef.current = 0;

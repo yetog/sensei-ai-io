@@ -409,11 +409,11 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
                 onClick={requestCoaching} 
                 variant="secondary" 
                 size="sm"
-                disabled={transcription.length === 0 || (coachingMode === 'live' && isListening)}
-                className={coachingMode === 'live' ? 'opacity-50' : ''}
+                disabled={transcription.length === 0}
+                className=""
               >
                 <Brain className="h-4 w-4 mr-1" />
-                {coachingMode === 'live' ? 'Auto Coaching' : 'Request Coaching'}
+                {coachingMode === 'live' ? 'Auto Coaching' : `Request Coaching ${transcription.length > 0 ? '(Ready)' : '(No transcript)'}`}
               </Button>
 
               {/* Audio Level Indicators */}
