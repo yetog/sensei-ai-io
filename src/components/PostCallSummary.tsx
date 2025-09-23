@@ -314,6 +314,42 @@ Generate a personalized follow-up email using the user-edited template fields. U
     });
   };
 
+  const generateCaseNotes = () => {
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const customerName = conversationData.customerName || callSummary.customerName || '[Customer Name]';
+    const companyName = conversationData.companyName || '[Company Name]';
+    
+    return `CASE NOTES - ${currentDate}
+
+Customer: ${customerName}
+Company: ${companyName}
+Call Type: ${callSummary.callType}
+Duration: ${callSummary.duration}
+Outcome: ${callSummary.outcome.replace(/_/g, ' ').toUpperCase()}
+
+KEY DISCUSSION POINTS:
+${callSummary.keyPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')}
+
+OBJECTIONS ADDRESSED:
+${callSummary.objections.length > 0 
+  ? callSummary.objections.map((obj, index) => `${index + 1}. ${obj}`).join('\n')
+  : 'None'}
+
+NEXT STEPS:
+${callSummary.nextSteps.map((step, index) => `${index + 1}. ${step}`).join('\n')}
+
+PAIN POINTS IDENTIFIED:
+- ${conversationData.keyPain || 'General business challenges'}
+
+DESIRED OUTCOMES:
+- ${conversationData.desiredOutcome || 'Improved efficiency and growth'}`;
+  };
+
   const fillTemplate = (template: string) => {
     return template
       .replace(/{{customerName}}/g, conversationData.customerName || callSummary.customerName || '[Customer Name]')
@@ -395,29 +431,24 @@ Generate a personalized follow-up email using the user-edited template fields. U
                   </Card>
                 </div>
 
-                {/* Key Points */}
+                {/* Case Notes */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      Key Discussion Points
+                      <FileText className="h-4 w-4" />
+                      Case Notes
                     </CardTitle>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(callSummary.keyPoints.join('\n'), 'Key Points')}
+                      onClick={() => copyToClipboard(generateCaseNotes(), 'Case Notes')}
                     >
-                      {copiedField === 'Key Points' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copiedField === 'Case Notes' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {callSummary.keyPoints.map((point, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                          <Badge variant="outline" className="text-xs mt-0.5">{index + 1}</Badge>
-                          <span className="text-sm leading-relaxed">{point}</span>
-                        </div>
-                      ))}
+                    <div className="p-4 bg-muted/30 rounded-lg font-mono text-sm leading-relaxed whitespace-pre-line">
+                      {generateCaseNotes()}
                     </div>
                   </CardContent>
                 </Card>
