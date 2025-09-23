@@ -414,39 +414,24 @@ export const useRealTimeCoaching = () => {
         }
         
         if (latestFinalResult) {
-          const bestTranscript = latestFinalResult[0];
-          const transcript = cleanTranscriptText(bestTranscript.transcript);
-          const confidence = bestTranscript.confidence || 0.7;
+          // Use Speech Recognition API's built-in resultIndex for proper duplicate detection
+          const resultId = `${event.timeStamp}_${latestFinalIndex}_final`;
           
-          // Create a content-based ID to prevent duplicate processing of same text
-          const transcriptHash = transcript.toLowerCase().trim();
-          const resultId = `${transcriptHash}_${Date.now()}`;
-          
-          // Check if we've processed this exact transcript recently (within 1 second)
-          const recentResults = Array.from(processedResults.current).filter(id => {
-            const [hash, timestamp] = id.split('_');
-            return hash === transcriptHash && (Date.now() - parseInt(timestamp)) < 1000;
-          });
-          
-          if (recentResults.length > 0) {
-            console.log('🚫 Skipping duplicate transcript:', transcript);
+          if (processedResults.current.has(resultId)) {
             setIsProcessing(false);
             return;
           }
-          
           processedResults.current.add(resultId);
-          console.log(`📝 Processing speech recognition transcript: ${transcript}`);
           
-          // Clean up old processed results (keep last 20)
-          if (processedResults.current.size > 20) {
-            const sortedIds = Array.from(processedResults.current).sort((a, b) => {
-              const timestampA = parseInt(a.split('_').pop() || '0');
-              const timestampB = parseInt(b.split('_').pop() || '0');
-              return timestampA - timestampB;
-            });
-            const oldIds = sortedIds.slice(0, -20);
+          // Clean up old processed results (keep last 10)
+          if (processedResults.current.size > 10) {
+            const oldIds = Array.from(processedResults.current).slice(0, -10);
             oldIds.forEach(id => processedResults.current.delete(id));
           }
+          
+          const bestTranscript = latestFinalResult[0];
+          const transcript = cleanTranscriptText(bestTranscript.transcript);
+          const confidence = bestTranscript.confidence || 0.7;
           
           if (transcript.length > 2) {
             setState(prev => {
@@ -458,9 +443,9 @@ export const useRealTimeCoaching = () => {
               
               const timeSinceLastSegment = lastSegment ? currentTime - lastSegment.timestamp : Infinity;
               
-              // Check for text similarity to prevent duplicates
+              // Check for text similarity to prevent duplicates (more precise threshold)
               const textSimilarity = lastSegment ? calculateTextSimilarity(lastSegment.text, transcript) : 0;
-              const isDuplicate = textSimilarity > 0.8;
+              const isDuplicate = textSimilarity > 0.95;
               
               if (isDuplicate) {
                 console.log('Skipping duplicate transcript:', transcript);
@@ -584,9 +569,6 @@ export const useRealTimeCoaching = () => {
 
       recognition.onend = () => {
         console.log('🔄 Speech recognition ended, restarting...');
-        
-        // Clear processed results on restart to avoid memory leak
-        processedResults.current.clear();
         
         if (state.isListening && restartAttemptRef.current < 5) {
           console.log('Auto-restarting speech recognition...');
