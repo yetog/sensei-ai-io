@@ -633,6 +633,7 @@ export const useRealTimeCoaching = () => {
     try {
       startTiming('session_startup');
       
+      // Clear any previous error states first
       setState(prev => ({ 
         ...prev, 
         callType,
@@ -645,8 +646,10 @@ export const useRealTimeCoaching = () => {
 
       console.log('🎤 Requesting audio access...');
       
-      // Try to use Whisper first, fallback to browser speech recognition
-      let useWhisper = false;
+      // Track which transcription methods actually started successfully
+      let whisperStarted = false;
+      let browserStarted = false;
+      const startupErrors: string[] = [];
       let audioStream: MediaStream | null = null;
 
       if (audioSource === 'microphone' || audioSource === 'both') {
@@ -729,156 +732,185 @@ export const useRealTimeCoaching = () => {
           console.error('❌ Audio level monitoring failed:', audioError);
         }
         
+        // Try Whisper first for better performance (graceful degradation)
         try {
           console.log('🤖 Attempting Whisper initialization...');
-          // Try Whisper first for better performance
           await whisperService.initialize();
           whisperService.addListener(handleWhisperTranscription);
           await whisperService.startTranscription(audioStream);
-          useWhisper = true;
+          whisperStarted = true;
           isUsingWhisper.current = true;
           console.log('✅ Whisper transcription started successfully');
         } catch (whisperError) {
-          console.warn('❌ Whisper initialization failed, falling back to browser speech recognition:', whisperError);
-          useWhisper = false;
+          console.warn('⚠️ Whisper initialization failed, will try browser speech recognition:', whisperError);
+          startupErrors.push(`Whisper: ${whisperError instanceof Error ? whisperError.message : 'Unknown error'}`);
           isUsingWhisper.current = false;
         }
       }
 
-      // Fallback to browser speech recognition if Whisper fails or no audio stream
-      if (!useWhisper) {
+      // Browser speech recognition fallback (works independently of audio streams)
+      if (!whisperStarted) {
         console.log('🎙️ Starting browser speech recognition fallback...');
         
-        // Create new speech recognition instance
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-          recognitionRef.current = new SpeechRecognition();
-          
-          recognitionRef.current.continuous = true;
-          recognitionRef.current.interimResults = true;
-          recognitionRef.current.lang = 'en-US';
-          recognitionRef.current.maxAlternatives = 1;
-          
-          // Browser speech recognition handles its own audio capture
-          console.log('🎤 Browser speech recognition will use default microphone');
-          
-          recognitionRef.current.onresult = (event) => {
-            setIsProcessing(true);
-            console.log('Speech recognition result received:', event);
-            
-            if (!processedResults.current) {
-              processedResults.current = new Set();
-            }
-            
-            // Only process the latest final result
-            let latestFinalResult = null;
-            let latestFinalIndex = -1;
-            
-            for (let i = 0; i < event.results.length; i++) {
-              const result = event.results[i];
-              if (result.isFinal) {
-                latestFinalResult = result;
-                latestFinalIndex = i;
-              }
-            }
-            
-            if (latestFinalResult) {
-              const resultId = `${event.timeStamp}_${latestFinalIndex}_final`;
-              
-              if (processedResults.current.has(resultId)) {
-                setIsProcessing(false);
-                return;
-              }
-              processedResults.current.add(resultId);
-              
-              const bestTranscript = latestFinalResult[0];
-              const transcript = cleanTranscriptText(bestTranscript.transcript);
-              const confidence = bestTranscript.confidence || 0.7;
-              
-              if (transcript.length > 2) {
-                console.log('📝 Processing speech recognition transcript:', transcript);
-                
-                // Use the same processing logic as the existing speech recognition
-                setState(prev => {
-                  const lastSegment = prev.transcription[prev.transcription.length - 1];
-                  const currentTime = Date.now();
-                  
-                  const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
-                  const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
-                  
-                  const newSegment: TranscriptionSegment = {
-                    id: currentTime.toString(),
-                    speaker: currentSpeaker,
-                    text: transcript,
-                    timestamp: currentTime,
-                    confidence: confidence,
-                    segmentGroup: `${currentSpeaker}_${Math.floor(currentTime / 30000)}`,
-                    duration: 0
-                  };
-
-                  return {
-                    ...prev,
-                    transcription: [...prev.transcription, newSegment],
-                    conversationLength: prev.conversationLength + transcript.length,
-                    totalExchanges: prev.totalExchanges + 1,
-                    transcriptQuality: Math.max(prev.transcriptQuality, confidence),
-                    lastTranscriptTime: currentTime,
-                    currentTurn: currentSpeaker
-                  };
-                });
-              }
-            }
-            setIsProcessing(false);
-          };
-          
-          recognitionRef.current.onerror = (event: any) => {
-            console.error('❌ Speech recognition error:', event.error);
-            setState(prev => ({
-              ...prev,
-              error: {
-                type: 'speech_recognition_error',
-                message: `Speech recognition error: ${event.error}`,
-                timestamp: Date.now(),
-                isRecoverable: true,
-                canRecover: true
-              }
-            }));
-          };
-          
-          recognitionRef.current.onend = () => {
-            console.log('🔄 Speech recognition ended, restarting...');
-            if (state.isListening && recognitionRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch (restartError) {
-                console.error('❌ Speech recognition restart failed:', restartError);
-              }
-            }
-          };
-          
           try {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            recognitionRef.current = new SpeechRecognition();
+            
+            recognitionRef.current.continuous = true;
+            recognitionRef.current.interimResults = true;
+            recognitionRef.current.lang = 'en-US';
+            recognitionRef.current.maxAlternatives = 1;
+            
+            console.log('🎤 Browser speech recognition will use default microphone');
+            
+            recognitionRef.current.onstart = () => {
+              console.log('🎤 Browser speech recognition started successfully');
+              browserStarted = true;
+              // Clear startup errors since browser speech recognition is working
+              if (startupErrors.length > 0) {
+                console.log('✅ Browser speech recognition active, Whisper failure is not critical');
+              }
+            };
+            
+            recognitionRef.current.onresult = (event) => {
+              setIsProcessing(true);
+              console.log('Speech recognition result received:', event);
+              
+              if (!processedResults.current) {
+                processedResults.current = new Set();
+              }
+              
+              // Only process the latest final result
+              let latestFinalResult = null;
+              let latestFinalIndex = -1;
+              
+              for (let i = 0; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                  latestFinalResult = result;
+                  latestFinalIndex = i;
+                }
+              }
+              
+              if (latestFinalResult) {
+                const resultId = `${event.timeStamp}_${latestFinalIndex}_final`;
+                
+                if (processedResults.current.has(resultId)) {
+                  setIsProcessing(false);
+                  return;
+                }
+                processedResults.current.add(resultId);
+                
+                const bestTranscript = latestFinalResult[0];
+                const transcript = cleanTranscriptText(bestTranscript.transcript);
+                const confidence = bestTranscript.confidence || 0.7;
+                
+                if (transcript.length > 2) {
+                  console.log('📝 Processing speech recognition transcript:', transcript);
+                  
+                  // Use the same processing logic as the existing speech recognition
+                  setState(prev => {
+                    const lastSegment = prev.transcription[prev.transcription.length - 1];
+                    const currentTime = Date.now();
+                    
+                    const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
+                    const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
+                    
+                    const newSegment: TranscriptionSegment = {
+                      id: currentTime.toString(),
+                      speaker: currentSpeaker,
+                      text: transcript,
+                      timestamp: currentTime,
+                      confidence: confidence,
+                      segmentGroup: `${currentSpeaker}_${Math.floor(currentTime / 30000)}`,
+                      duration: 0
+                    };
+
+                    return {
+                      ...prev,
+                      transcription: [...prev.transcription, newSegment],
+                      conversationLength: prev.conversationLength + transcript.length,
+                      totalExchanges: prev.totalExchanges + 1,
+                      transcriptQuality: Math.max(prev.transcriptQuality, confidence),
+                      lastTranscriptTime: currentTime,
+                      currentTurn: currentSpeaker
+                    };
+                  });
+                }
+              }
+              setIsProcessing(false);
+            };
+            
+            recognitionRef.current.onerror = (event: any) => {
+              console.error('❌ Speech recognition error:', event.error);
+              if (event.error === 'not-allowed') {
+                setState(prev => ({
+                  ...prev,
+                  error: {
+                    type: 'permission_denied',
+                    message: 'Microphone access denied. Please allow microphone access and try again.',
+                    timestamp: Date.now(),
+                    isRecoverable: true,
+                    canRecover: true
+                  }
+                }));
+              } else if (event.error !== 'network') {
+                // Don't show network errors as they're usually temporary
+                setState(prev => ({
+                  ...prev,
+                  error: {
+                    type: 'speech_recognition_error',
+                    message: `Speech recognition error: ${event.error}`,
+                    timestamp: Date.now(),
+                    isRecoverable: true,
+                    canRecover: true
+                  }
+                }));
+              }
+            };
+            
+            recognitionRef.current.onend = () => {
+              console.log('🔄 Speech recognition ended, restarting...');
+              if (state.isListening && recognitionRef.current) {
+                try {
+                  recognitionRef.current.start();
+                } catch (restartError) {
+                  console.error('❌ Speech recognition restart failed:', restartError);
+                }
+              }
+            };
+            
             recognitionRef.current.start();
-            console.log('✅ Browser speech recognition started successfully');
-          } catch (startError) {
-            console.error('❌ Browser speech recognition start failed:', startError);
-            throw new Error(`Speech recognition failed: ${startError}`);
+            restartAttemptRef.current = 0;
+            processedResults.current = new Set();
+            console.log('🎤 Starting browser speech recognition...');
+            
+          } catch (speechError) {
+            console.error('❌ Browser speech recognition start failed:', speechError);
+            startupErrors.push(`Browser Speech: ${speechError instanceof Error ? speechError.message : 'Unknown error'}`);
           }
         } else {
-          throw new Error('Browser speech recognition not supported');
+          startupErrors.push('Browser Speech: Not supported in this browser');
         }
-        // Speech recognition already started above - no duplicate start call needed
-        restartAttemptRef.current = 0;
-        processedResults.current = new Set();
       }
 
-      if (!useWhisper && !recognitionRef.current) {
-        console.error('❌ No speech recognition method available');
-        throw new Error('No speech recognition method available');
+      // Only show error if BOTH methods failed to start
+      if (!whisperStarted && !browserStarted && startupErrors.length > 0) {
+        throw new Error(`All transcription methods failed: ${startupErrors.join(', ')}`);
       }
 
       startAutoBackup();
       endTiming('session_startup');
-      console.log('🎉 Coaching session started successfully');
+      
+      // Success message shows which method is active
+      if (whisperStarted) {
+        console.log('🎉 Coaching session started successfully using Whisper');
+      } else if (browserStarted) {
+        console.log('🎉 Coaching session started successfully using browser speech recognition');
+      } else {
+        console.log('🎉 Coaching session started - transcription will begin when audio is detected');
+      }
       
     } catch (error) {
       console.error('❌ Error starting listening:', error);
