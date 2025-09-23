@@ -895,9 +895,30 @@ export const useRealTimeCoaching = () => {
         }
       }
 
-      // Only show error if BOTH methods failed to start
-      if (!whisperStarted && !browserStarted && startupErrors.length > 0) {
-        throw new Error(`All transcription methods failed: ${startupErrors.join(', ')}`);
+      // Set up timeout-based error detection (only show error if no transcription starts within 3 seconds)
+      const errorTimeout = setTimeout(() => {
+        if (!whisperStarted && !browserStarted && startupErrors.length > 0) {
+          setState(prev => ({ 
+            ...prev, 
+            error: { 
+              type: 'audio_failure',
+              message: 'Unable to start transcription. Please check your microphone permissions.',
+              canRecover: true,
+              isRecoverable: true,
+              timestamp: Date.now()
+            }
+          }));
+        }
+      }, 3000);
+
+      // Clear error timeout if transcription starts successfully
+      const originalOnStart = recognitionRef.current?.onstart;
+      if (recognitionRef.current) {
+        recognitionRef.current.onstart = () => {
+          clearTimeout(errorTimeout);
+          browserStarted = true;
+          if (originalOnStart) originalOnStart();
+        };
       }
 
       startAutoBackup();
