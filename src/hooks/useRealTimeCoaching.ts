@@ -628,6 +628,8 @@ export const useRealTimeCoaching = () => {
 
   // Main functions
   const startListening = async (callType: CoachingState['callType'], audioSource: AudioSource['type'], selectedAgentId?: string | null) => {
+    console.log('🎤 Starting coaching session...', { callType, audioSource, selectedAgentId });
+    
     try {
       startTiming('session_startup');
       
@@ -637,22 +639,40 @@ export const useRealTimeCoaching = () => {
         audioSource,
         sessionStartTime: Date.now(),
         selectedAgentId: selectedAgentId || null,
-        error: null
+        error: null,
+        isListening: true
       }));
 
+      console.log('🎤 Requesting audio access...');
+      
       // Try to use Whisper first, fallback to browser speech recognition
       let useWhisper = false;
       let audioStream: MediaStream | null = null;
 
       if (audioSource === 'microphone' || audioSource === 'both') {
+        console.log('🎙️ Requesting microphone audio...');
         audioStream = await requestMicrophoneAudio();
-        if (!audioStream && audioSource === 'both') {
-          throw new Error('Microphone access failed - required for microphone + system audio mode');
+        if (audioStream) {
+          console.log('✅ Microphone audio stream obtained');
+        } else {
+          console.log('❌ Microphone audio failed');
+          if (audioSource === 'both') {
+            throw new Error('Microphone access failed - required for microphone + system audio mode');
+          }
         }
       }
+      
       if (audioSource === 'tab' || audioSource === 'both') {
+        console.log('🖥️ Requesting tab audio...');
         const tabStream = await requestTabAudio();
+        if (tabStream) {
+          console.log('✅ Tab audio stream obtained');
+        } else {
+          console.log('❌ Tab audio failed');
+        }
+        
         if (audioSource === 'both' && audioStream && tabStream) {
+          console.log('🔗 Combining microphone and tab audio streams...');
           // Combine both streams for 'both' mode
           const audioContext = new AudioContext();
           const micSource = audioContext.createMediaStreamSource(audioStream);
@@ -663,6 +683,7 @@ export const useRealTimeCoaching = () => {
           tabSource.connect(destination);
           
           audioStream = destination.stream;
+          console.log('✅ Audio streams combined successfully');
         } else {
           audioStream = audioStream || tabStream;
         }
@@ -672,17 +693,53 @@ export const useRealTimeCoaching = () => {
         }
       }
 
+      console.log('🎵 Audio stream status:', { 
+        hasStream: !!audioStream, 
+        tracks: audioStream?.getTracks().length || 0,
+        active: audioStream?.active 
+      });
+
       if (audioStream) {
+        // Start audio level monitoring first
+        console.log('🎵 Setting up audio level monitoring...');
         try {
+          const audioContext = new AudioContext();
+          const source = audioContext.createMediaStreamSource(audioStream);
+          const analyser = audioContext.createAnalyser();
+          
+          analyser.fftSize = 256;
+          source.connect(analyser);
+          
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          
+          const updateAudioLevel = () => {
+            if (!state.isListening) return;
+            
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const normalizedLevel = Math.min(100, (average / 128) * 100);
+            
+            setState(prev => ({ ...prev, micLevel: normalizedLevel }));
+            requestAnimationFrame(updateAudioLevel);
+          };
+          
+          updateAudioLevel();
+          console.log('✅ Audio level monitoring started');
+        } catch (audioError) {
+          console.error('❌ Audio level monitoring failed:', audioError);
+        }
+        
+        try {
+          console.log('🤖 Attempting Whisper initialization...');
           // Try Whisper first for better performance
           await whisperService.initialize();
           whisperService.addListener(handleWhisperTranscription);
           await whisperService.startTranscription(audioStream);
           useWhisper = true;
           isUsingWhisper.current = true;
-          console.log('🎤 Using Whisper for transcription (optimal performance)');
+          console.log('✅ Whisper transcription started successfully');
         } catch (whisperError) {
-          console.warn('Whisper initialization failed, falling back to browser speech recognition:', whisperError);
+          console.warn('❌ Whisper initialization failed, falling back to browser speech recognition:', whisperError);
           useWhisper = false;
           isUsingWhisper.current = false;
         }
@@ -690,22 +747,35 @@ export const useRealTimeCoaching = () => {
 
       // Fallback to browser speech recognition if Whisper fails
       if (!useWhisper && recognitionRef.current) {
-        console.log('🎤 Using browser speech recognition (fallback)');
-        recognitionRef.current.start();
-        restartAttemptRef.current = 0;
-        processedResults.current = new Set();
+        console.log('🎙️ Starting browser speech recognition fallback...');
+        try {
+          recognitionRef.current.start();
+          restartAttemptRef.current = 0;
+          processedResults.current = new Set();
+          console.log('✅ Browser speech recognition started successfully');
+        } catch (speechError) {
+          console.error('❌ Failed to start browser speech recognition:', speechError);
+          throw new Error('Both Whisper and browser speech recognition failed to start');
+        }
+      }
+
+      if (!useWhisper && !recognitionRef.current) {
+        console.error('❌ No speech recognition method available');
+        throw new Error('No speech recognition method available');
       }
 
       startAutoBackup();
       endTiming('session_startup');
+      console.log('🎉 Coaching session started successfully');
       
     } catch (error) {
-      console.error('Error starting listening:', error);
+      console.error('❌ Error starting listening:', error);
       setState(prev => ({ 
         ...prev, 
+        isListening: false,
         error: { 
           type: 'audio_failure', 
-          message: 'Failed to start audio capture', 
+          message: error instanceof Error ? error.message : 'Failed to start audio capture', 
           timestamp: Date.now(), 
           isRecoverable: true,
           canRecover: true

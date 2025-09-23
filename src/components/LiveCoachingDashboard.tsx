@@ -247,8 +247,10 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   };
 
   const getStatusText = () => {
+    if (error) return `Error: ${error.message}`;
     if (isProcessing) return 'Processing...';
-    if (isListening) return 'Listening';
+    if (isListening && transcription.length === 0) return 'Listening for speech...';
+    if (isListening) return `Active - ${suggestions.length} suggestions`;
     return 'Ready';
   };
 
