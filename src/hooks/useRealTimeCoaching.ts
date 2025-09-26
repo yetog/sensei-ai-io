@@ -109,7 +109,7 @@ interface CoachingState {
 }
 
 interface CoachingError {
-  type: 'audio_failure' | 'speech_recognition_error' | 'ai_service_error' | 'permission_denied';
+  type: 'audio_failure' | 'speech_recognition_error' | 'ai_service_error' | 'permission_denied' | 'tab_audio_ended' | 'tab_audio_failed';
   message: string;
   timestamp: number;
   isRecoverable: boolean;
@@ -630,21 +630,85 @@ export const useRealTimeCoaching = () => {
     }
   }, [state.currentTurn, state.callType]);
 
-  // Audio capture functions
+  // Enhanced Audio capture functions
   const requestTabAudio = async (): Promise<MediaStream | null> => {
     try {
-      const stream = await (navigator.mediaDevices as any).getDisplayMedia({
+      console.log('🎵 Enhanced tab audio capture starting...');
+      
+      const constraints = {
         video: false,
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100
+          echoCancellation: false, // Disable for better transcription
+          noiseSuppression: false, // Preserve original audio
+          autoGainControl: false,
+          sampleRate: 44100,
+          channelCount: 2,
+          // Enhanced audio quality for better transcription
+          advanced: [{
+            googEchoCancellation: false,
+            googAutoGainControl: false,
+            googNoiseSuppression: false,
+            googHighpassFilter: false
+          }]
         }
+      };
+
+      const stream = await (navigator.mediaDevices as any).getDisplayMedia(constraints);
+      
+      // Validate audio track exists
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        throw new Error('No audio track found. Please ensure "Share tab audio" is checked when selecting the tab.');
+      }
+
+      console.log('✅ Enhanced tab audio stream obtained:', {
+        audioTracks: audioTracks.length,
+        hasAudio: audioTracks.length > 0,
+        sampleRate: audioTracks[0]?.getSettings?.()?.sampleRate
       });
+
+      // Handle stream end gracefully
+      audioTracks[0].onended = () => {
+        console.log('🔇 Tab audio stream ended');
+        setState(prev => ({
+          ...prev,
+          error: {
+            type: 'tab_audio_ended',
+            message: 'Tab audio sharing ended. Click to restart if needed.',
+            timestamp: Date.now(),
+            isRecoverable: true,
+            canRecover: true
+          }
+        }));
+      };
+
       tabStreamRef.current = stream;
       return stream;
-    } catch (error) {
-      console.error('Error accessing tab audio:', error);
+    } catch (error: any) {
+      console.error('❌ Enhanced tab audio capture failed:', error);
+      
+      let errorMessage = 'Failed to capture tab audio. ';
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Permission denied. Please allow screen sharing and try again.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage += 'Screen sharing not supported. Please use Chrome or Edge.';
+      } else if (error.message?.includes('Share tab audio')) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Please ensure you select "Share tab audio" when choosing the Google Meet tab.';
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: {
+          type: 'tab_audio_failed',
+          message: errorMessage,
+          timestamp: Date.now(),
+          isRecoverable: true,
+          canRecover: true
+        }
+      }));
+
       return null;
     }
   };
@@ -1287,6 +1351,34 @@ Provide 1-2 specific, actionable suggestions in JSON format:
     toggleSpeaker: () => {},
     clearSession: () => setState(prev => ({ ...prev, transcription: [], suggestions: [] })),
     toggleDemoMode: () => setState(prev => ({ ...prev, isDemoMode: !prev.isDemoMode })),
+    addDemoTranscription: (text: string, speaker: 'agent' | 'customer') => {
+      const currentTime = Date.now();
+      const mappedSpeaker: 'user' | 'customer' = speaker === 'agent' ? 'user' : 'customer';
+      const newSegment: TranscriptionSegment = {
+        id: currentTime.toString(),
+        speaker: mappedSpeaker,
+        text,
+        timestamp: currentTime,
+        confidence: 1.0,
+        segmentGroup: `demo_${mappedSpeaker}_${Math.floor(currentTime / 30000)}`,
+        duration: 0
+      };
+      
+      setState(prev => ({
+        ...prev,
+        transcription: [...prev.transcription, newSegment],
+        conversationLength: prev.conversationLength + text.length,
+        totalExchanges: prev.totalExchanges + 1,
+        lastTranscriptTime: currentTime,
+        currentTurn: mappedSpeaker
+      }));
+    },
+    addDemoSuggestion: (suggestion: any) => {
+      setState(prev => ({
+        ...prev,
+        suggestions: [...prev.suggestions, suggestion]
+      }));
+    },
     requestCoaching: async () => {
       if (state.transcription.length === 0) return;
       

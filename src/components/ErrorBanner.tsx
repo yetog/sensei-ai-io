@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 
 interface CoachingError {
-  type: 'audio_failure' | 'speech_recognition_error' | 'ai_service_error' | 'permission_denied';
+  type: 'audio_failure' | 'speech_recognition_error' | 'ai_service_error' | 'permission_denied' | 'tab_audio_ended' | 'tab_audio_failed';
   message: string;
   canRecover: boolean;
   timestamp: number;
@@ -40,6 +40,10 @@ export function ErrorBanner({ error, onRetry, onDismiss }: ErrorBannerProps) {
         return 'Speech Recognition Error';
       case 'ai_service_error':
         return 'AI Service Error';
+      case 'tab_audio_ended':
+        return 'Tab Audio Ended';
+      case 'tab_audio_failed':
+        return 'Tab Audio Failed';
       default:
         return 'Error Occurred';
     }
@@ -55,6 +59,10 @@ export function ErrorBanner({ error, onRetry, onDismiss }: ErrorBannerProps) {
         return 'Speech recognition was interrupted. Your microphone may have been disconnected.';
       case 'ai_service_error':
         return 'The AI coaching service is temporarily unavailable.';
+      case 'tab_audio_ended':
+        return 'Screen sharing was stopped. Click retry to restart tab audio capture.';
+      case 'tab_audio_failed':
+        return 'Ensure you select "Share tab audio" when choosing the Google Meet tab.';
       default:
         return 'An unexpected error occurred.';
     }
