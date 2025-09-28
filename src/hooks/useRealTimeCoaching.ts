@@ -227,6 +227,15 @@ export const useRealTimeCoaching = () => {
       return;
     }
 
+    // CRITICAL FIX: Add Whisper-specific duplicate detection
+    const whisperResultId = `whisper_${result.timestamp}_${transcript.length}`;
+    if (processedResults.current.has(whisperResultId)) {
+      console.log('🚫 Whisper duplicate detected:', transcript.substring(0, 50) + '...');
+      performanceProfiler.endProfile(profileId);
+      return;
+    }
+    processedResults.current.add(whisperResultId);
+
     setState(prev => {
       const currentTime = Date.now();
       const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
@@ -237,9 +246,37 @@ export const useRealTimeCoaching = () => {
         return { ...prev, interimTranscript: transcript };
       }
 
+      // CRITICAL FIX: Apply same duplicate detection as browser speech recognition
+      // 1. Check for exact content duplicates
+      if (detectExactDuplicate(transcript, recentTranscripts.current)) {
+        console.log('🚫 Whisper exact duplicate detected:', transcript.substring(0, 50) + '...');
+        return prev;
+      }
+      
+      // 2. Check for repetitive patterns
+      if (detectRepetitivePattern(transcript, phraseFrequency.current)) {
+        console.log('🚫 Whisper repetitive pattern detected:', transcript.substring(0, 50) + '...');
+        return prev;
+      }
+      
+      // 3. Check for substring duplicates
+      if (isSubstringDuplicate(transcript, recentTranscripts.current)) {
+        console.log('🚫 Whisper substring duplicate detected:', transcript.substring(0, 50) + '...');
+        return prev;
+      }
+
+      // Add to tracking systems
+      const contentHash = generateContentHash(transcript);
+      recentTranscripts.current.push({
+        content: transcript,
+        timestamp: currentTime,
+        hash: contentHash
+      });
+      contentHashSet.current.add(contentHash);
+
       // Create new segment for final result
       const newSegment: TranscriptionSegment = {
-        id: currentTime.toString(),
+        id: `whisper_${currentTime}`,
         speaker: currentSpeaker,
         text: transcript,
         timestamp: currentTime,
