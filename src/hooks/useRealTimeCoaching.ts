@@ -667,7 +667,7 @@ export const useRealTimeCoaching = () => {
     }
   }, [state.currentTurn, state.callType]);
 
-  // Enhanced Audio capture functions
+  // CRITICAL FIX: Enhanced Audio Capture with Single Transcription System Selection
   const requestTabAudio = async (): Promise<MediaStream | null> => {
     try {
       console.log('🎵 Enhanced tab audio capture starting...');
@@ -1047,7 +1047,7 @@ export const useRealTimeCoaching = () => {
         }
       }
 
-      // Set up timeout-based error detection (only show error if no transcription starts within 3 seconds)
+      // Set up timeout-based error detection 
       const errorTimeout = setTimeout(() => {
         if (!whisperStarted && !browserStarted && startupErrors.length > 0) {
           setState(prev => ({ 
@@ -1063,14 +1063,9 @@ export const useRealTimeCoaching = () => {
         }
       }, 3000);
 
-      // Clear error timeout if transcription starts successfully
-      const originalOnStart = recognitionRef.current?.onstart;
-      if (recognitionRef.current) {
-        recognitionRef.current.onstart = () => {
-          clearTimeout(errorTimeout);
-          browserStarted = true;
-          if (originalOnStart) originalOnStart();
-        };
+      // Clear error timeout if transcription starts successfully  
+      if (whisperStarted || browserStarted) {
+        clearTimeout(errorTimeout);
       }
 
       startAutoBackup();
@@ -1078,11 +1073,11 @@ export const useRealTimeCoaching = () => {
       
       // Success message shows which method is active
       if (whisperStarted) {
-        console.log('🎉 Coaching session started successfully using Whisper');
+        console.log('🎉 Coaching session started successfully with Whisper (browser speech disabled)');
       } else if (browserStarted) {
-        console.log('🎉 Coaching session started successfully using browser speech recognition');
+        console.log('🎉 Coaching session started successfully with browser speech recognition');
       } else {
-        console.log('🎉 Coaching session started - transcription will begin when audio is detected');
+        console.log('⚠️ Coaching session started but transcription may have issues');
       }
       
     } catch (error) {

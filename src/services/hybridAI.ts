@@ -1,5 +1,6 @@
 import { localAI } from './localAI';
 import { ionosAI } from './ionosAI';
+import { feedbackLearning } from './feedbackLearning';
 
 interface CoachingSuggestion {
   id: string;
@@ -56,8 +57,15 @@ class HybridAIService {
           const totalTime = performance.now() - startTime;
           console.log(`✅ Local AI success in ${totalTime.toFixed(2)}ms`);
           
+          // CRITICAL: Apply feedback learning to improve suggestion
+          const improvedSuggestion = feedbackLearning.improveSuggestion(
+            localResult.suggestion, 
+            localResult.context || transcript
+          );
+          
           return {
             ...localResult,
+            suggestion: improvedSuggestion,
             source: 'local' as const,
             processingTime: totalTime
           };
@@ -78,6 +86,19 @@ class HybridAIService {
           this.cloudAttempts++;
           
           const totalTime = performance.now() - startTime;
+          
+          // CRITICAL: Apply feedback learning to improve suggestion
+          const improvedSuggestion = feedbackLearning.improveSuggestion(
+            cloudResult.suggestion, 
+            cloudResult.context || transcript
+          );
+          
+          return {
+            ...cloudResult,
+            suggestion: improvedSuggestion,
+            source: 'cloud' as const,
+            processingTime: totalTime
+          };
           console.log(`✅ Cloud AI success in ${totalTime.toFixed(2)}ms`);
           
           return {
