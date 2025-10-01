@@ -177,36 +177,52 @@ class HybridAIService {
     fileContext?: string
   ): string {
     const context = conversationHistory.slice(-3).join('\n');
+    const hasProductKnowledge = fileContext && fileContext.trim().length > 100;
     
-    let prompt = `As an expert sales coach, analyze this ${callType} conversation transcript and provide coaching feedback.
+    let prompt = `You are an expert sales coach providing REAL-TIME guidance during ${callType} calls.
 
-Transcript: "${transcript}"
+🎯 YOUR MISSION: Provide ONE specific, immediately actionable coaching suggestion that moves this conversation toward a successful outcome.
 
-Recent conversation context:
-${context}`;
+📞 CURRENT MOMENT:
+Agent just said: "${transcript}"
 
-    // Add product knowledge context if available
-    if (fileContext && fileContext.trim()) {
-      prompt += `
+📋 CONVERSATION SO FAR:
+${context || 'Beginning of conversation'}
 
-PRODUCT KNOWLEDGE BASE:
+${hasProductKnowledge ? `
+💡 AVAILABLE PRODUCTS & SERVICES (USE THESE SPECIFICS):
 ${fileContext}
 
-Use the product information above to provide specific recommendations. Reference actual products, features, pricing, or benefits when relevant to the conversation.`;
-    }
+🎯 CRITICAL: Your suggestion MUST reference specific products, features, or pricing from above when relevant. Don't give generic advice - use the actual product data!
+` : ''}
 
-    prompt += `
+🎓 COACHING FRAMEWORK:
+1. WHAT should the agent say/do next?
+2. WHY is this the right move now?
+3. ${hasProductKnowledge ? 'WHICH specific products/features should they mention?' : 'HOW should they position the value?'}
 
-Please provide your response in this exact format:
+⚡ PRIORITY SITUATIONS:
+- Customer mentions a need → Match to specific product immediately
+- Customer has objection → Address with product-specific benefits
+- Customer is engaged → Suggest complementary products for upsell
+- Conversation stalling → Provide open-ended question to re-engage
+
+📊 RESPOND IN THIS EXACT FORMAT:
 
 Summary & Analysis:
-[Provide a brief analysis of what happened in the conversation and key observations]
+[Brief analysis of what just happened and key observations - 1-2 sentences max]
 
 Suggestion:
-[Provide ONE specific, actionable coaching tip in 1-2 sentences. If relevant, reference specific products or features from the knowledge base.]
+[ONE specific action with product details if available - be concrete and actionable - 2-3 sentences max]
 
-TYPE: [objection, product_pitch, closing, retention, or general]
-PRIORITY: [high, medium, low]`;
+TYPE: [product_pitch, objection_handling, closing, retention, or general]
+PRIORITY: [high, medium, low]
+
+🚫 AVOID:
+- Generic advice without product specifics
+- Long-winded explanations
+- Multiple suggestions (pick ONE best action)
+- Repeating what was already said`;
 
     return prompt;
   }

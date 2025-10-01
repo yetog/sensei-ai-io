@@ -19,6 +19,7 @@ import {
   type TranscriptEntry,
   type PhraseData
 } from '@/utils/duplicateDetection';
+import { sanitizeTranscript, cleanConversationContext, isContextCorrupted } from '@/utils/contextSanitization';
 
 // Types and interfaces
 interface SpeechRecognitionResult {
@@ -1165,25 +1166,96 @@ export const useRealTimeCoaching = () => {
     }));
   };
 
-  // AI coaching functions - using hybrid local/cloud AI
+  // AI coaching functions - using hybrid local/cloud AI with sanitization
   const processTranscriptionForCoaching = async (text: string, callType: string) => {
     try {
       startTiming('ai_coaching_generation');
       
+      // EMERGENCY: Sanitize transcript before processing
+      const sanitized = sanitizeTranscript(text);
+      if (!sanitized.isValid) {
+        console.log('🚫 Blocked corrupted transcript (quality:', sanitized.quality.toFixed(2), '):', text.substring(0, 50));
+        return;
+      }
+
+      const cleanedText = sanitized.cleanedText;
+      console.log('✨ Sanitized transcript:', sanitized.duplicatesRemoved, 'duplicates removed, quality:', sanitized.quality.toFixed(2));
+
+      // Generate hash for cleaned transcript
+      const contentHash = generateContentHash(cleanedText);
+      
+      // AGGRESSIVE: Check for exact duplicates with stricter rules
+      if (detectExactDuplicate(cleanedText, recentTranscripts.current)) {
+        console.log('🚫 Blocked exact duplicate:', cleanedText.substring(0, 50));
+        return;
+      }
+      
+      // Check for repetitive patterns with stricter thresholds
+      if (detectRepetitivePattern(cleanedText, phraseFrequency.current)) {
+        console.log('🚫 Blocked repetitive pattern:', cleanedText.substring(0, 50));
+        return;
+      }
+      
+      // Check for substring duplicates with stricter matching
+      if (isSubstringDuplicate(cleanedText, recentTranscripts.current)) {
+        console.log('🚫 Blocked substring duplicate:', cleanedText.substring(0, 50));
+        return;
+      }
+
+      // Track this CLEANED transcript
+      recentTranscripts.current.push({
+        content: cleanedText,
+        timestamp: Date.now(),
+        hash: contentHash
+      });
+
+      // More aggressive cleanup in preview mode
+      const maxHistory = window.self !== window.top ? 15 : 20;
+      if (recentTranscripts.current.length > maxHistory) {
+        cleanupOldData(
+          recentTranscripts.current,
+          phraseFrequency.current,
+          contentHashSet.current,
+          window.self !== window.top ? 30000 : 60000 // Shorter retention in preview
+        );
+      }
+
+      console.log('✅ Processing unique transcript:', cleanedText.substring(0, 100));
+      
+      // QUALITY CHECK: Validate conversation context before sending to AI
+      const allTranscripts = [...state.transcription.map(t => t.text), cleanedText];
+      if (isContextCorrupted(allTranscripts)) {
+        console.warn('⚠️ Corrupted context detected, cleaning conversation history');
+        // Reset to only last 5 clean transcripts
+        setState(prev => ({
+          ...prev,
+          transcription: prev.transcription.slice(-5)
+        }));
+      }
+
       // Get conversation history for context
       const conversationHistory = state.transcription
         .slice(-5)
         .map(segment => `${segment.speaker}: ${segment.text}`);
       
+      // Clean conversation context for better AI understanding
+      const cleanedConversation = cleanConversationContext(conversationHistory);
+      
       // Extract relevant product context from uploaded files
-      const fileContextResult = await getRelevantFileContextDetailed(text, 2000);
+      const fileContextResult = await getRelevantFileContextDetailed(cleanedText, 2000);
       const fileContext = fileContextResult.context;
       
-      // Use hybrid AI service for coaching suggestions with product context
+      console.log('📄 Extracted file context for coaching:', {
+        hasContext: fileContext.length > 0,
+        contextLength: fileContext.length,
+        preview: fileContext.substring(0, 200)
+      });
+      
+      // Use hybrid AI service for coaching suggestions with CLEANED context and file context
       const suggestion = await hybridAI.generateCoachingSuggestion(
-        text, 
+        cleanedText, 
         callType, 
-        conversationHistory,
+        [cleanedConversation],
         fileContext
       );
       
