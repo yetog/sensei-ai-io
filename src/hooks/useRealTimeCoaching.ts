@@ -884,7 +884,7 @@ export const useRealTimeCoaching = () => {
           console.error('❌ Audio level monitoring failed:', audioError);
         }
         
-        // Try Whisper first for better performance (graceful degradation)
+        // CRITICAL FIX: Try Whisper FIRST - only use browser speech recognition as fallback
         try {
           console.log('🤖 Attempting Whisper initialization...');
           await whisperService.initialize();
@@ -892,7 +892,10 @@ export const useRealTimeCoaching = () => {
           await whisperService.startTranscription(audioStream);
           whisperStarted = true;
           isUsingWhisper.current = true;
-          console.log('✅ Whisper transcription started successfully');
+          console.log('✅ Whisper transcription started - browser speech recognition will NOT start');
+          
+          // IMPORTANT: When Whisper starts successfully, we skip browser speech recognition entirely
+          // This prevents dual transcription and duplicate issues
         } catch (whisperError) {
           console.warn('⚠️ Whisper initialization failed, will try browser speech recognition:', whisperError);
           startupErrors.push(`Whisper: ${whisperError instanceof Error ? whisperError.message : 'Unknown error'}`);
@@ -900,7 +903,7 @@ export const useRealTimeCoaching = () => {
         }
       }
 
-      // Browser speech recognition fallback (works independently of audio streams)
+      // CRITICAL FIX: Browser speech recognition ONLY as fallback when Whisper fails
       if (!whisperStarted) {
         console.log('🎙️ Starting browser speech recognition fallback...');
         

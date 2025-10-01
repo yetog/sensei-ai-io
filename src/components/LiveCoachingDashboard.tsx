@@ -39,6 +39,8 @@ import { ProcessingIndicator } from '@/components/ProcessingIndicator';
 
 import { PerformanceDashboard } from '@/components/PerformanceDashboard';
 import { TranscriptDebugger } from '@/components/TranscriptDebugger';
+import { FeedbackAnalyticsDashboard } from '@/components/FeedbackAnalyticsDashboard';
+import { DuplicateDetectionMonitor } from '@/components/DuplicateDetectionMonitor';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
@@ -98,6 +100,8 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [showDemoScenarios, setShowDemoScenarios] = useState(false);
   const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(false);
   const [showDebugger, setShowDebugger] = useState(false);
+  const [showFeedbackAnalytics, setShowFeedbackAnalytics] = useState(false);
+  const [showDuplicateMonitor, setShowDuplicateMonitor] = useState(false);
   const { toast } = useToast();
 
   // Initialize smart cache and performance profiler
@@ -480,7 +484,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       </Card>
 
       {/* Simple Agent Status */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
         <span>Agent: {selectedAgentId ? 'Specialized' : 'Generic'} Coaching</span>
         <span className="flex items-center gap-1">
           Mode: <Badge variant={coachingMode === 'live' ? 'default' : 'secondary'} className="text-xs">
@@ -490,6 +494,47 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             <span className="text-green-600 animate-pulse">● Auto-suggestions enabled</span>
           )}
         </span>
+        <span className="flex items-center gap-1">
+          Transcription: <Badge variant={isUsingWhisper ? 'default' : 'secondary'} className="text-xs">
+            {isUsingWhisper ? '🤖 Whisper AI' : '🎤 Browser'}
+          </Badge>
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowFeedbackAnalytics(true)}
+          className="text-xs"
+        >
+          <TrendingUp className="h-3 w-3 mr-1" />
+          AI Analytics
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowDuplicateMonitor(true)}
+          className="text-xs"
+        >
+          <Activity className="h-3 w-3 mr-1" />
+          Duplicates
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowPerformanceDashboard(true)}
+          className="text-xs"
+        >
+          <Clock className="h-3 w-3 mr-1" />
+          Performance
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowDebugger(true)}
+          className="text-xs"
+        >
+          <Settings className="h-3 w-3 mr-1" />
+          Debug
+        </Button>
       </div>
 
       {/* Main Dashboard */}
@@ -677,6 +722,38 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             isListening={isListening} 
           />
         </div>
+      )}
+
+      {/* Performance Dashboard Modal */}
+      {showPerformanceDashboard && (
+        <PerformanceDashboard
+          isVisible={showPerformanceDashboard}
+          onClose={() => setShowPerformanceDashboard(false)}
+        />
+      )}
+
+      {/* Transcript Debugger Modal */}
+      {showDebugger && (
+        <TranscriptDebugger
+          isVisible={showDebugger}
+          onClose={() => setShowDebugger(false)}
+        />
+      )}
+
+      {/* Feedback Analytics Dashboard */}
+      {showFeedbackAnalytics && (
+        <FeedbackAnalyticsDashboard
+          isVisible={showFeedbackAnalytics}
+          onClose={() => setShowFeedbackAnalytics(false)}
+        />
+      )}
+
+      {/* Duplicate Detection Monitor */}
+      {showDuplicateMonitor && (
+        <DuplicateDetectionMonitor
+          isVisible={showDuplicateMonitor}
+          onClose={() => setShowDuplicateMonitor(false)}
+        />
       )}
     </div>
   );

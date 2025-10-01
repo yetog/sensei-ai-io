@@ -36,16 +36,16 @@ class WhisperTranscriptionService {
 
   private async initializeInternal(): Promise<void> {
     try {
-      console.log('Initializing Whisper pipeline...');
-      // Use the smallest, fastest model for real-time performance
+      console.log('🔄 Initializing Whisper pipeline for real-time transcription...');
+      // Use tiny model optimized for speed - critical for real-time performance
       const pipelineInstance = await pipeline(
         'automatic-speech-recognition',
         'onnx-community/whisper-tiny.en'
       );
       this.pipeline = pipelineInstance;
-      console.log('Whisper pipeline initialized successfully');
+      console.log('✅ Whisper pipeline initialized - ready for real-time transcription');
     } catch (error) {
-      console.error('Failed to initialize Whisper pipeline:', error);
+      console.error('❌ Failed to initialize Whisper pipeline:', error);
       throw error;
     }
   }
@@ -88,8 +88,8 @@ class WhisperTranscriptionService {
     this.isProcessing = true;
 
     try {
-      // Process chunks in batches for better performance
-      const chunksToProcess = this.audioQueue.splice(0, Math.min(3, this.audioQueue.length));
+      // PERFORMANCE FIX: Process smaller chunks more frequently for lower latency
+      const chunksToProcess = this.audioQueue.splice(0, Math.min(2, this.audioQueue.length));
       
       if (chunksToProcess.length === 0) {
         this.isProcessing = false;
@@ -106,28 +106,35 @@ class WhisperTranscriptionService {
         offset += chunk.audio.length;
       }
 
-      // Only process if we have enough audio (at least 0.5 seconds)
-      if (combinedAudio.length < 8000) {
+      // PERFORMANCE FIX: Lower minimum threshold for faster response (0.3s instead of 0.5s)
+      if (combinedAudio.length < 4800) {
         this.isProcessing = false;
         return;
       }
 
       const startTime = performance.now();
       
-      // Transcribe with Whisper
+      // PERFORMANCE FIX: Optimized Whisper settings for real-time
       const result = await this.pipeline(combinedAudio, {
-        return_timestamps: true,
-        chunk_length_s: 30,
-        stride_length_s: 5
+        return_timestamps: false, // Disable timestamps for faster processing
+        chunk_length_s: 10, // Shorter chunks for lower latency
+        stride_length_s: 2, // Smaller stride for better continuity
+        language: 'en', // Specify language to skip detection
       });
 
       const processingTime = performance.now() - startTime;
-      console.log(`Whisper transcription took ${processingTime.toFixed(2)}ms`);
+      
+      // Only log slow processing times
+      if (processingTime > 500) {
+        console.warn(`⚠️ Slow Whisper transcription: ${processingTime.toFixed(2)}ms`);
+      } else {
+        console.log(`⚡ Fast Whisper transcription: ${processingTime.toFixed(2)}ms`);
+      }
 
       if (result.text && result.text.trim()) {
         const transcriptionResult: TranscriptionResult = {
           text: result.text.trim(),
-          confidence: 0.85, // Whisper doesn't provide confidence scores
+          confidence: 0.85,
           timestamp: Date.now(),
           isPartial: this.audioQueue.length > 0
         };
@@ -137,13 +144,13 @@ class WhisperTranscriptionService {
       }
 
     } catch (error) {
-      console.error('Error processing audio with Whisper:', error);
+      console.error('❌ Whisper processing error:', error);
     } finally {
       this.isProcessing = false;
       
-      // Continue processing if there are more chunks
+      // PERFORMANCE FIX: Reduce delay between processing for faster throughput
       if (this.audioQueue.length > 0) {
-        setTimeout(() => this.processQueue(), 100);
+        setTimeout(() => this.processQueue(), 50);
       }
     }
   }
