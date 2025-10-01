@@ -1366,10 +1366,17 @@ export const useRealTimeCoaching = () => {
       const fileContextResult = await getRelevantFileContextDetailed(cleanedText, 2000);
       const fileContext = fileContextResult.context;
       
+      // Extract product names for debugging
+      const productMatches = fileContext.match(/### (.+)/g) || [];
+      const productNames = productMatches.map(m => m.replace('### ', '').trim()).slice(0, 5);
+      
       console.log('📄 Extracted file context for coaching:', {
         hasContext: fileContext.length > 0,
         contextLength: fileContext.length,
-        preview: fileContext.substring(0, 200)
+        filesUsed: fileContextResult.files.length,
+        productCount: productNames.length,
+        products: productNames,
+        preview: fileContext.substring(0, 300)
       });
       
       // Use hybrid AI service for coaching suggestions with CLEANED context and file context

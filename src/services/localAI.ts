@@ -81,7 +81,8 @@ class LocalAIService {
   async generateCoachingSuggestion(
     transcript: string, 
     callType: string,
-    conversationHistory: string[] = []
+    conversationHistory: string[] = [],
+    fileContext?: string
   ): Promise<CoachingSuggestion | null> {
     try {
       if (!this.isInitialized) {
@@ -90,8 +91,8 @@ class LocalAIService {
 
       const startTime = performance.now();
       
-      // Create coaching prompt based on transcript and call type
-      const prompt = this.createCoachingPrompt(transcript, callType, conversationHistory);
+      // Create coaching prompt based on transcript and call type with file context
+      const prompt = this.createCoachingPrompt(transcript, callType, conversationHistory, fileContext);
       
       const result = await this.model(prompt, {
         max_new_tokens: 150,
@@ -127,9 +128,13 @@ class LocalAIService {
   private createCoachingPrompt(
     transcript: string, 
     callType: string, 
-    conversationHistory: string[]
+    conversationHistory: string[],
+    fileContext?: string
   ): string {
     const context = conversationHistory.slice(-3).join('\n');
+    const hasProductData = fileContext && fileContext.trim().length > 100;
+    
+    const productContext = hasProductData ? `\n\nAvailable Products:\n${fileContext}\n\nIMPORTANT: Reference specific products by name when relevant.` : '';
     
     const prompts = {
       cold_call: `You are an expert sales coach. Based on this cold call transcript: "${transcript}", provide coaching feedback. Focus on building rapport, handling objections, or moving to next steps.`,
@@ -142,7 +147,7 @@ class LocalAIService {
 
     const basePrompt = prompts[callType as keyof typeof prompts] || prompts.general;
     
-    return `${basePrompt}
+    return `${basePrompt}${productContext}
 
 Context from conversation:
 ${context}

@@ -130,7 +130,7 @@ class HybridAIService {
       }, this.config.localTimeout);
 
       try {
-        const result = await localAI.generateCoachingSuggestion(transcript, callType, conversationHistory);
+        const result = await localAI.generateCoachingSuggestion(transcript, callType, conversationHistory, fileContext);
         clearTimeout(timeout);
         resolve(result);
       } catch (error) {
@@ -147,8 +147,11 @@ class HybridAIService {
     fileContext?: string
   ): Promise<Omit<CoachingSuggestion, 'source'> | null> {
     try {
-      // Create coaching prompt for cloud AI with product context
-      const prompt = this.createCloudPrompt(transcript, callType, conversationHistory, fileContext);
+      // Extract domain-relevant products from file context
+      const relevantProducts = this.extractRelevantProducts(transcript, fileContext);
+      
+      // Create coaching prompt for cloud AI with prioritized product context
+      const prompt = this.createCloudPrompt(transcript, callType, conversationHistory, relevantProducts);
       
       const messages = [
         {
@@ -168,6 +171,75 @@ class HybridAIService {
       console.error('Cloud AI generation error:', error);
       throw error;
     }
+  }
+
+  private extractRelevantProducts(transcript: string, fileContext?: string): string {
+    if (!fileContext || fileContext.trim().length < 100) return '';
+    
+    // Keywords to identify conversation topics
+    const transcriptLower = transcript.toLowerCase();
+    const keywords = {
+      domain: ['domain', 'website', 'url', 'site', '.com', '.de', '.net'],
+      email: ['email', 'mail', 'inbox', 'mailbox'],
+      security: ['security', 'ssl', 'certificate', 'https', 'secure', 'protection', 'guard'],
+      hosting: ['host', 'hosting', 'server', 'managed'],
+      website: ['website', 'web', 'builder', 'design', 'online']
+    };
+    
+    // Determine conversation topic
+    const topics: string[] = [];
+    for (const [topic, words] of Object.entries(keywords)) {
+      if (words.some(word => transcriptLower.includes(word))) {
+        topics.push(topic);
+      }
+    }
+    
+    if (topics.length === 0) return fileContext; // Return all context if no specific topic detected
+    
+    console.log('🎯 Detected conversation topics:', topics);
+    
+    // Extract only products relevant to detected topics
+    const lines = fileContext.split('\n');
+    const relevantLines: string[] = [];
+    let currentProductBlock = '';
+    let isRelevantProduct = false;
+    
+    for (const line of lines) {
+      // Start of a new product
+      if (line.startsWith('### ')) {
+        // Save previous product if it was relevant
+        if (isRelevantProduct && currentProductBlock) {
+          relevantLines.push(currentProductBlock);
+        }
+        currentProductBlock = line + '\n';
+        
+        // Check if this product matches any detected topics
+        const lineLower = line.toLowerCase();
+        isRelevantProduct = topics.some(topic => 
+          keywords[topic as keyof typeof keywords].some(word => lineLower.includes(word))
+        );
+      } else if (currentProductBlock) {
+        currentProductBlock += line + '\n';
+      } else {
+        // Header lines (file names, etc.)
+        relevantLines.push(line);
+      }
+    }
+    
+    // Don't forget the last product
+    if (isRelevantProduct && currentProductBlock) {
+      relevantLines.push(currentProductBlock);
+    }
+    
+    const filteredContext = relevantLines.join('\n').trim();
+    
+    if (filteredContext.length < 100) {
+      console.log('⚠️ Topic filtering too aggressive, using full context');
+      return fileContext;
+    }
+    
+    console.log(`✅ Filtered context: ${fileContext.length} → ${filteredContext.length} chars for topics:`, topics);
+    return filteredContext;
   }
 
   private createCloudPrompt(
@@ -190,22 +262,28 @@ Agent just said: "${transcript}"
 ${context || 'Beginning of conversation'}
 
 ${hasProductKnowledge ? `
-💡 AVAILABLE PRODUCTS & SERVICES (USE THESE SPECIFICS):
+💡 RELEVANT PRODUCTS FOR THIS CONVERSATION (PRIORITIZE THESE):
 ${fileContext}
 
-🎯 CRITICAL: Your suggestion MUST reference specific products, features, or pricing from above when relevant. Don't give generic advice - use the actual product data!
+🎯 CRITICAL RULES:
+1. Your suggestion MUST reference SPECIFIC products by name from the list above
+2. Include ACTUAL product features, pricing, or benefits when available
+3. Match products to the customer's stated needs or interests
+4. DO NOT suggest generic "managed hosting" or vague services - use EXACT product names
+5. If customer mentions domain/security → suggest Domain Guard, SSL certificates, etc.
+6. If customer needs email → suggest specific email hosting products by name
 ` : ''}
 
 🎓 COACHING FRAMEWORK:
-1. WHAT should the agent say/do next?
-2. WHY is this the right move now?
-3. ${hasProductKnowledge ? 'WHICH specific products/features should they mention?' : 'HOW should they position the value?'}
+1. WHAT specific product should the agent pitch? (Name the exact product)
+2. WHY is this product relevant to what the customer just said?
+3. WHAT are the key features/benefits to mention?
 
-⚡ PRIORITY SITUATIONS:
-- Customer mentions a need → Match to specific product immediately
-- Customer has objection → Address with product-specific benefits
-- Customer is engaged → Suggest complementary products for upsell
-- Conversation stalling → Provide open-ended question to re-engage
+⚡ PRIORITY SITUATIONS (with product examples):
+- Customer mentions "domain" → Suggest Domain Guard (security), SSL certificates, or specific domain extensions
+- Customer has objection → Counter with specific product features and benefits from the list
+- Customer is engaged → Suggest complementary products by name (e.g., if they want domain, suggest email hosting)
+- Conversation stalling → Ask about specific needs that match available products
 
 📊 RESPOND IN THIS EXACT FORMAT:
 
@@ -218,11 +296,12 @@ Suggestion:
 TYPE: [product_pitch, objection_handling, closing, retention, or general]
 PRIORITY: [high, medium, low]
 
-🚫 AVOID:
-- Generic advice without product specifics
-- Long-winded explanations
-- Multiple suggestions (pick ONE best action)
-- Repeating what was already said`;
+🚫 NEVER DO:
+- Generic advice like "suggest managed hosting" - NAME THE SPECIFIC PRODUCT
+- Vague features - use ACTUAL product details from the list
+- Long explanations - be concise and actionable
+- Multiple suggestions - pick ONE best product/action
+- Suggesting products not in the available list`;
 
     return prompt;
   }
