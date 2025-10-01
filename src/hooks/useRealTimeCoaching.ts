@@ -906,31 +906,17 @@ export const useRealTimeCoaching = () => {
           console.error('❌ Audio level monitoring failed:', audioError);
         }
         
-        // CRITICAL FIX: Try Whisper FIRST - only use browser speech recognition as fallback
-        // Enhanced fallback logic: Whisper → Browser Speech → Demo Mode
+        // CRITICAL FIX: Skip Whisper in preview, use browser speech recognition directly
+        // Enhanced fallback logic: Browser Speech (in preview) → Whisper (in prod/dev) → Manual Mode
         const env = detectEnvironment();
         
-        // In preview, be more cautious about Whisper initialization
+        // In preview, skip Whisper entirely to avoid loading issues
         if (env.isPreview) {
-          console.log('🔍 Preview environment detected - checking if Whisper is viable');
-          try {
-            const whisperInitialized = await Promise.race([
-              whisperService.initialize(),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Whisper initialization timeout')), 10000))
-            ]);
-            
-            whisperService.addListener(handleWhisperTranscription);
-            await whisperService.startTranscription(audioStream);
-            whisperStarted = true;
-            isUsingWhisper.current = true;
-            console.log('✅ Whisper transcription started in preview environment');
-          } catch (whisperError) {
-            console.warn('⚠️ Whisper failed in preview, will try browser speech recognition:', whisperError);
-            startupErrors.push(`Whisper: ${whisperError instanceof Error ? whisperError.message : 'Unknown error'}`);
-            isUsingWhisper.current = false;
-          }
+          console.log('🔍 Preview environment detected - skipping Whisper, using browser speech recognition');
+          isUsingWhisper.current = false;
+          whisperStarted = false;
         } else {
-          // In dev/production, normal initialization
+          // In dev/production, try Whisper first
           try {
             console.log('🤖 Attempting Whisper initialization...');
             await whisperService.initialize();

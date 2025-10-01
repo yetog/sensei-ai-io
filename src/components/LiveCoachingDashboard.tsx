@@ -503,9 +503,9 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         {/* Environment indicator */}
         {environmentInfo.isPreview && (
           <span className="flex items-center gap-1">
-            Environment: <Badge variant="outline" className="text-xs flex items-center gap-1">
+            Environment: <Badge variant="outline" className="text-xs flex items-center gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
               <Cloud className="h-3 w-3" />
-              Preview Mode
+              Preview Mode - Browser Speech Only
             </Badge>
           </span>
         )}

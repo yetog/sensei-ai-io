@@ -55,9 +55,9 @@ export const checkNetworkConditions = async (): Promise<boolean> => {
   }
   
   try {
-    // Quick network test - try to fetch a small resource
+    // Quick network test - reduced timeout for faster failures
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
     
     const response = await fetch('https://cdn.jsdelivr.net/npm/@huggingface/transformers/package.json', {
       signal: controller.signal,

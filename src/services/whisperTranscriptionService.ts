@@ -39,16 +39,20 @@ class WhisperTranscriptionService {
     try {
       console.log('🔄 Initializing Whisper pipeline for real-time transcription...');
       
-      // Check network conditions before attempting download
+      // Check environment - skip Whisper entirely in preview
       const env = detectEnvironment();
       console.log('Environment detected:', env);
       
       if (env.isPreview) {
-        const networkOk = await checkNetworkConditions();
-        if (!networkOk) {
-          console.warn('Network conditions not optimal for model loading in preview');
-          throw new Error('Network conditions not suitable for model download');
-        }
+        console.warn('⚠️ Whisper disabled in preview environment - use browser speech recognition instead');
+        throw new Error('Whisper is not available in preview environments');
+      }
+      
+      // Check network conditions before attempting download
+      const networkOk = await checkNetworkConditions();
+      if (!networkOk) {
+        console.warn('Network conditions not optimal for model loading');
+        throw new Error('Network conditions not suitable for model download');
       }
       
       const model = getOptimalWhisperModel();
