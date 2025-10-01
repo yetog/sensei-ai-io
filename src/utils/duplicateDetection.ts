@@ -106,8 +106,9 @@ export function isSubstringDuplicate(
   recentTranscripts: TranscriptEntry[],
   threshold?: number
 ): boolean {
-  // Preview: LOWER threshold = MORE strict (catch more duplicates)
-  const effectiveThreshold = threshold ?? (isPreviewEnvironment() ? 0.75 : 0.9);
+  // Preview: MUCH LOWER threshold = MORE strict (catch more duplicates)
+  // Reduced from 0.75 to 0.7 for even stricter matching
+  const effectiveThreshold = threshold ?? (isPreviewEnvironment() ? 0.7 : 0.9);
   const cleanText = text.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
   
   return recentTranscripts.some(recent => {

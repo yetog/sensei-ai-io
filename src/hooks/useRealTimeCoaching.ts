@@ -195,7 +195,104 @@ export const useRealTimeCoaching = () => {
   const contentHashSet = useRef<Set<string>>(new Set());
   const recentTranscripts = useRef<TranscriptEntry[]>([]);
   const phraseFrequency = useRef<Map<string, PhraseData>>(new Map());
+  
+  // EMERGENCY DUPLICATE DETECTION - Preview environment circuit breaker
+  const emergencyDuplicateCache = useRef<Map<string, number>>(new Map());
+  const identicalTranscriptCount = useRef<Map<string, number>>(new Map());
+  const lastProcessedTranscript = useRef<string>('');
+  const circuitBreakerTripped = useRef<boolean>(false);
+  const slidingWindowResults = useRef<Array<{ transcript: string; timestamp: number }>>([])
 
+  // EMERGENCY DUPLICATE DETECTION FUNCTION - Called BEFORE any state updates
+  const isEmergencyDuplicate = (transcript: string): boolean => {
+    const now = Date.now();
+    const env = detectEnvironment();
+    const isPreview = env.isPreview || env.isDevelopment;
+    
+    // CIRCUIT BREAKER: If we've tripped the circuit breaker, block ALL transcripts for 2 seconds
+    if (circuitBreakerTripped.current) {
+      const lastTrip = emergencyDuplicateCache.current.get('__circuit_breaker_trip_time__') || 0;
+      if (now - lastTrip < 2000) {
+        console.log('⚠️ CIRCUIT BREAKER ACTIVE - Blocking all transcripts');
+        return true;
+      } else {
+        // Reset circuit breaker
+        circuitBreakerTripped.current = false;
+        identicalTranscriptCount.current.clear();
+        console.log('✅ Circuit breaker reset');
+      }
+    }
+    
+    // EMERGENCY CACHE: Block identical transcripts within 500ms (preview) or 1000ms (production)
+    const emergencyWindow = isPreview ? 500 : 1000;
+    const transcriptHash = generateContentHash(transcript);
+    const lastSeen = emergencyDuplicateCache.current.get(transcriptHash);
+    
+    if (lastSeen && (now - lastSeen) < emergencyWindow) {
+      console.log('🚫 EMERGENCY CACHE: Blocking duplicate within', emergencyWindow, 'ms');
+      return true;
+    }
+    emergencyDuplicateCache.current.set(transcriptHash, now);
+    
+    // Cleanup emergency cache (keep last 20)
+    if (emergencyDuplicateCache.current.size > 20) {
+      const oldestKeys = Array.from(emergencyDuplicateCache.current.entries())
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, emergencyDuplicateCache.current.size - 20)
+        .map(([key]) => key);
+      oldestKeys.forEach(key => emergencyDuplicateCache.current.delete(key));
+    }
+    
+    // SLIDING WINDOW: Check last 10 results for exact matches (preview mode only)
+    if (isPreview) {
+      slidingWindowResults.current.push({ transcript, timestamp: now });
+      
+      // Keep only last 10 results
+      if (slidingWindowResults.current.length > 10) {
+        slidingWindowResults.current.shift();
+      }
+      
+      // Check for duplicates in sliding window
+      const duplicateCount = slidingWindowResults.current.filter(
+        r => r.transcript === transcript
+      ).length;
+      
+      if (duplicateCount > 1) {
+        console.log('🚫 SLIDING WINDOW: Duplicate detected in last 10 results');
+        return true;
+      }
+    }
+    
+    // IDENTICAL TRANSCRIPT COUNTER: Trip circuit breaker if 5+ identical in 10 seconds
+    const identicalKey = transcriptHash;
+    const identicalCount = identicalTranscriptCount.current.get(identicalKey) || 0;
+    const identicalTimestamp = emergencyDuplicateCache.current.get(`${identicalKey}_first_seen`) || now;
+    
+    if (now - identicalTimestamp > 10000) {
+      // Reset count if outside 10 second window
+      identicalTranscriptCount.current.set(identicalKey, 1);
+      emergencyDuplicateCache.current.set(`${identicalKey}_first_seen`, now);
+    } else {
+      identicalTranscriptCount.current.set(identicalKey, identicalCount + 1);
+      
+      if (identicalCount + 1 >= 5) {
+        console.error('🔥 CIRCUIT BREAKER TRIPPED: 5+ identical transcripts in 10 seconds');
+        circuitBreakerTripped.current = true;
+        emergencyDuplicateCache.current.set('__circuit_breaker_trip_time__', now);
+        toast.error('Duplicate detection: Speech recognition paused temporarily');
+        return true;
+      }
+    }
+    
+    // LAST PROCESSED CHECK: Block if identical to the very last processed transcript
+    if (lastProcessedTranscript.current === transcript) {
+      console.log('🚫 LAST PROCESSED: Identical to previous transcript');
+      return true;
+    }
+    
+    return false;
+  };
+  
   // Helper functions
   const detectSpeaker = (micLevel: number, tabLevel: number, audioSource: AudioSource['type']): 'user' | 'customer' | null => {
     if (audioSource === 'microphone') return 'user';
@@ -450,12 +547,7 @@ export const useRealTimeCoaching = () => {
       };
 
       recognition.onresult = (event) => {
-        setIsProcessing(true);
         console.log('Speech recognition result received:', event);
-        
-        if (!processedResults.current) {
-          processedResults.current = new Set();
-        }
         
         // Only process the latest final result
         let latestFinalResult = null;
@@ -470,14 +562,35 @@ export const useRealTimeCoaching = () => {
         }
         
         if (latestFinalResult) {
+          const bestTranscript = latestFinalResult[0];
+          const transcript = cleanTranscriptText(bestTranscript.transcript);
+          const confidence = bestTranscript.confidence || 0.7;
+          
+          // EMERGENCY DUPLICATE DETECTION - BEFORE ANY STATE UPDATES
+          if (transcript.length < 2) {
+            console.log('🚫 Transcript too short, ignoring');
+            return;
+          }
+          
           // Use Speech Recognition API's built-in resultIndex for proper duplicate detection
           const resultId = `${event.timeStamp}_${latestFinalIndex}_final`;
           
           if (processedResults.current.has(resultId)) {
-            setIsProcessing(false);
+            console.log('🚫 Result ID already processed:', resultId);
             return;
           }
+          
+          // CRITICAL: Emergency duplicate detection BEFORE adding to processedResults
+          if (isEmergencyDuplicate(transcript)) {
+            console.log('🚫 EMERGENCY DUPLICATE BLOCKED:', transcript.substring(0, 50) + '...');
+            return; // Block completely - don't add to processedResults, don't update state
+          }
+          
+          // Only add to processedResults AFTER passing emergency duplicate check
           processedResults.current.add(resultId);
+          
+          // Update last processed transcript
+          lastProcessedTranscript.current = transcript;
           
           // Clean up old processed results (keep last 10)
           if (processedResults.current.size > 10) {
@@ -485,151 +598,152 @@ export const useRealTimeCoaching = () => {
             oldIds.forEach(id => processedResults.current.delete(id));
           }
           
-          const bestTranscript = latestFinalResult[0];
-          const transcript = cleanTranscriptText(bestTranscript.transcript);
-          const confidence = bestTranscript.confidence || 0.7;
+          // Now proceed with state updates
+          setIsProcessing(true);
           
-          if (transcript.length > 2) {
-            setState(prev => {
-              const lastSegment = prev.transcription[prev.transcription.length - 1];
-              const currentTime = Date.now();
-              
-              const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
-              const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
-              
-              const timeSinceLastSegment = lastSegment ? currentTime - lastSegment.timestamp : Infinity;
-              
-              // ENHANCED DUPLICATE DETECTION
-              
-              // 1. Check for exact content duplicates
-              if (detectExactDuplicate(transcript, recentTranscripts.current)) {
-                console.log('🚫 Exact duplicate detected:', transcript.substring(0, 50) + '...');
-                return prev;
-              }
-              
-              // 2. Check for repetitive patterns
-              if (detectRepetitivePattern(transcript, phraseFrequency.current)) {
-                console.log('🚫 Repetitive pattern detected:', transcript.substring(0, 50) + '...');
-                return prev;
-              }
-              
-              // 3. Check for substring duplicates
-              if (isSubstringDuplicate(transcript, recentTranscripts.current)) {
-                console.log('🚫 Substring duplicate detected:', transcript.substring(0, 50) + '...');
-                return prev;
-              }
-              
-              // 4. Legacy similarity check as fallback
-              const textSimilarity = lastSegment ? calculateTextSimilarity(lastSegment.text, transcript) : 0;
-              if (textSimilarity > 0.98) {
-                console.log('🚫 High similarity duplicate detected:', transcript.substring(0, 50) + '...');
-                return prev;
-              }
-              
-              // Add to tracking systems
-              const contentHash = generateContentHash(transcript);
-              recentTranscripts.current.push({
-                content: transcript,
-                timestamp: currentTime,
-                hash: contentHash
-              });
-              contentHashSet.current.add(contentHash);
-              
-              // Cleanup old data every 10 segments
-              if (recentTranscripts.current.length % 10 === 0) {
-                cleanupOldData(
-                  recentTranscripts.current,
-                  phraseFrequency.current,
-                  contentHashSet.current
-                );
-              }
-              
-              const shouldMerge = lastSegment && 
-                lastSegment.speaker === currentSpeaker && 
-                timeSinceLastSegment < 5000 && 
-                lastSegment.text.length < 200;
-              
-              const qualityScore = Math.round((confidence * 100 + (transcript.length > 10 ? 20 : 0)) / 1.2);
-              
-              if (shouldMerge) {
-                const updatedTranscription = [...prev.transcription];
-                const lastText = lastSegment.text.trimEnd();
-                const cleanedTranscript = transcript.trim();
-                
-                // Check if new transcript is substring of last text
-                if (lastText.toLowerCase().includes(cleanedTranscript.toLowerCase())) {
-                  console.log('Skipping substring duplicate:', cleanedTranscript);
-                  return prev;
-                }
-                
-                // Check for word overlap and remove it
-                const lastWords = lastText.split(' ').slice(-3);
-                const newWords = cleanedTranscript.split(' ');
-                
-                let finalText = lastText;
-                let startIndex = 0;
-                
-                // Find overlap
-                for (let i = 0; i < Math.min(lastWords.length, newWords.length); i++) {
-                  if (lastWords[lastWords.length - 1 - i].toLowerCase() === newWords[i].toLowerCase()) {
-                    startIndex = i + 1;
-                  }
-                }
-                
-                // Merge without overlap
-                const remainingNewWords = newWords.slice(startIndex);
-                if (remainingNewWords.length > 0) {
-                  const connector = lastText.match(/[.!?]$/) ? ' ' : '. ';
-                  finalText = lastText + connector + remainingNewWords.join(' ');
-                }
-                
-                updatedTranscription[updatedTranscription.length - 1] = {
-                  ...lastSegment,
-                  text: finalText,
-                  confidence: Math.max(lastSegment.confidence, confidence),
-                  isConsolidated: true,
-                  duration: currentTime - lastSegment.timestamp
-                };
-                
-                return {
-                  ...prev,
-                  transcription: updatedTranscription,
-                  conversationLength: prev.conversationLength + transcript.length,
-                  transcriptQuality: Math.max(prev.transcriptQuality, qualityScore),
-                  lastTranscriptTime: currentTime,
-                  interimTranscript: ''
-                };
-              } else {
-                // Create new segment
-                const groupId = `${currentSpeaker}_${Math.floor(currentTime / 30000)}`;
-                const newSegment: TranscriptionSegment = {
-                  id: currentTime.toString(),
-                  speaker: currentSpeaker,
-                  text: transcript,
-                  timestamp: currentTime,
-                  confidence: confidence,
-                  segmentGroup: groupId,
-                  duration: 0
-                };
-                
-                return {
-                  ...prev,
-                  transcription: [...prev.transcription, newSegment],
-                  conversationLength: prev.conversationLength + transcript.length,
-                  totalExchanges: prev.totalExchanges + 1,
-                  transcriptQuality: Math.max(prev.transcriptQuality, qualityScore),
-                  lastTranscriptTime: currentTime,
-                  currentTurn: currentSpeaker,
-                  interimTranscript: ''
-                };
-              }
-            });
+          setState(prev => {
+            const lastSegment = prev.transcription[prev.transcription.length - 1];
+            const currentTime = Date.now();
             
-            // Process for coaching suggestions
-            if (shouldGenerateSuggestion(transcript, state.suggestions, state.lastSuggestionTime, state.coachingMode)) {
-              processTranscriptionForCoaching(transcript, state.callType);
+            const detectedSpeaker = detectSpeaker(prev.micLevel, prev.tabLevel, prev.audioSource);
+            const currentSpeaker = detectedSpeaker || prev.currentTurn || 'user';
+            
+            const timeSinceLastSegment = lastSegment ? currentTime - lastSegment.timestamp : Infinity;
+            
+            // ENHANCED DUPLICATE DETECTION (Secondary layer)
+            
+            // 1. Check for exact content duplicates
+            if (detectExactDuplicate(transcript, recentTranscripts.current)) {
+              console.log('🚫 Exact duplicate detected:', transcript.substring(0, 50) + '...');
+              return prev;
             }
+            
+            // 2. Check for repetitive patterns
+            if (detectRepetitivePattern(transcript, phraseFrequency.current)) {
+              console.log('🚫 Repetitive pattern detected:', transcript.substring(0, 50) + '...');
+              return prev;
+            }
+            
+            // 3. Check for substring duplicates
+            if (isSubstringDuplicate(transcript, recentTranscripts.current)) {
+              console.log('🚫 Substring duplicate detected:', transcript.substring(0, 50) + '...');
+              return prev;
+            }
+            
+            // 4. Legacy similarity check as fallback
+            const textSimilarity = lastSegment ? calculateTextSimilarity(lastSegment.text, transcript) : 0;
+            if (textSimilarity > 0.98) {
+              console.log('🚫 High similarity duplicate detected:', transcript.substring(0, 50) + '...');
+              return prev;
+            }
+            
+            // Add to tracking systems
+            const contentHash = generateContentHash(transcript);
+            recentTranscripts.current.push({
+              content: transcript,
+              timestamp: currentTime,
+              hash: contentHash
+            });
+            contentHashSet.current.add(contentHash);
+            
+            // Cleanup old data every 10 segments
+            if (recentTranscripts.current.length % 10 === 0) {
+              cleanupOldData(
+                recentTranscripts.current,
+                phraseFrequency.current,
+                contentHashSet.current
+              );
+            }
+            
+            const shouldMerge = lastSegment && 
+              lastSegment.speaker === currentSpeaker && 
+              timeSinceLastSegment < 5000 && 
+              lastSegment.text.length < 200;
+            
+            const qualityScore = Math.round((confidence * 100 + (transcript.length > 10 ? 20 : 0)) / 1.2);
+            
+            if (shouldMerge) {
+              const updatedTranscription = [...prev.transcription];
+              const lastText = lastSegment.text.trimEnd();
+              const cleanedTranscript = transcript.trim();
+              
+              // Check if new transcript is substring of last text
+              if (lastText.toLowerCase().includes(cleanedTranscript.toLowerCase())) {
+                console.log('Skipping substring duplicate:', cleanedTranscript);
+                return prev;
+              }
+              
+              // Check for word overlap and remove it
+              const lastWords = lastText.split(' ').slice(-3);
+              const newWords = cleanedTranscript.split(' ');
+              
+              let finalText = lastText;
+              let startIndex = 0;
+              
+              // Find overlap
+              for (let i = 0; i < Math.min(lastWords.length, newWords.length); i++) {
+                if (lastWords[lastWords.length - 1 - i].toLowerCase() === newWords[i].toLowerCase()) {
+                  startIndex = i + 1;
+                }
+              }
+              
+              // Merge without overlap
+              const remainingNewWords = newWords.slice(startIndex);
+              if (remainingNewWords.length > 0) {
+                const connector = lastText.match(/[.!?]$/) ? ' ' : '. ';
+                finalText = lastText + connector + remainingNewWords.join(' ');
+              }
+              
+              updatedTranscription[updatedTranscription.length - 1] = {
+                ...lastSegment,
+                text: finalText,
+                confidence: Math.max(lastSegment.confidence, confidence),
+                isConsolidated: true,
+                duration: currentTime - lastSegment.timestamp
+              };
+              
+              return {
+                ...prev,
+                transcription: updatedTranscription,
+                conversationLength: prev.conversationLength + transcript.length,
+                transcriptQuality: Math.max(prev.transcriptQuality, qualityScore),
+                lastTranscriptTime: currentTime,
+                interimTranscript: ''
+              };
+            } else {
+              // Create new segment
+              const groupId = `${currentSpeaker}_${Math.floor(currentTime / 30000)}`;
+              const newSegment: TranscriptionSegment = {
+                id: currentTime.toString(),
+                speaker: currentSpeaker,
+                text: transcript,
+                timestamp: currentTime,
+                confidence: confidence,
+                segmentGroup: groupId,
+                duration: 0
+              };
+              
+              console.log('✅ NEW TRANSCRIPT ADDED:', transcript.substring(0, 50) + '...');
+              
+              return {
+                ...prev,
+                transcription: [...prev.transcription, newSegment],
+                conversationLength: prev.conversationLength + transcript.length,
+                totalExchanges: prev.totalExchanges + 1,
+                transcriptQuality: Math.max(prev.transcriptQuality, qualityScore),
+                lastTranscriptTime: currentTime,
+                currentTurn: currentSpeaker,
+                interimTranscript: ''
+              };
+            }
+          });
+          
+          // Process for coaching suggestions
+          if (shouldGenerateSuggestion(transcript, state.suggestions, state.lastSuggestionTime, state.coachingMode)) {
+            processTranscriptionForCoaching(transcript, state.callType);
           }
+          
+          setIsProcessing(false);
         }
         
         // Handle interim results
@@ -638,8 +752,6 @@ export const useRealTimeCoaching = () => {
           const interimText = latestResult[0].transcript;
           setState(prev => ({ ...prev, interimTranscript: interimText }));
         }
-        
-        setIsProcessing(false);
       };
 
       recognition.onerror = (event) => {
@@ -1155,6 +1267,15 @@ export const useRealTimeCoaching = () => {
     // Clear processing queue
     processingQueue.current = [];
     setIsProcessing(false);
+    
+    // EMERGENCY CLEANUP: Reset all duplicate detection caches
+    emergencyDuplicateCache.current.clear();
+    identicalTranscriptCount.current.clear();
+    slidingWindowResults.current = [];
+    lastProcessedTranscript.current = '';
+    circuitBreakerTripped.current = false;
+    processedResults.current.clear();
+    console.log('🧹 Emergency duplicate detection caches cleared');
     
     // Log performance report
     logPerformanceReport();
