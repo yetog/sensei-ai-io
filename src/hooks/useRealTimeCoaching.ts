@@ -7,6 +7,8 @@ import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { feedbackLearning, type SuggestionFeedback as FeedbackData } from '@/services/feedbackLearning';
+import { detectEnvironment, validateAudioPermissions } from '@/utils/environmentDetection';
+import { toast } from 'sonner';
 import { 
   generateContentHash, 
   detectExactDuplicate, 
@@ -782,8 +784,28 @@ export const useRealTimeCoaching = () => {
   const startListening = async (callType: CoachingState['callType'], audioSource: AudioSource['type'], selectedAgentId?: string | null) => {
     console.log('🎤 Starting coaching session...', { callType, audioSource, selectedAgentId });
     
+    // Validate audio permissions first
+    const permissionCheck = await validateAudioPermissions();
+    if (!permissionCheck.granted) {
+      setState(prev => ({
+        ...prev,
+        error: {
+          type: 'permission_denied',
+          message: permissionCheck.error || 'Microphone access denied',
+          timestamp: Date.now(),
+          isRecoverable: false,
+          canRecover: false
+        }
+      }));
+      toast.error(permissionCheck.error || 'Microphone access denied');
+      return;
+    }
+    
     try {
       startTiming('session_startup');
+      
+      const env = detectEnvironment();
+      console.log('Environment:', env);
       
       // Clear any previous error states first
       setState(prev => ({ 
@@ -885,21 +907,43 @@ export const useRealTimeCoaching = () => {
         }
         
         // CRITICAL FIX: Try Whisper FIRST - only use browser speech recognition as fallback
-        try {
-          console.log('🤖 Attempting Whisper initialization...');
-          await whisperService.initialize();
-          whisperService.addListener(handleWhisperTranscription);
-          await whisperService.startTranscription(audioStream);
-          whisperStarted = true;
-          isUsingWhisper.current = true;
-          console.log('✅ Whisper transcription started - browser speech recognition will NOT start');
-          
-          // IMPORTANT: When Whisper starts successfully, we skip browser speech recognition entirely
-          // This prevents dual transcription and duplicate issues
-        } catch (whisperError) {
-          console.warn('⚠️ Whisper initialization failed, will try browser speech recognition:', whisperError);
-          startupErrors.push(`Whisper: ${whisperError instanceof Error ? whisperError.message : 'Unknown error'}`);
-          isUsingWhisper.current = false;
+        // Enhanced fallback logic: Whisper → Browser Speech → Demo Mode
+        const env = detectEnvironment();
+        
+        // In preview, be more cautious about Whisper initialization
+        if (env.isPreview) {
+          console.log('🔍 Preview environment detected - checking if Whisper is viable');
+          try {
+            const whisperInitialized = await Promise.race([
+              whisperService.initialize(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Whisper initialization timeout')), 10000))
+            ]);
+            
+            whisperService.addListener(handleWhisperTranscription);
+            await whisperService.startTranscription(audioStream);
+            whisperStarted = true;
+            isUsingWhisper.current = true;
+            console.log('✅ Whisper transcription started in preview environment');
+          } catch (whisperError) {
+            console.warn('⚠️ Whisper failed in preview, will try browser speech recognition:', whisperError);
+            startupErrors.push(`Whisper: ${whisperError instanceof Error ? whisperError.message : 'Unknown error'}`);
+            isUsingWhisper.current = false;
+          }
+        } else {
+          // In dev/production, normal initialization
+          try {
+            console.log('🤖 Attempting Whisper initialization...');
+            await whisperService.initialize();
+            whisperService.addListener(handleWhisperTranscription);
+            await whisperService.startTranscription(audioStream);
+            whisperStarted = true;
+            isUsingWhisper.current = true;
+            console.log('✅ Whisper transcription started - browser speech recognition will NOT start');
+          } catch (whisperError) {
+            console.warn('⚠️ Whisper initialization failed, will try browser speech recognition:', whisperError);
+            startupErrors.push(`Whisper: ${whisperError instanceof Error ? whisperError.message : 'Unknown error'}`);
+            isUsingWhisper.current = false;
+          }
         }
       }
 

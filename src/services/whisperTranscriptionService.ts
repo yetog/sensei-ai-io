@@ -1,4 +1,5 @@
 import { pipeline, Pipeline } from '@huggingface/transformers';
+import { detectEnvironment, getOptimalWhisperModel, checkNetworkConditions } from '@/utils/environmentDetection';
 
 interface TranscriptionResult {
   text: string;
@@ -37,10 +38,26 @@ class WhisperTranscriptionService {
   private async initializeInternal(): Promise<void> {
     try {
       console.log('🔄 Initializing Whisper pipeline for real-time transcription...');
-      // Use tiny model optimized for speed - critical for real-time performance
+      
+      // Check network conditions before attempting download
+      const env = detectEnvironment();
+      console.log('Environment detected:', env);
+      
+      if (env.isPreview) {
+        const networkOk = await checkNetworkConditions();
+        if (!networkOk) {
+          console.warn('Network conditions not optimal for model loading in preview');
+          throw new Error('Network conditions not suitable for model download');
+        }
+      }
+      
+      const model = getOptimalWhisperModel();
+      console.log(`Loading Whisper model: ${model}`);
+      
+      // Use environment-optimized model
       const pipelineInstance = await pipeline(
         'automatic-speech-recognition',
-        'onnx-community/whisper-tiny.en'
+        model
       );
       this.pipeline = pipelineInstance;
       console.log('✅ Whisper pipeline initialized - ready for real-time transcription');

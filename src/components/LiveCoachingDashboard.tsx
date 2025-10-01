@@ -23,7 +23,11 @@ import {
   Download,
   FileText,
   Save,
-  Activity
+  Activity,
+  Wifi,
+  WifiOff,
+  Cloud,
+  Monitor
 } from 'lucide-react';
 import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
 import { PostCallSummary } from '@/components/PostCallSummary';
@@ -44,6 +48,7 @@ import { DuplicateDetectionMonitor } from '@/components/DuplicateDetectionMonito
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
+import { detectEnvironment } from '@/utils/environmentDetection';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -102,6 +107,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [showDebugger, setShowDebugger] = useState(false);
   const [showFeedbackAnalytics, setShowFeedbackAnalytics] = useState(false);
   const [showDuplicateMonitor, setShowDuplicateMonitor] = useState(false);
+  const [environmentInfo] = useState(() => detectEnvironment());
   const { toast } = useToast();
 
   // Initialize smart cache and performance profiler
@@ -260,6 +266,13 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     if (isListening && transcription.length === 0) return 'Listening for speech...';
     if (isListening) return `Active - ${suggestions.length} suggestions`;
     return 'Ready';
+  };
+
+  const getTranscriptionEngine = () => {
+    if (!isListening) return 'None';
+    if (error) return 'Failed';
+    if (isUsingWhisper) return 'Whisper AI';
+    return 'Browser Speech';
   };
 
   const getSuggestionIcon = (type: string) => {
@@ -486,6 +499,17 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       {/* Simple Agent Status */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
         <span>Agent: {selectedAgentId ? 'Specialized' : 'Generic'} Coaching</span>
+        
+        {/* Environment indicator */}
+        {environmentInfo.isPreview && (
+          <span className="flex items-center gap-1">
+            Environment: <Badge variant="outline" className="text-xs flex items-center gap-1">
+              <Cloud className="h-3 w-3" />
+              Preview Mode
+            </Badge>
+          </span>
+        )}
+        
         <span className="flex items-center gap-1">
           Mode: <Badge variant={coachingMode === 'live' ? 'default' : 'secondary'} className="text-xs">
             {coachingMode === 'live' ? '🔄 Live' : '👆 Manual'}
@@ -495,8 +519,18 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           )}
         </span>
         <span className="flex items-center gap-1">
-          Transcription: <Badge variant={isUsingWhisper ? 'default' : 'secondary'} className="text-xs">
-            {isUsingWhisper ? '🤖 Whisper AI' : '🎤 Browser'}
+          Transcription: <Badge variant={isUsingWhisper ? 'default' : 'secondary'} className="text-xs flex items-center gap-1">
+            {isUsingWhisper ? (
+              <>
+                <Wifi className="h-3 w-3" />
+                Whisper AI
+              </>
+            ) : (
+              <>
+                <Monitor className="h-3 w-3" />
+                Browser
+              </>
+            )}
           </Badge>
         </span>
         <Button
