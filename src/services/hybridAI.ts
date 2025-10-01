@@ -38,7 +38,8 @@ class HybridAIService {
   async generateCoachingSuggestion(
     transcript: string,
     callType: string,
-    conversationHistory: string[] = []
+    conversationHistory: string[] = [],
+    fileContext?: string
   ): Promise<CoachingSuggestion | null> {
     const startTime = performance.now();
     
@@ -49,7 +50,7 @@ class HybridAIService {
       console.log('🏠 Attempting local AI generation...');
       
       try {
-        const localResult = await this.tryLocalGeneration(transcript, callType, conversationHistory);
+        const localResult = await this.tryLocalGeneration(transcript, callType, conversationHistory, fileContext);
         if (localResult) {
           this.lastLocalSuccess = Date.now();
           this.localAttempts++;
@@ -80,7 +81,7 @@ class HybridAIService {
       console.log('☁️ Attempting cloud AI generation...');
       
       try {
-        const cloudResult = await this.tryCloudGeneration(transcript, callType, conversationHistory);
+        const cloudResult = await this.tryCloudGeneration(transcript, callType, conversationHistory, fileContext);
         if (cloudResult) {
           this.lastCloudSuccess = Date.now();
           this.cloudAttempts++;
@@ -119,7 +120,8 @@ class HybridAIService {
   private async tryLocalGeneration(
     transcript: string,
     callType: string,
-    conversationHistory: string[]
+    conversationHistory: string[],
+    fileContext?: string
   ): Promise<Omit<CoachingSuggestion, 'source'> | null> {
     return new Promise(async (resolve, reject) => {
       // Set timeout for local processing
@@ -141,11 +143,12 @@ class HybridAIService {
   private async tryCloudGeneration(
     transcript: string,
     callType: string,
-    conversationHistory: string[]
+    conversationHistory: string[],
+    fileContext?: string
   ): Promise<Omit<CoachingSuggestion, 'source'> | null> {
     try {
-      // Create coaching prompt for cloud AI
-      const prompt = this.createCloudPrompt(transcript, callType, conversationHistory);
+      // Create coaching prompt for cloud AI with product context
+      const prompt = this.createCloudPrompt(transcript, callType, conversationHistory, fileContext);
       
       const messages = [
         {
@@ -170,16 +173,29 @@ class HybridAIService {
   private createCloudPrompt(
     transcript: string,
     callType: string,
-    conversationHistory: string[]
+    conversationHistory: string[],
+    fileContext?: string
   ): string {
     const context = conversationHistory.slice(-3).join('\n');
     
-    return `As an expert sales coach, analyze this ${callType} conversation transcript and provide coaching feedback.
+    let prompt = `As an expert sales coach, analyze this ${callType} conversation transcript and provide coaching feedback.
 
 Transcript: "${transcript}"
 
 Recent conversation context:
-${context}
+${context}`;
+
+    // Add product knowledge context if available
+    if (fileContext && fileContext.trim()) {
+      prompt += `
+
+PRODUCT KNOWLEDGE BASE:
+${fileContext}
+
+Use the product information above to provide specific recommendations. Reference actual products, features, pricing, or benefits when relevant to the conversation.`;
+    }
+
+    prompt += `
 
 Please provide your response in this exact format:
 
@@ -187,10 +203,12 @@ Summary & Analysis:
 [Provide a brief analysis of what happened in the conversation and key observations]
 
 Suggestion:
-[Provide ONE specific, actionable coaching tip in 1-2 sentences]
+[Provide ONE specific, actionable coaching tip in 1-2 sentences. If relevant, reference specific products or features from the knowledge base.]
 
 TYPE: [objection, product_pitch, closing, retention, or general]
 PRIORITY: [high, medium, low]`;
+
+    return prompt;
   }
 
   private parseCloudResponse(

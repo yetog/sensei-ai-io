@@ -9,6 +9,7 @@ import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { feedbackLearning, type SuggestionFeedback as FeedbackData } from '@/services/feedbackLearning';
 import { detectEnvironment, validateAudioPermissions } from '@/utils/environmentDetection';
 import { toast } from 'sonner';
+import { useFileContext } from '@/contexts/FileContext';
 import { 
   generateContentHash, 
   detectExactDuplicate, 
@@ -144,6 +145,7 @@ function cleanTranscriptText(text: string): string {
 // Main hook
 export const useRealTimeCoaching = () => {
   const { startTiming, endTiming, getStats, logPerformanceReport } = usePerformanceMetrics();
+  const { getRelevantFileContextDetailed } = useFileContext();
   
   const [state, setState] = useState<CoachingState>({
     isListening: false,
@@ -1173,8 +1175,17 @@ export const useRealTimeCoaching = () => {
         .slice(-5)
         .map(segment => `${segment.speaker}: ${segment.text}`);
       
-      // Use hybrid AI service for coaching suggestions
-      const suggestion = await hybridAI.generateCoachingSuggestion(text, callType, conversationHistory);
+      // Extract relevant product context from uploaded files
+      const fileContextResult = await getRelevantFileContextDetailed(text, 2000);
+      const fileContext = fileContextResult.context;
+      
+      // Use hybrid AI service for coaching suggestions with product context
+      const suggestion = await hybridAI.generateCoachingSuggestion(
+        text, 
+        callType, 
+        conversationHistory,
+        fileContext
+      );
       
       endTiming('ai_coaching_generation');
       
@@ -1468,11 +1479,19 @@ Provide your response in this format:
 Summary & Analysis: [Your analysis]
 Suggestion: [Specific coaching advice]`;
         
+        // Extract relevant product context from uploaded files
+        const fileContextResult = await getRelevantFileContextDetailed(
+          conversationSummary.map(t => t.text).join(' '),
+          2000
+        );
+        const fileContext = fileContextResult.context;
+        
         // Generate coaching suggestion using hybrid AI with full context
         const suggestion = await hybridAI.generateCoachingSuggestion(
           contextualPrompt, 
           state.callType, 
-          conversationSummary.map(t => `${t.speaker}: ${t.text}`)
+          conversationSummary.map(t => `${t.speaker}: ${t.text}`),
+          fileContext
         );
         
         if (suggestion) {
