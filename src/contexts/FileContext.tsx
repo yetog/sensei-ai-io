@@ -143,7 +143,18 @@ const getRelevantFileContext = (query: string, maxChars: number = 2000): string 
   return getRelevantFileContextDetailed(query, maxChars).context;
 };
 
+// Simple cache for file contexts to avoid repeated processing
+const contextCache = new Map<string, { context: string; files: UploadedFile[]; suggestions: string[]; timestamp: number }>();
+const CACHE_TTL = 30000; // 30 seconds
+
 const getRelevantFileContextDetailed = (query: string, maxChars: number = 2000) => {
+  // Check cache first
+  const cacheKey = `${query}_${maxChars}`;
+  const cached = contextCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    return { context: cached.context, files: cached.files, suggestions: cached.suggestions };
+  }
+
   const relevantFiles = searchFiles(query).slice(0, 3);
 
   // Build suggestions if no results
@@ -167,13 +178,20 @@ const getRelevantFileContextDetailed = (query: string, maxChars: number = 2000) 
 
   if (relevantFiles.length === 0) {
     console.debug('[FileContext] No relevant files found for query:', query, 'suggestions:', suggestions);
-    return { context: '', files: [], suggestions };
+    const result = { context: '', files: [], suggestions };
+    contextCache.set(cacheKey, { ...result, timestamp: Date.now() });
+    return result;
   }
 
+  // Track which files we've already added to avoid duplication
+  const addedFiles = new Set<string>();
   let context = 'Relevant files:\n\n';
   let remainingChars = maxChars - context.length;
 
   for (const file of relevantFiles) {
+    // Skip if already added
+    if (addedFiles.has(file.id)) continue;
+    
     const content = file.extractedText || file.content;
     const fileHeader = `📄 ${file.name} (${file.type || 'text'}):\n`;
 
@@ -188,11 +206,14 @@ const getRelevantFileContextDetailed = (query: string, maxChars: number = 2000) 
 
     context += truncatedContent + '\n\n';
     remainingChars -= truncatedContent.length + 2;
+    addedFiles.add(file.id);
 
     if (remainingChars <= 100) break;
   }
 
-  return { context, files: relevantFiles, suggestions };
+  const result = { context, files: relevantFiles, suggestions };
+  contextCache.set(cacheKey, { ...result, timestamp: Date.now() });
+  return result;
 };
 
 const getAllFilesContext = (maxChars: number = 3000): string => {

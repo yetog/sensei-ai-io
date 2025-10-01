@@ -154,7 +154,7 @@ class HybridAIService {
         }
       ];
 
-      const response = await ionosAI.sendMessage(messages, 'Sales Coach');
+      const response = await ionosAI.sendCoachingMessage(messages, 'Sales Coach');
       
       if (response) {
         return this.parseCloudResponse(response, transcript, callType);

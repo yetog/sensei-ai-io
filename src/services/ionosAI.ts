@@ -67,19 +67,12 @@ export class IONOSAIService {
       throw new Error('API token not set');
     }
 
+    // Regular chat - free-form responses without forced formatting
     const systemPrompt = agentName && agentName !== "AI Assistant" 
       ? `You are ${agentName}, a specialized AI assistant. Maintain your role identity throughout the conversation and respond in a way that's consistent with your expertise.
 
-For coaching suggestions, provide responses in this exact format:
-Summary & Analysis: [Brief analysis of the conversation context]
-Suggestion: [Specific, actionable coaching advice in 2-3 lines]
-
-Provide concise, actionable advice based on your specialization.`
+Provide clear, natural, conversational responses based on your specialization.`
       : `You are a helpful AI assistant capable of helping with a wide range of business and professional tasks. You are knowledgeable, professional, and adaptable to any topic or industry.
-
-For coaching suggestions, provide responses in this exact format:
-Summary & Analysis: [Brief analysis of the conversation context]
-Suggestion: [Specific, actionable coaching advice in 2-3 lines]
 
 You can assist with:
 - Business strategy and planning
@@ -88,7 +81,64 @@ You can assist with:
 - Problem-solving and recommendations
 - General professional guidance
 
-Provide clear, actionable advice tailored to the user's specific needs.`;
+Provide clear, natural, conversational responses tailored to the user's specific needs.`;
+
+    const request: IONOSAIRequest = {
+      model: TEXT_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        ...messages
+      ],
+      temperature: 0.7,
+      max_tokens: 1000
+    };
+
+    try {
+      const response = await fetch(TEXT_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data: IONOSAIResponse = await response.json();
+      return data.choices[0]?.message?.content || 'No response received';
+    } catch (error) {
+      console.error('IONOS AI API Error:', error);
+      throw error;
+    }
+  }
+
+  async sendCoachingMessage(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, agentName?: string): Promise<string> {
+    const token = this.apiToken || this.defaultToken;
+    if (!token) {
+      throw new Error('API token not set');
+    }
+
+    // Coaching-specific - structured "Summary & Analysis / Suggestion" format
+    const systemPrompt = `You are ${agentName || 'an expert sales coach'}, providing real-time coaching during live customer conversations.
+
+CRITICAL: Always provide your response in this EXACT format:
+
+Summary & Analysis:
+[Brief analysis of what happened in the conversation and key observations]
+
+Suggestion:
+[ONE specific, actionable coaching tip in 1-2 sentences that the agent can apply immediately]
+
+TYPE: [objection, product_pitch, closing, retention, or general]
+PRIORITY: [high, medium, low]
+
+Keep your coaching concise, specific, and immediately actionable.`;
 
     const request: IONOSAIRequest = {
       model: TEXT_MODEL,
