@@ -85,27 +85,98 @@ export class FileService {
   private async processCsvFile(file: File): Promise<string> {
     const content = await file.text();
     const lines = content.split('\n');
-    const headers = lines[0]?.split(',') || [];
     
     if (lines.length < 2) {
-      return content; // Return as-is if no data rows
+      return content;
     }
 
-    // Convert CSV to readable text format
-    let result = `Data from ${headers.length} columns:\n\n`;
-    
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',');
-      if (values.length === headers.length) {
-        result += `Entry ${i}:\n`;
-        headers.forEach((header, index) => {
-          result += `  ${header.trim()}: ${values[index]?.trim() || 'N/A'}\n`;
+    const products: any[] = [];
+    const categories: string[] = [];
+    let currentCategory = '';
+    let result = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const fields = this.parseCSVLine(line);
+      
+      // Check if this is a category header (first field has content, rest are mostly empty)
+      const nonEmptyFields = fields.filter(f => f.trim().length > 0);
+      if (nonEmptyFields.length === 1 && fields[0].trim().length > 0) {
+        currentCategory = fields[0].trim();
+        categories.push(currentCategory);
+        result += `\n## ${currentCategory}\n\n`;
+        continue;
+      }
+
+      // Check if this is a header row
+      if (fields[0]?.toLowerCase() === 'product' || fields.some(f => f.toLowerCase().includes('what is it'))) {
+        continue;
+      }
+
+      // Parse product data
+      const productName = fields[0]?.trim();
+      const description = fields[1]?.trim();
+      const pitch = fields[2]?.trim();
+      const targetAudience = fields[6]?.trim();
+
+      if (productName && productName.length > 0) {
+        products.push({
+          name: productName,
+          description: description || '',
+          pitch: pitch || '',
+          targetAudience: targetAudience || '',
+          category: currentCategory
         });
-        result += '\n';
+
+        result += `### ${productName}\n`;
+        if (description) result += `**What it is:** ${description}\n\n`;
+        if (pitch) result += `**Pitch:** ${pitch}\n\n`;
+        if (targetAudience) result += `**Target Audience:** ${targetAudience}\n\n`;
+        result += `**Category:** ${currentCategory}\n\n`;
+        result += '---\n\n';
       }
     }
-    
+
+    // Store structured data in the file object
+    const storedFiles = this.getStoredFiles();
+    const fileToUpdate = storedFiles.find(f => f.name === file.name);
+    if (fileToUpdate) {
+      fileToUpdate.products = products;
+      fileToUpdate.categories = categories;
+      localStorage.setItem('uploaded_files', JSON.stringify(storedFiles));
+    }
+
     return result;
+  }
+
+  private parseCSVLine(line: string): string[] {
+    const fields: string[] = [];
+    let currentField = '';
+    let insideQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"') {
+        if (insideQuotes && nextChar === '"') {
+          currentField += '"';
+          i++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === ',' && !insideQuotes) {
+        fields.push(currentField);
+        currentField = '';
+      } else {
+        currentField += char;
+      }
+    }
+
+    fields.push(currentField);
+    return fields;
   }
 
   private flattenJsonToText(obj: any, prefix = ''): string {
@@ -132,31 +203,53 @@ export class FileService {
     return result;
   }
 
-  private createChunks(text: string, fileId: string, chunkSize = 1000, overlap = 200): FileChunk[] {
+  private createChunks(text: string, fileId: string, chunkSize = 2000, overlap = 400): FileChunk[] {
     const chunks: FileChunk[] = [];
-    const words = text.split(/\s+/);
-    const wordsPerChunk = Math.floor(chunkSize / 5); // Approximate words per chunk
     
-    for (let i = 0; i < words.length; i += wordsPerChunk - Math.floor(overlap / 5)) {
-      const chunkWords = words.slice(i, i + wordsPerChunk);
-      const chunkContent = chunkWords.join(' ');
+    // For product CSV files, create category-based chunks
+    if (text.includes('## ') && text.includes('### ')) {
+      const sections = text.split(/(?=## )/);
       
-      if (chunkContent.trim().length > 0) {
-        chunks.push({
-          id: `${fileId}_chunk_${chunks.length}`,
-          fileId,
-          content: chunkContent,
-          metadata: {
-            chunkIndex: chunks.length,
-            totalChunks: 0, // Will be updated after all chunks are created
-            startPosition: i,
-            endPosition: i + chunkWords.length
-          }
-        });
+      sections.forEach(section => {
+        if (section.trim().length > 0) {
+          chunks.push({
+            id: `${fileId}_chunk_${chunks.length}`,
+            fileId,
+            content: section.trim(),
+            metadata: {
+              chunkIndex: chunks.length,
+              totalChunks: 0,
+              startPosition: 0,
+              endPosition: section.length
+            }
+          });
+        }
+      });
+    } else {
+      // Regular text chunking
+      const words = text.split(/\s+/);
+      const wordsPerChunk = Math.floor(chunkSize / 5);
+      
+      for (let i = 0; i < words.length; i += wordsPerChunk - Math.floor(overlap / 5)) {
+        const chunkWords = words.slice(i, i + wordsPerChunk);
+        const chunkContent = chunkWords.join(' ');
+        
+        if (chunkContent.trim().length > 0) {
+          chunks.push({
+            id: `${fileId}_chunk_${chunks.length}`,
+            fileId,
+            content: chunkContent,
+            metadata: {
+              chunkIndex: chunks.length,
+              totalChunks: 0,
+              startPosition: i,
+              endPosition: i + chunkWords.length
+            }
+          });
+        }
       }
     }
 
-    // Update total chunks count
     chunks.forEach(chunk => {
       chunk.metadata.totalChunks = chunks.length;
     });

@@ -183,8 +183,9 @@ const getRelevantFileContextDetailed = (query: string, maxChars: number = 2000) 
     return result;
   }
 
-  // Track which files we've already added to avoid duplication
+  // Track which content we've already added to avoid duplication
   const addedFiles = new Set<string>();
+  const seenContent = new Set<string>();
   let context = 'Relevant files:\n\n';
   let remainingChars = maxChars - context.length;
 
@@ -192,20 +193,64 @@ const getRelevantFileContextDetailed = (query: string, maxChars: number = 2000) 
     // Skip if already added
     if (addedFiles.has(file.id)) continue;
     
-    const content = file.extractedText || file.content;
     const fileHeader = `📄 ${file.name} (${file.type || 'text'}):\n`;
-
+    
     if (remainingChars <= fileHeader.length + 50) break;
 
     context += fileHeader;
     remainingChars -= fileHeader.length;
 
-    const truncatedContent = content.length > remainingChars - 10
-      ? content.substring(0, remainingChars - 10) + '...'
-      : content;
+    // For product CSV files, use structured product data
+    if (file.products && file.products.length > 0) {
+      const queryLower = query.toLowerCase();
+      const queryWords = queryLower.split(/\s+/);
+      
+      // Score and rank products by relevance
+      const scoredProducts = file.products
+        .map((product: any) => {
+          let score = 0;
+          const productText = `${product.name} ${product.description} ${product.pitch} ${product.category}`.toLowerCase();
+          
+          queryWords.forEach(word => {
+            if (productText.includes(word)) score += 2;
+            if (product.name.toLowerCase().includes(word)) score += 5;
+            if (product.category.toLowerCase().includes(word)) score += 4;
+          });
+          
+          return { product, score };
+        })
+        .filter(p => p.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
 
-    context += truncatedContent + '\n\n';
-    remainingChars -= truncatedContent.length + 2;
+      for (const { product } of scoredProducts) {
+        const productText = `### ${product.name}\n**Category:** ${product.category}\n**Description:** ${product.description}\n**Pitch:** ${product.pitch}\n**Target Audience:** ${product.targetAudience}\n\n`;
+        
+        const normalized = productText.replace(/\s+/g, ' ').trim();
+        if (seenContent.has(normalized)) continue;
+        
+        if (remainingChars >= productText.length) {
+          context += productText;
+          remainingChars -= productText.length;
+          seenContent.add(normalized);
+        }
+      }
+    } else {
+      // Regular file content
+      const content = file.extractedText || file.content;
+      const normalized = content.replace(/\s+/g, ' ').trim();
+      
+      if (!seenContent.has(normalized)) {
+        const truncatedContent = content.length > remainingChars - 10
+          ? content.substring(0, remainingChars - 10) + '...'
+          : content;
+
+        context += truncatedContent + '\n\n';
+        remainingChars -= truncatedContent.length + 2;
+        seenContent.add(normalized);
+      }
+    }
+    
     addedFiles.add(file.id);
 
     if (remainingChars <= 100) break;

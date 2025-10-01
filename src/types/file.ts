@@ -1,3 +1,11 @@
+export interface ProductData {
+  name: string;
+  description: string;
+  pitch: string;
+  targetAudience: string;
+  category: string;
+}
+
 export interface UploadedFile {
   id: string;
   name: string;
@@ -7,6 +15,8 @@ export interface UploadedFile {
   extractedText?: string;
   uploadDate: Date;
   projectId?: string;
+  products?: ProductData[];
+  categories?: string[];
 }
 
 export interface FileChunk {
