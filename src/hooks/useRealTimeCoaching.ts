@@ -552,6 +552,16 @@ export const useRealTimeCoaching = () => {
       };
 
       recognition.onresult = (event) => {
+        // NUCLEAR RATE LIMIT: Minimum 2 seconds between transcripts
+        const now = Date.now();
+        const lastProcessedTimeStr = lastProcessedTranscript.current.split('_')[0];
+        const lastProcessedTime = lastProcessedTimeStr ? parseInt(lastProcessedTimeStr) : 0;
+        
+        if (lastProcessedTime && now - lastProcessedTime < 2000) {
+          console.log('🚫 RATE LIMIT: Blocking transcript - only', now - lastProcessedTime, 'ms since last (need 2000ms)');
+          return;
+        }
+        
         console.log('Speech recognition result received:', event);
         
         // Only process the latest final result
@@ -594,8 +604,8 @@ export const useRealTimeCoaching = () => {
           // Only add to processedResults AFTER passing emergency duplicate check
           processedResults.current.add(resultId);
           
-          // Update last processed transcript
-          lastProcessedTranscript.current = transcript;
+          // Update last processed transcript with timestamp
+          lastProcessedTranscript.current = `${now}_${transcript.substring(0, 20)}`;
           
           // Clean up old processed results (keep last 10)
           if (processedResults.current.size > 10) {

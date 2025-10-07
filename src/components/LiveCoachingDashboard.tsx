@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useEmergencyReset } from '@/hooks/useEmergencyReset';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +47,7 @@ import { TranscriptDebugger } from '@/components/TranscriptDebugger';
 import { FeedbackAnalyticsDashboard } from '@/components/FeedbackAnalyticsDashboard';
 import { DuplicateDetectionMonitor } from '@/components/DuplicateDetectionMonitor';
 import { EnvironmentDebugPanel } from '@/components/EnvironmentDebugPanel';
+import { SafeModeToggle } from '@/components/SafeModeToggle';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
@@ -96,6 +98,8 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
     coachingMode,
     setCoachingMode
   } = useRealTimeCoaching();
+  
+  const { emergencyReset } = useEmergencyReset();
 
   const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
   const [copiedSuggestionId, setCopiedSuggestionId] = useState<string | null>(null);
@@ -109,6 +113,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [showFeedbackAnalytics, setShowFeedbackAnalytics] = useState(false);
   const [showDuplicateMonitor, setShowDuplicateMonitor] = useState(false);
   const [showEnvironmentDebug, setShowEnvironmentDebug] = useState(false);
+  const [safeModeEnabled, setSafeModeEnabled] = useState(false);
   const [environmentInfo] = useState(() => detectEnvironment());
   const { toast } = useToast();
 
@@ -121,6 +126,12 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   }, []);
 
   const handleStartCoaching = () => {
+    if (safeModeEnabled) {
+      toast({
+        title: "Safe Mode Active",
+        description: "Speech recognition is limited. Transcripts will be processed with extra caution.",
+      });
+    }
     setCallStartTime(Date.now());
     startListening(selectedCallType, selectedAudioSource, selectedAgentId);
   };
@@ -493,6 +504,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
               <Button onClick={clearSession} variant="outline" size="sm">
                 Clear Session
               </Button>
+              
+              <Button 
+                onClick={emergencyReset} 
+                variant="destructive" 
+                size="sm"
+                className="ml-auto"
+              >
+                🚨 Emergency Reset
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -501,6 +521,13 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       {/* Simple Agent Status */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
         <span>Agent: {selectedAgentId ? 'Specialized' : 'Generic'} Coaching</span>
+        
+        {/* Duplicate Warning */}
+        {transcription.length > 50 && sessionDuration < 30000 && (
+          <Badge variant="destructive" className="animate-pulse">
+            ⚠️ High Activity Detected - {transcription.length} transcripts in {Math.round(sessionDuration/1000)}s
+          </Badge>
+        )}
         
         {/* Environment indicator */}
         {environmentInfo.isPreview && (
@@ -581,6 +608,27 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           Environment
         </Button>
       </div>
+
+      {/* Safe Mode Card - Always Visible */}
+      <SafeModeToggle
+        isEnabled={safeModeEnabled}
+        onToggle={() => {
+          setSafeModeEnabled(!safeModeEnabled);
+          if (!safeModeEnabled) {
+            toast({
+              title: "Safe Mode Enabled",
+              description: "Aggressive duplicate protection is now active.",
+            });
+          } else {
+            toast({
+              title: "Safe Mode Disabled",
+              description: "Normal speech recognition resumed.",
+            });
+          }
+        }}
+        transcriptCount={transcription.length}
+        sessionDuration={sessionDuration}
+      />
 
       {/* Main Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
