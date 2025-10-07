@@ -190,6 +190,7 @@ export const useRealTimeCoaching = () => {
   const restartAttemptRef = useRef<number>(0);
   const isUsingWhisper = useRef<boolean>(false);
   const processingQueue = useRef<string[]>([]);
+  const isListeningRef = useRef<boolean>(false); // Track listening state to avoid closure issues
   
   // Enhanced duplicate detection refs
   const contentHashSet = useRef<Set<string>>(new Set());
@@ -530,6 +531,7 @@ export const useRealTimeCoaching = () => {
     };
   }, []);
 
+  // Initialize Speech Recognition ONCE on mount - prevent duplicate listeners
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognitionClass = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
@@ -541,8 +543,11 @@ export const useRealTimeCoaching = () => {
       recognition.lang = 'en-US';
       recognition.maxAlternatives = 1;
 
+      console.log('🎙️ Speech Recognition initialized ONCE - event handlers will NOT be recreated');
+
       recognition.onstart = () => {
         setState(prev => ({ ...prev, isListening: true }));
+        isListeningRef.current = true;
         restartAttemptRef.current = 0;
       };
 
@@ -738,10 +743,13 @@ export const useRealTimeCoaching = () => {
             }
           });
           
-          // Process for coaching suggestions
-          if (shouldGenerateSuggestion(transcript, state.suggestions, state.lastSuggestionTime, state.coachingMode)) {
-            processTranscriptionForCoaching(transcript, state.callType);
-          }
+          // Process for coaching suggestions - access current state via callback
+          setState(currentState => {
+            if (shouldGenerateSuggestion(transcript, currentState.suggestions, currentState.lastSuggestionTime, currentState.coachingMode)) {
+              processTranscriptionForCoaching(transcript, currentState.callType);
+            }
+            return currentState; // No state change here
+          });
           
           setIsProcessing(false);
         }
@@ -768,21 +776,24 @@ export const useRealTimeCoaching = () => {
             isListening: false,
             recognitionRestarts: prev.recognitionRestarts + 1
           }));
+          isListeningRef.current = false;
         }
       };
 
       recognition.onend = () => {
         console.log('🔄 Speech recognition ended, restarting...');
         
-        if (state.isListening && restartAttemptRef.current < 5) {
+        // Check isListeningRef instead of state to avoid closure issues
+        if (isListeningRef.current && restartAttemptRef.current < 5) {
           console.log('Auto-restarting speech recognition...');
           setTimeout(() => attemptRecognitionRestart(), 1000);
         } else {
           setState(prev => ({ ...prev, isListening: false }));
+          isListeningRef.current = false;
         }
       };
     }
-  }, [state.currentTurn, state.callType]);
+  }, []); // Empty dependency array - only run once on mount!
 
   // CRITICAL FIX: Enhanced Audio Capture with Single Transcription System Selection
   const requestTabAudio = async (): Promise<MediaStream | null> => {
@@ -932,6 +943,7 @@ export const useRealTimeCoaching = () => {
         error: null,
         isListening: true
       }));
+      isListeningRef.current = true;
 
       console.log('🎤 Requesting audio access...');
       
@@ -1285,6 +1297,7 @@ export const useRealTimeCoaching = () => {
       isListening: false,
       sessionDuration: prev.sessionStartTime ? Date.now() - prev.sessionStartTime : 0
     }));
+    isListeningRef.current = false;
   };
 
   // AI coaching functions - using hybrid local/cloud AI with sanitization

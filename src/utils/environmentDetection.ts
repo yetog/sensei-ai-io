@@ -17,8 +17,18 @@ export const detectEnvironment = (): EnvironmentInfo => {
   
   const isPreview = hostname.includes('lovable.app') || hostname.includes('preview');
   const isDevelopment = hostname === 'localhost' || hostname === '127.0.0.1';
+  // Custom domains should be treated like preview/dev for better API compatibility
   const isProduction = !isPreview && !isDevelopment;
   const hasHTTPS = protocol === 'https:';
+  
+  console.log('🌍 Environment Detection:', {
+    hostname,
+    protocol,
+    isPreview,
+    isDevelopment,
+    isProduction,
+    hasHTTPS
+  });
   
   return {
     isProduction,
@@ -44,9 +54,10 @@ export const getOptimalWhisperModel = (): string => {
 export const shouldUseLocalAI = (): boolean => {
   const env = detectEnvironment();
   
-  // Local AI might not work reliably in preview due to large model downloads
-  // Prefer cloud AI in preview environments
-  return env.isProduction || env.isDevelopment;
+  // Use cloud/browser APIs for all environments to ensure compatibility
+  // Local AI can be resource-intensive and may not work on all custom domains
+  console.log('🤖 AI Mode Selection:', { env, shouldUseLocal: false });
+  return false; // Always use browser/cloud APIs for better compatibility
 };
 
 export const checkNetworkConditions = async (): Promise<boolean> => {

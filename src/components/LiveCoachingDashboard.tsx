@@ -45,6 +45,7 @@ import { PerformanceDashboard } from '@/components/PerformanceDashboard';
 import { TranscriptDebugger } from '@/components/TranscriptDebugger';
 import { FeedbackAnalyticsDashboard } from '@/components/FeedbackAnalyticsDashboard';
 import { DuplicateDetectionMonitor } from '@/components/DuplicateDetectionMonitor';
+import { EnvironmentDebugPanel } from '@/components/EnvironmentDebugPanel';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { smartCache } from '@/services/smartCache';
 import { performanceProfiler } from '@/services/performanceProfiler';
@@ -107,6 +108,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const [showDebugger, setShowDebugger] = useState(false);
   const [showFeedbackAnalytics, setShowFeedbackAnalytics] = useState(false);
   const [showDuplicateMonitor, setShowDuplicateMonitor] = useState(false);
+  const [showEnvironmentDebug, setShowEnvironmentDebug] = useState(false);
   const [environmentInfo] = useState(() => detectEnvironment());
   const { toast } = useToast();
 
@@ -569,6 +571,15 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           <Settings className="h-3 w-3 mr-1" />
           Debug
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowEnvironmentDebug(true)}
+          className="text-xs"
+        >
+          <Monitor className="h-3 w-3 mr-1" />
+          Environment
+        </Button>
       </div>
 
       {/* Main Dashboard */}
@@ -789,6 +800,14 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           onClose={() => setShowDuplicateMonitor(false)}
         />
       )}
+
+      {/* Environment Debug Panel */}
+      <EnvironmentDebugPanel
+        isVisible={showEnvironmentDebug}
+        onClose={() => setShowEnvironmentDebug(false)}
+        isListening={isListening}
+        isUsingWhisper={isUsingWhisper}
+      />
     </div>
   );
 }
