@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import Tools from "./pages/Tools";
 import NotFound from "./pages/NotFound";
 import { CallHistory } from "./pages/CallHistory";
+import FollowupAnalysis from "./pages/FollowupAnalysis";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Sword } from "lucide-react";
@@ -48,6 +49,7 @@ const App = () => (
                     <Route path="/datasets" element={<Datasets />} />
                     <Route path="/agents" element={<Agents />} />
                     <Route path="/products" element={<Products />} />
+                    <Route path="/followup-analysis" element={<FollowupAnalysis />} />
                     <Route path="/call-history" element={<CallHistory />} />
                     <Route path="/tools" element={<Tools />} />
                     <Route path="/settings" element={<Settings />} />
