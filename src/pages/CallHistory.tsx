@@ -24,6 +24,7 @@ import {
 import { callSummaryStorage, type StoredCallSummary } from '@/services/callSummaryStorage';
 import { useToast } from '@/hooks/use-toast';
 import { PostCallSummary } from '@/components/PostCallSummary';
+import { ionosAI } from '@/services/ionosAI';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
@@ -37,6 +38,7 @@ export function CallHistory() {
   const [filteredSummaries, setFilteredSummaries] = useState<StoredCallSummary[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSummary, setSelectedSummary] = useState<StoredCallSummary | null>(null);
+  const [generatedSummary, setGeneratedSummary] = useState<any>(null);
   const [showPostCallSummary, setShowPostCallSummary] = useState(false);
   const [selectedCallType, setSelectedCallType] = useState<CallType>('follow_up');
   const { toast } = useToast();
@@ -148,11 +150,28 @@ ${summary.followUpEmail || 'No email generated'}
     await startListening(selectedCallType, 'microphone');
   };
 
-  const handleStopAnalysis = () => {
+  const handleStopAnalysis = async () => {
     stopListening();
     // Auto-show post-call summary when stopping
     if (transcription.length > 0) {
-      setShowPostCallSummary(true);
+      // Generate AI-powered summary
+      toast({
+        title: "Analyzing Call...",
+        description: "AI is analyzing your conversation to generate insights."
+      });
+      
+      try {
+        const summary = await generateCallSummary();
+        setGeneratedSummary(summary);
+        setShowPostCallSummary(true);
+      } catch (error) {
+        console.error('Failed to generate summary:', error);
+        toast({
+          title: "Analysis Error",
+          description: "Failed to analyze call. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -161,13 +180,86 @@ ${summary.followUpEmail || 'No email generated'}
     loadSummaries(); // Reload to show new summary
   };
 
-  const generateCallSummary = () => {
+  const generateCallSummary = async () => {
     const formatDuration = (seconds: number) => {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    // Combine all transcription into full conversation context
+    const fullTranscript = transcription.map(t => t.text).join(' ');
+    
+    // If transcript is too short, use basic extraction
+    if (fullTranscript.length < 50) {
+      return {
+        duration: formatDuration(sessionDuration),
+        callType: selectedCallType,
+        keyPoints: transcription.slice(-5).map(t => t.text.substring(0, 100)),
+        objections: suggestions.filter(s => s.type === 'objection').map(s => s.suggestion),
+        nextSteps: ['Review call transcript', 'Send follow-up email', 'Schedule next meeting'],
+        outcome: 'follow_up' as const,
+        transcriptHighlights: transcription.slice(-10).map(t => t.text),
+      };
+    }
+
+    // Use AI to analyze the conversation
+    try {
+      const analysisPrompt = `
+Analyze this sales call transcript and extract actionable intelligence:
+
+TRANSCRIPT:
+${fullTranscript}
+
+CALL TYPE: ${selectedCallType}
+
+Extract and return ONLY a valid JSON object with this exact structure:
+{
+  "customerName": "First name if mentioned, otherwise empty string",
+  "companyName": "Company name if mentioned, otherwise empty string",
+  "keyPoints": ["3-5 specific discussion points from actual conversation"],
+  "objections": ["Any concerns or objections raised by customer"],
+  "nextSteps": ["3-4 specific, actionable next steps based on conversation"],
+  "productRecommendations": ["Specific IONOS products/services mentioned or needed"],
+  "painPoints": ["Customer's key challenges mentioned"],
+  "desiredOutcomes": ["What customer wants to achieve"],
+  "outcome": "follow_up or quote_needed or closed or no_interest or demo_scheduled"
+}
+
+Be specific and extract actual conversation details, not generic placeholders.
+      `;
+
+      const response = await ionosAI.sendMessage([
+        { role: 'system', content: 'You are a sales analysis expert. Extract structured insights from conversations. Return ONLY valid JSON, no additional text.' },
+        { role: 'user', content: analysisPrompt }
+      ]);
+
+      // Parse JSON from AI response
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const analyzed = JSON.parse(jsonMatch[0]);
+        
+        const outcome = analyzed.outcome || 'follow_up';
+        return {
+          duration: formatDuration(sessionDuration),
+          callType: selectedCallType,
+          customerName: analyzed.customerName || '',
+          companyName: analyzed.companyName || '',
+          keyPoints: analyzed.keyPoints?.length > 0 ? analyzed.keyPoints : transcription.slice(-5).map(t => t.text.substring(0, 100)),
+          objections: analyzed.objections?.length > 0 ? analyzed.objections : suggestions.filter(s => s.type === 'objection').map(s => s.suggestion),
+          nextSteps: analyzed.nextSteps?.length > 0 ? analyzed.nextSteps : ['Review call transcript', 'Send follow-up email', 'Schedule next meeting'],
+          outcome: outcome as 'follow_up' | 'quote_needed' | 'closed' | 'no_interest' | 'demo_scheduled',
+          transcriptHighlights: transcription.slice(-10).map(t => t.text),
+          keyPain: analyzed.painPoints?.join(', ') || '',
+          desiredOutcome: analyzed.desiredOutcomes?.join(', ') || '',
+        };
+      }
+    } catch (error) {
+      console.error('Failed to AI-analyze call summary:', error);
+      // Fallback to basic extraction
+    }
+
+    // Fallback if AI analysis fails
     return {
       duration: formatDuration(sessionDuration),
       callType: selectedCallType,
@@ -463,11 +555,14 @@ ${summary.followUpEmail || 'No email generated'}
         </TabsContent>
       </Tabs>
 
-      {/* Post Call Summary Modal for Follow-up Analysis */}
-      {showPostCallSummary && !selectedSummary && (
+      {/* Post Call Summary Modal for Follow-up Analysis (triggered by handleStopAnalysis) */}
+      {showPostCallSummary && generatedSummary && (
         <PostCallSummary
-          callSummary={generateCallSummary()}
-          onClose={() => setShowPostCallSummary(false)}
+          callSummary={generatedSummary}
+          onClose={() => {
+            setShowPostCallSummary(false);
+            setGeneratedSummary(null);
+          }}
           onSaveToHistory={handleSaveToHistory}
         />
       )}

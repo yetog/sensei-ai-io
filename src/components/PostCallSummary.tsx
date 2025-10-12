@@ -182,27 +182,32 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
       }
       
       const analysisPrompt = `
-Analyze this sales conversation and extract key information:
+Analyze this sales conversation and extract detailed information for personalized follow-up:
 
-Transcript: "${transcriptText}"
-Call Type: "${callSummary.callType}"
-Key Points: ${callSummary.keyPoints.join(', ')}
+TRANSCRIPT:
+"${transcriptText}"
 
-Extract and return ONLY a JSON object with:
+CALL TYPE: ${callSummary.callType}
+KEY POINTS: ${callSummary.keyPoints.join(', ')}
+OBJECTIONS: ${callSummary.objections.join(', ')}
+
+Extract and return ONLY a valid JSON object with:
 {
-  "customerName": "first name only if clearly mentioned",
-  "companyName": "company name if mentioned", 
-  "keyPain": "main problem/challenge customer mentioned",
-  "desiredOutcome": "what customer wants to achieve"
+  "customerName": "First name only if clearly mentioned",
+  "companyName": "Company name if mentioned",
+  "keyPain": "Specific problems/challenges customer mentioned (be detailed, not generic)",
+  "desiredOutcome": "Specific outcomes customer wants to achieve",
+  "productNeeds": ["List of IONOS products/services customer needs based on conversation"]
 }
 
-If any field is not clearly mentioned, use relevant fallback based on call context.
+Be specific and extract actual details from the conversation. Use exact phrases when possible.
+If something is not mentioned, use context-appropriate fallback based on call type and discussion.
       `;
 
       const response = await ionosAI.sendMessage([
         {
           role: 'system',
-          content: 'You are an expert at extracting key information from sales conversations. Return only valid JSON.'
+          content: 'You are an expert at extracting key information from sales conversations. Return ONLY valid JSON with detailed, specific information from the conversation.'
         },
         {
           role: 'user',
@@ -215,17 +220,33 @@ If any field is not clearly mentioned, use relevant fallback based on call conte
         if (jsonMatch) {
           const extracted = JSON.parse(jsonMatch[0]);
           setConversationData({
-            customerName: extracted.customerName || '',
+            customerName: extracted.customerName || callSummary.customerName || '',
             companyName: extracted.companyName || '',
-            keyPain: extracted.keyPain || '',
-            desiredOutcome: extracted.desiredOutcome || ''
+            keyPain: extracted.keyPain || 'Business optimization needs',
+            desiredOutcome: extracted.desiredOutcome || 'Improved efficiency and growth'
           });
+          
+          console.log('Enhanced conversation analysis:', extracted);
         }
       } catch (parseError) {
         console.error('Failed to parse conversation analysis:', parseError);
+        // Use fallback data
+        setConversationData({
+          customerName: callSummary.customerName || '',
+          companyName: '',
+          keyPain: 'Business optimization needs',
+          desiredOutcome: 'Improved efficiency and growth'
+        });
       }
     } catch (error) {
       console.error('Failed to analyze conversation:', error);
+      // Use fallback data
+      setConversationData({
+        customerName: callSummary.customerName || '',
+        companyName: '',
+        keyPain: 'Business optimization needs',
+        desiredOutcome: 'Improved efficiency and growth'
+      });
     }
   };
 
