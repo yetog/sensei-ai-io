@@ -35,17 +35,19 @@ export const useElevenLabsVoiceAgent = (options: VoiceAgentOptions = {}) => {
       throw new Error('Agent ID not configured');
     }
 
-    // For public agents, we can use the agentId directly to get a signed URL
-    // This requires the agent to be set as "Public" in ElevenLabs dashboard
+    // Get signed URL from ElevenLabs API
+    // Note: API key is hardcoded here for development. Move to backend for production.
     const response = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'xi-api-key': 'sk_8e01678d62936838bc440a754e187457811e36b93613dca6',
       },
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get signed URL: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(`Failed to get signed URL: ${errorData.detail?.message || response.statusText}`);
     }
 
     const data = await response.json();
