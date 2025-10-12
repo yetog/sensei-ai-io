@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@11labs/react": "^0.2.0",
     "@elevenlabs/client": "^0.8.0",
     "@hookform/resolvers": "^3.9.0",
     "@huggingface/transformers": "^3.7.3",

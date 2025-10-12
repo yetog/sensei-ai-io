@@ -2,7 +2,6 @@ import { useState, useRef, useCallback } from 'react';
 import { Conversation } from '@elevenlabs/client';
 
 interface VoiceAgentOptions {
-  apiBaseUrl?: string;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onModeChange?: (mode: { mode: 'speaking' | 'listening' }) => void;
@@ -18,7 +17,7 @@ export const useElevenLabsVoiceAgent = (options: VoiceAgentOptions = {}) => {
   const [error, setError] = useState<string | null>(null);
   const conversationRef = useRef<any>(null);
 
-  const apiBaseUrl = options.apiBaseUrl || '/api/voice';
+  const agentId = import.meta.env.VITE_ELEVEN_LABS_AGENT_ID;
 
   const requestMicrophonePermission = async (): Promise<boolean> => {
     try {
@@ -32,12 +31,25 @@ export const useElevenLabsVoiceAgent = (options: VoiceAgentOptions = {}) => {
   };
 
   const getSignedUrl = async (): Promise<string> => {
-    const response = await fetch(`${apiBaseUrl}/signed-url`);
-    if (!response.ok) {
-      throw new Error('Failed to get signed URL from backend');
+    if (!agentId) {
+      throw new Error('Agent ID not configured');
     }
+
+    // For public agents, we can use the agentId directly to get a signed URL
+    // This requires the agent to be set as "Public" in ElevenLabs dashboard
+    const response = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get signed URL: ${response.statusText}`);
+    }
+
     const data = await response.json();
-    return data.signedUrl;
+    return data.signed_url;
   };
 
   const start = useCallback(async () => {
@@ -49,13 +61,17 @@ export const useElevenLabsVoiceAgent = (options: VoiceAgentOptions = {}) => {
     try {
       setError(null);
 
+      if (!agentId) {
+        throw new Error('ElevenLabs Agent ID not configured. Please set VITE_ELEVEN_LABS_AGENT_ID in .env file');
+      }
+
       // Request microphone permission
       const hasPermission = await requestMicrophonePermission();
       if (!hasPermission) {
         throw new Error('Microphone permission required');
       }
 
-      // Get signed URL from backend
+      // Get signed URL for public agent
       const signedUrl = await getSignedUrl();
 
       // Start ElevenLabs conversation
@@ -113,7 +129,7 @@ export const useElevenLabsVoiceAgent = (options: VoiceAgentOptions = {}) => {
       setError(err.message || 'Failed to start voice conversation');
       throw err;
     }
-  }, [apiBaseUrl, options]);
+  }, [agentId, options]);
 
   const stop = useCallback(async () => {
     if (conversationRef.current) {

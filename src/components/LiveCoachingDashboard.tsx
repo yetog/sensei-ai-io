@@ -1,24 +1,28 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Mic, 
-  MicOff, 
-  PhoneOff,
-  Brain, 
-  X,
-  AlertCircle,
-  PhoneCall,
+  PhoneOff, 
+  X, 
+  Trash2, 
   Download,
-  CheckCircle
+  Clock,
+  Calendar,
+  Radio,
+  Activity,
+  PhoneCall,
+  Brain,
+  AlertCircle
 } from 'lucide-react';
 import { useRealTimeCoachingWithElevenLabs } from '@/hooks/useRealTimeCoachingWithElevenLabs';
-import { PostCallSummary } from '@/components/PostCallSummary';
-import { SuggestionCard } from '@/components/SuggestionCard';
-import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
+import { EnhancedTranscriptDisplay } from './EnhancedTranscriptDisplay';
+import { SuggestionCard } from './SuggestionCard';
+import { PostCallSummary } from './PostCallSummary';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -45,64 +49,72 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
 
   const [showPostCallSummary, setShowPostCallSummary] = useState(false);
   const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
+  const [sessionDuration, setSessionDuration] = useState(0);
   const { toast } = useToast();
+
+  // Update session duration every second
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isListening && sessionStartTime) {
+      interval = setInterval(() => {
+        setSessionDuration(Date.now() - sessionStartTime);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isListening, sessionStartTime]);
 
   const handleStartCoaching = () => {
     startListening();
   };
 
   const handleStopCall = () => {
-    console.log('🛑 Stopping call, transcription segments:', transcription.length);
     stopListening();
-    
-    if (transcription.length > 0) {
+    if (transcription.length > 0 || suggestions.length > 0) {
       setShowPostCallSummary(true);
     }
   };
 
-  const formatDuration = (milliseconds: number): string => {
-    const seconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const formatDuration = (ms: number): string => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const generateCallSummary = () => {
-    const duration = sessionStartTime ? formatDuration(Date.now() - sessionStartTime) : '0:00';
-    
-    const keyPoints = transcription
-      .slice(0, 5)
-      .map(seg => seg.text.substring(0, 100) + (seg.text.length > 100 ? '...' : ''));
-    
-    const nextSteps = suggestions
-      .slice(0, 3)
-      .map(suggestion => suggestion.suggestion.substring(0, 80) + (suggestion.suggestion.length > 80 ? '...' : ''));
+    const duration = sessionStartTime ? Date.now() - sessionStartTime : 0;
+    const summaryText = transcription
+      .map(t => `${t.speaker === 'user' ? 'Agent' : 'Customer'}: ${t.text}`)
+      .join('\n\n');
 
     return {
-      duration,
-      customerName: undefined,
+      id: `call-${Date.now()}`,
+      date: new Date().toISOString(),
+      duration: formatDuration(duration),
       callType: selectedCallType,
-      keyPoints: keyPoints.length > 0 ? keyPoints : ['Customer expressed interest in our solution'],
-      objections: [],
-      nextSteps: nextSteps.length > 0 ? nextSteps : ['Follow up within 24 hours'],
+      transcript: summaryText,
+      coachingSuggestions: suggestions.map(s => ({
+        type: s.type,
+        message: s.suggestion,
+        timestamp: s.timestamp
+      })),
+      summary: `Sales call with ${transcription.length} exchanges and ${suggestions.length} coaching tips`,
+      keyPoints: suggestions.slice(0, 5).map(s => s.title),
+      nextSteps: [],
       outcome: 'follow_up' as const,
-      transcriptHighlights: transcription.slice(-3).map(seg => seg.text)
+      transcriptHighlights: [],
+      objections: [],
+      customerName: 'Customer',
+      companyName: 'IONOS'
     };
   };
 
-  const handleSaveToHistory = async (summary: any, email?: string) => {
+  const handleSaveToHistory = async (summary: any, email: string) => {
     try {
-      const savedCallId = callSummaryStorage.saveCallSummary({
-        duration: summary.duration,
-        callType: selectedCallType,
-        keyPoints: summary.keyPoints || [],
-        objections: summary.objections || [],
-        nextSteps: summary.nextSteps || [],
-        outcome: summary.outcome || 'follow_up',
-        transcriptHighlights: summary.transcriptHighlights || [],
+      callSummaryStorage.saveCallSummary({
+        ...summary,
         followUpEmail: email,
-        customerName: summary.customerName,
-        companyName: summary.companyName
+        objections: []
       });
       
       toast({
@@ -123,22 +135,16 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
 
   if (!isAvailable) {
     return (
-      <Card className="w-full max-w-4xl mx-auto">
+      <Card className="border-destructive bg-destructive/5">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PhoneCall className="h-5 w-5" />
-            Live Coaching Dashboard
+          <CardTitle className="text-destructive flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Voice Agent Not Available
           </CardTitle>
+          <CardDescription>
+            ElevenLabs Voice Agent is not properly configured. Please add VITE_ELEVEN_LABS_AGENT_ID to your .env file and make sure your agent is set to "Public" in the ElevenLabs dashboard.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Voice Agent Not Available</h3>
-            <p className="text-muted-foreground">
-              Please check your backend configuration and ensure ElevenLabs credentials are set.
-            </p>
-          </div>
-        </CardContent>
       </Card>
     );
   }
@@ -156,9 +162,9 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
 
       {/* Error Display */}
       {error && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-destructive bg-destructive/5">
           <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-red-800">
+            <div className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />
               <span>{error.message}</span>
             </div>
@@ -168,50 +174,60 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
 
       {/* Header Controls */}
       <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <PhoneCall className="h-5 w-5" />
-              ElevenLabs Voice Coaching
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              {/* Agent Avatar */}
               {isListening && (
-                <Badge variant={isSpeaking ? "default" : "secondary"}>
-                  {isSpeaking ? "🎙️ Agent Speaking" : "👂 Listening"}
-                </Badge>
+                <Avatar className={`h-12 w-12 border-2 transition-colors ${isSpeaking ? 'border-primary animate-pulse' : 'border-muted'}`}>
+                  <AvatarFallback className={`${isSpeaking ? 'bg-primary/20' : 'bg-muted'}`}>
+                    <Mic className={`h-6 w-6 ${isSpeaking ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </AvatarFallback>
+                </Avatar>
               )}
-            </CardTitle>
+
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={isListening ? handleStopCall : handleStartCoaching}
+                  size="lg"
+                  variant={isListening ? "destructive" : "default"}
+                  className={!isListening ? 'animate-pulse' : ''}
+                >
+                  {isListening ? (
+                    <>
+                      <PhoneOff className="mr-2 h-5 w-5" />
+                      End Coaching
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="mr-2 h-5 w-5" />
+                      Start Voice Coaching
+                    </>
+                  )}
+                </Button>
+                
+                {isListening && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isSpeaking ? "default" : "secondary"} className={isSpeaking ? "animate-pulse" : ""}>
+                      {isSpeaking ? "🎙️ Agent Speaking" : "👂 Listening"}
+                    </Badge>
+                    <Badge variant="outline" className="animate-pulse">
+                      <Radio className="mr-1 h-3 w-3" />
+                      Live
+                    </Badge>
+                    <Badge variant="outline">
+                      <Clock className="mr-1 h-3 w-3" />
+                      {formatDuration(sessionDuration)}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {onClose && (
-              <Button variant="ghost" size="sm" onClick={onClose}>
+              <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Control Buttons */}
-            {!isListening ? (
-              <Button onClick={handleStartCoaching} size="lg">
-                <Mic className="h-4 w-4 mr-2" />
-                Start Voice Coaching
-              </Button>
-            ) : (
-              <Button onClick={handleStopCall} variant="destructive" size="lg">
-                <PhoneOff className="h-4 w-4 mr-2" />
-                End Coaching
-              </Button>
-            )}
-
-            {isListening && sessionStartTime && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Duration: {formatDuration(Date.now() - sessionStartTime)}</span>
-              </div>
-            )}
-
-            {isProcessing && (
-              <Badge variant="outline">
-                <Brain className="h-3 w-3 mr-1 animate-pulse" />
-                Processing...
-              </Badge>
             )}
           </div>
         </CardContent>
@@ -220,91 +236,79 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Transcription Panel */}
-        <Card>
+        <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <PhoneCall className="h-4 w-4" />
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
               Live Transcription
-              {transcription.length > 0 && (
-                <Badge variant="secondary" className="ml-auto">
-                  {transcription.length} segments
-                </Badge>
-              )}
             </CardTitle>
+            <CardDescription>
+              Real-time conversation powered by ElevenLabs
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[500px]">
-              {transcription.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <PhoneCall className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Start coaching to see live transcription</p>
-                </div>
-              ) : (
-                <EnhancedTranscriptDisplay
-                  segments={transcription.map(t => ({
-                    ...t,
-                    speaker: t.speaker === 'assistant' ? 'customer' : 'user'
-                  }))}
-                  interimText=""
-                  transcriptQuality={0.9}
-                  sessionDuration={sessionStartTime ? Date.now() - sessionStartTime : 0}
-                  onExportTranscript={() => {
-                    const text = transcription.map(t => `${t.speaker}: ${t.text}`).join('\n');
-                    const blob = new Blob([text], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'transcript.txt';
-                    a.click();
-                  }}
-                />
-              )}
-            </ScrollArea>
+          <CardContent className="max-h-[500px] overflow-y-auto">
+            {transcription.length === 0 && !isListening && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Mic className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>Start voice coaching to see transcription</p>
+              </div>
+            )}
+            {transcription.length === 0 && isListening && (
+              <div className="text-center py-8 text-muted-foreground animate-pulse">
+                <Radio className="h-12 w-12 mx-auto mb-3" />
+                <p>Listening... Start speaking</p>
+              </div>
+            )}
+            {transcription.length > 0 && (
+              <EnhancedTranscriptDisplay 
+                segments={transcription.map(t => ({
+                  ...t,
+                  speaker: t.speaker === 'assistant' ? 'customer' : 'user'
+                }))}
+                interimText=""
+                transcriptQuality={0.9}
+                sessionDuration={sessionDuration}
+              />
+            )}
           </CardContent>
         </Card>
 
-        {/* Suggestions Panel */}
-        <Card>
+        {/* Coaching Suggestions Panel */}
+        <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Brain className="h-4 w-4" />
-              AI Coaching Suggestions
-              {suggestions.length > 0 && (
-                <Badge variant="secondary" className="ml-auto">
-                  {suggestions.length} tips
-                </Badge>
-              )}
+            <CardTitle className="flex items-center gap-2">
+              💡 AI Coaching Suggestions
             </CardTitle>
+            <CardDescription>
+              Real-time coaching powered by IONOS AI
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[500px]">
-              {suggestions.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Brain className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Coaching suggestions will appear here</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {suggestions.map((suggestion) => (
-                    <SuggestionCard
-                      key={suggestion.id}
-                      suggestion={suggestion}
-                      onCopy={(s) => {
-                        navigator.clipboard.writeText(s.suggestion);
-                        toast({
-                          title: "Copied",
-                          description: "Suggestion copied to clipboard"
-                        });
-                      }}
-                      onDismiss={(id) => dismissSuggestion(id)}
-                      onRate={(id, rating) =>
-                        rateSuggestion(id, rating)
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+          <CardContent className="space-y-4 max-h-[500px] overflow-y-auto">
+            {suggestions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {isListening ? (
+                  <>
+                    <Activity className="h-12 w-12 mx-auto mb-3 opacity-50 animate-pulse" />
+                    <p>Analyzing conversation for coaching tips...</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-4xl mb-3">💡</div>
+                    <p>AI coaching suggestions will appear here</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              suggestions.map((suggestion) => (
+                <SuggestionCard
+                  key={suggestion.id}
+                  suggestion={suggestion}
+                  onDismiss={dismissSuggestion}
+                  onRate={rateSuggestion}
+                  onCopy={() => navigator.clipboard.writeText(suggestion.suggestion)}
+                />
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
@@ -313,40 +317,35 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       {isListening && (
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle className="h-4 w-4" />
-                <span>Session active - coaching in progress</span>
+                <PhoneCall className="h-4 w-4" />
+                <span>Active coaching session</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    clearSession();
-                    toast({
-                      title: "Session Cleared",
-                      description: "Transcription and suggestions cleared."
-                    });
-                  }}
+                  onClick={clearSession}
                 >
+                  <Trash2 className="h-4 w-4 mr-2" />
                   Clear Session
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const text = transcription.map(t => `${t.speaker}: ${t.text}`).join('\n');
-                    const blob = new Blob([text], { type: 'text/plain' });
+                    const data = JSON.stringify(generateCallSummary(), null, 2);
+                    const blob = new Blob([data], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `coaching-session-${Date.now()}.txt`;
+                    a.download = `coaching-session-${Date.now()}.json`;
                     a.click();
                   }}
                 >
-                  <Download className="h-4 w-4 mr-1" />
-                  Export
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Transcript
                 </Button>
               </div>
             </div>
