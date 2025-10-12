@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useEmergencyReset } from '@/hooks/useEmergencyReset';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,54 +7,20 @@ import { Separator } from '@/components/ui/separator';
 import { 
   Mic, 
   MicOff, 
-  Users, 
-  User, 
+  PhoneOff,
   Brain, 
-  Clock, 
-  Target,
-  TrendingUp,
   X,
-  Copy,
-  CheckCircle,
   AlertCircle,
   PhoneCall,
-  Settings,
-  History,
   Download,
-  FileText,
-  Save,
-  Activity,
-  Wifi,
-  WifiOff,
-  Cloud,
-  Monitor
+  CheckCircle
 } from 'lucide-react';
-import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
+import { useRealTimeCoachingWithElevenLabs } from '@/hooks/useRealTimeCoachingWithElevenLabs';
 import { PostCallSummary } from '@/components/PostCallSummary';
-import { GoogleMeetInstructions } from '@/components/GoogleMeetInstructions';
-import { ErrorBanner } from '@/components/ErrorBanner';
 import { SuggestionCard } from '@/components/SuggestionCard';
-import { AnimatedSuggestionCard } from '@/components/AnimatedSuggestionCard';
-import { AgentSelector } from '@/components/AgentSelector';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
-import { EnhancedDemoScenarios } from '@/components/EnhancedDemoScenarios';
-import { ProcessingIndicator } from '@/components/ProcessingIndicator';
-
-
-import { PerformanceDashboard } from '@/components/PerformanceDashboard';
-import { TranscriptDebugger } from '@/components/TranscriptDebugger';
-import { FeedbackAnalyticsDashboard } from '@/components/FeedbackAnalyticsDashboard';
-import { DuplicateDetectionMonitor } from '@/components/DuplicateDetectionMonitor';
-import { EnvironmentDebugPanel } from '@/components/EnvironmentDebugPanel';
-import { SafeModeToggle } from '@/components/SafeModeToggle';
 import { callSummaryStorage } from '@/services/callSummaryStorage';
-import { smartCache } from '@/services/smartCache';
-import { performanceProfiler } from '@/services/performanceProfiler';
-import { detectEnvironment } from '@/utils/environmentDetection';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { NativeSelect } from '@/components/ui/native-select';
-import '@/services/demoAgentSetup';
 
 interface LiveCoachingDashboardProps {
   onClose?: () => void;
@@ -64,96 +29,35 @@ interface LiveCoachingDashboardProps {
 export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   const {
     isListening,
+    isSpeaking,
     isProcessing,
     transcription,
     suggestions,
-    currentTurn,
-    callType,
-    isDemoMode,
-    audioSource,
-    micLevel,
-    tabLevel,
-    isTabAudioAvailable,
+    sessionStartTime,
     error,
-    sessionStatus,
     startListening,
     stopListening,
-    toggleSpeaker,
     clearSession,
     dismissSuggestion,
     rateSuggestion,
-    toggleDemoMode,
-    requestCoaching,
-    saveTranscript,
-    exportTranscriptData,
-    clearError,
-    retryOperation,
     isAvailable,
-    sessionDuration,
-    transcriptQuality,
-    interimTranscript,
-    getPerformanceStats,
-    logPerformanceReport,
-    isUsingWhisper,
-    coachingMode,
-    setCoachingMode
-  } = useRealTimeCoaching();
-  
-  const { emergencyReset } = useEmergencyReset();
+  } = useRealTimeCoachingWithElevenLabs();
 
-  const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
-  const [copiedSuggestionId, setCopiedSuggestionId] = useState<string | null>(null);
   const [showPostCallSummary, setShowPostCallSummary] = useState(false);
-  const [selectedAudioSource, setSelectedAudioSource] = useState<'microphone' | 'tab' | 'both'>('microphone');
-  const [callStartTime, setCallStartTime] = useState<number | null>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [showDemoScenarios, setShowDemoScenarios] = useState(false);
-  const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(false);
-  const [showDebugger, setShowDebugger] = useState(false);
-  const [showFeedbackAnalytics, setShowFeedbackAnalytics] = useState(false);
-  const [showDuplicateMonitor, setShowDuplicateMonitor] = useState(false);
-  const [showEnvironmentDebug, setShowEnvironmentDebug] = useState(false);
-  const [safeModeEnabled, setSafeModeEnabled] = useState(false);
-  const [environmentInfo] = useState(() => detectEnvironment());
+  const [selectedCallType, setSelectedCallType] = useState<'incoming_sales' | 'retention' | 'outbound' | 'general'>('incoming_sales');
   const { toast } = useToast();
 
-  // Initialize smart cache and performance profiler
-  useEffect(() => {
-    smartCache.initialize().then(() => {
-      smartCache.preCacheCommonResponses();
-      console.log('✅ Smart cache initialized and pre-cached');
-    }).catch(console.warn);
-  }, []);
-
   const handleStartCoaching = () => {
-    if (safeModeEnabled) {
-      toast({
-        title: "Safe Mode Active",
-        description: "Speech recognition is limited. Transcripts will be processed with extra caution.",
-      });
-    }
-    setCallStartTime(Date.now());
-    startListening(selectedCallType, selectedAudioSource, selectedAgentId);
+    startListening();
   };
 
   const handleStopCall = () => {
     console.log('🛑 Stopping call, transcription segments:', transcription.length);
     stopListening();
     
-    // Show post-call summary if we have any transcription data
     if (transcription.length > 0) {
-      console.log('📊 Showing post-call summary with', transcription.length, 'segments');
-      setShowPostCallSummary(true); // Remove delay - immediate display
-    } else {
-      console.log('⚠️ No transcription data, not showing summary');
+      setShowPostCallSummary(true);
     }
-    setCallStartTime(null);
-  };
-
-  const handleSelectScenario = (scenario: any) => {
-    setSelectedCallType(scenario.callType);
-    setShowDemoScenarios(false);
-    // Optionally start coaching immediately or let user start manually
   };
 
   const formatDuration = (milliseconds: number): string => {
@@ -164,22 +68,12 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   };
 
   const generateCallSummary = () => {
-    const duration = callStartTime ? formatDuration(Date.now() - callStartTime) : '0:00';
+    const duration = sessionStartTime ? formatDuration(Date.now() - sessionStartTime) : '0:00';
     
-    // Extract key points from transcription
-    const customerSegments = transcription.filter(seg => seg.speaker === 'customer');
-    const keyPoints = customerSegments
+    const keyPoints = transcription
       .slice(0, 5)
       .map(seg => seg.text.substring(0, 100) + (seg.text.length > 100 ? '...' : ''));
     
-    // Extract objections (segments with negative keywords)
-    const objectionKeywords = ['but', 'however', 'concern', 'worry', 'expensive', 'cost', 'budget'];
-    const objections = customerSegments
-      .filter(seg => objectionKeywords.some(keyword => seg.text.toLowerCase().includes(keyword)))
-      .slice(0, 3)
-      .map(seg => seg.text.substring(0, 80) + (seg.text.length > 80 ? '...' : ''));
-
-    // Generate next steps based on suggestions
     const nextSteps = suggestions
       .slice(0, 3)
       .map(suggestion => suggestion.suggestion.substring(0, 80) + (suggestion.suggestion.length > 80 ? '...' : ''));
@@ -189,7 +83,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
       customerName: undefined,
       callType: selectedCallType,
       keyPoints: keyPoints.length > 0 ? keyPoints : ['Customer expressed interest in our solution'],
-      objections: objections.length > 0 ? objections : [],
+      objections: [],
       nextSteps: nextSteps.length > 0 ? nextSteps : ['Follow up within 24 hours'],
       outcome: 'follow_up' as const,
       transcriptHighlights: transcription.slice(-3).map(seg => seg.text)
@@ -197,23 +91,7 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
   };
 
   const handleSaveToHistory = async (summary: any, email?: string) => {
-    const profileId = performanceProfiler.startProfile('save_call_history', 'cache', {
-      summarySize: JSON.stringify(summary).length,
-      hasEmail: !!email
-    });
-
     try {
-      console.log('💾 Saving call to history:', {
-        duration: summary.duration,
-        callType: selectedCallType,
-        keyPoints: summary.keyPoints,
-        objections: summary.objections,
-        nextSteps: summary.nextSteps,
-        outcome: summary.outcome,
-        transcriptHighlights: summary.transcriptHighlights,
-        followUpEmail: email
-      });
-
       const savedCallId = callSummaryStorage.saveCallSummary({
         duration: summary.duration,
         callType: selectedCallType,
@@ -226,18 +104,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         customerName: summary.customerName,
         companyName: summary.companyName
       });
-      
-      console.log('✅ Call saved successfully with ID:', savedCallId);
-      
-      // Cache successful patterns for future use
-      if (summary.keyPoints?.length > 0) {
-        const cacheKey = `call_pattern_${selectedCallType}_${Date.now()}`;
-        await smartCache.set(cacheKey, {
-          keyPoints: summary.keyPoints,
-          outcome: summary.outcome,
-          nextSteps: summary.nextSteps
-        }, `successful ${selectedCallType} call pattern`);
-      }
       
       toast({
         title: "Call Saved",
@@ -252,59 +118,6 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         description: "Failed to save call to history. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      performanceProfiler.endProfile(profileId, { success: true });
-    }
-  };
-
-  const handleCopySuggestion = async (suggestion: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(suggestion);
-      setCopiedSuggestionId(id);
-      setTimeout(() => setCopiedSuggestionId(null), 2000);
-    } catch (error) {
-      console.error('Failed to copy suggestion:', error);
-    }
-  };
-
-  const getStatusColor = () => {
-    if (isProcessing) return 'bg-amber-500';
-    if (isListening) return 'bg-green-500';
-    return 'bg-gray-400';
-  };
-
-  const getStatusText = () => {
-    if (error) return `Error: ${error.message}`;
-    if (isProcessing) return 'Processing...';
-    if (isListening && transcription.length === 0) return 'Listening for speech...';
-    if (isListening) return `Active - ${suggestions.length} suggestions`;
-    return 'Ready';
-  };
-
-  const getTranscriptionEngine = () => {
-    if (!isListening) return 'None';
-    if (error) return 'Failed';
-    if (isUsingWhisper) return 'Whisper AI';
-    return 'Browser Speech';
-  };
-
-  const getSuggestionIcon = (type: string) => {
-    switch (type) {
-      case 'objection': return <AlertCircle className="h-4 w-4" />;
-      case 'product_pitch': return <Target className="h-4 w-4" />;
-      case 'closing': return <TrendingUp className="h-4 w-4" />;
-      case 'retention': return <Users className="h-4 w-4" />;
-      default: return <Brain className="h-4 w-4" />;
-    }
-  };
-
-  const getSuggestionColor = (type: string) => {
-    switch (type) {
-      case 'objection': return 'border-red-200 bg-red-50';
-      case 'product_pitch': return 'border-blue-200 bg-blue-50';
-      case 'closing': return 'border-green-200 bg-green-50';
-      case 'retention': return 'border-purple-200 bg-purple-50';
-      default: return 'border-gray-200 bg-gray-50';
     }
   };
 
@@ -320,9 +133,9 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         <CardContent>
           <div className="text-center py-8">
             <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Speech Recognition Not Available</h3>
+            <h3 className="text-lg font-semibold mb-2">Voice Agent Not Available</h3>
             <p className="text-muted-foreground">
-              Your browser doesn't support speech recognition. Please use Chrome, Edge, or Safari for the best experience.
+              Please check your backend configuration and ensure ElevenLabs credentials are set.
             </p>
           </div>
         </CardContent>
@@ -332,13 +145,25 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4">
-      {/* Error Banner */}
-      {error && (
-        <ErrorBanner 
-          error={error}
-          onRetry={retryOperation}
-          onDismiss={clearError}
+      {/* Post Call Summary Modal */}
+      {showPostCallSummary && (
+        <PostCallSummary
+          callSummary={generateCallSummary()}
+          onClose={() => setShowPostCallSummary(false)}
+          onSaveToHistory={handleSaveToHistory}
         />
+      )}
+
+      {/* Error Display */}
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error.message}</span>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Header Controls */}
@@ -347,13 +172,12 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <PhoneCall className="h-5 w-5" />
-              Live Sales Coaching
-               <ProcessingIndicator 
-                 isProcessing={isProcessing}
-                 isListening={isListening}
-                 micLevel={micLevel}
-                 className="ml-2"
-               />
+              ElevenLabs Voice Coaching
+              {isListening && (
+                <Badge variant={isSpeaking ? "default" : "secondary"}>
+                  {isSpeaking ? "🎙️ Agent Speaking" : "👂 Listening"}
+                </Badge>
+              )}
             </CardTitle>
             {onClose && (
               <Button variant="ghost" size="sm" onClick={onClose}>
@@ -364,362 +188,118 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex items-center gap-4 flex-wrap">
-            {/* Call Type Selection */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Call Type:</span>
-              <NativeSelect 
-                value={selectedCallType}
-                onChange={(e) => setSelectedCallType(e.target.value as any)}
-                className="w-auto"
-                disabled={isListening}
-              >
-                <option value="incoming_sales">Incoming Sales</option>
-                <option value="retention">Retention</option>
-                <option value="outbound">Outbound</option>
-                <option value="general">General</option>
-              </NativeSelect>
-            </div>
-
-
-            {/* Audio Source Selection */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Audio:</span>
-              <NativeSelect 
-                value={selectedAudioSource}
-                onChange={(e) => setSelectedAudioSource(e.target.value as any)}
-                className="w-auto"
-                disabled={isListening}
-              >
-                <option value="microphone">Microphone Only</option>
-                <option value="tab">System Audio Only</option>
-                <option value="both">Microphone + System</option>
-              </NativeSelect>
-            </div>
-
-            {/* Coaching Mode Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Coaching:</span>
-              <NativeSelect 
-                value={coachingMode}
-                onChange={(e) => setCoachingMode(e.target.value as 'live' | 'manual')}
-                className="w-auto"
-                disabled={isListening}
-              >
-                <option value="live">Live Mode (Auto)</option>
-                <option value="manual">Manual Mode (Request)</option>
-              </NativeSelect>
-            </div>
-
             {/* Control Buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {!isListening ? (
-                <Button onClick={handleStartCoaching} className="flex items-center gap-2">
-                  <Mic className="h-4 w-4" />
-                  Start Coaching
-                </Button>
-              ) : (
-                <Button onClick={handleStopCall} variant="destructive" className="flex items-center gap-2">
-                  <MicOff className="h-4 w-4" />
-                  Stop Call
-                </Button>
-              )}
-              
-              {isListening && (
-                <Button onClick={toggleSpeaker} variant="outline" size="sm">
-                  {currentTurn === 'user' ? (
-                    <>
-                      <User className="h-4 w-4 mr-1" />
-                      You're Speaking
-                    </>
-                  ) : (
-                    <>
-                      <Users className="h-4 w-4 mr-1" />
-                      Customer Speaking
-                    </>
-                  )}
-                </Button>
-              )}
-              
-              
-              <Button 
-                onClick={() => {
-                  console.log('🎯 Manual coaching request triggered');
-                  requestCoaching();
-                }} 
-                variant="secondary" 
-                size="sm"
-                disabled={transcription.length === 0 || !transcription.some(t => t.text.trim())}
-                className=""
-              >
-                <Brain className="h-4 w-4 mr-1" />
-                {coachingMode === 'live' ? 'Auto Coaching' : `Request Coaching ${transcription.length > 0 ? '(Ready)' : '(No transcript)'}`}
+            {!isListening ? (
+              <Button onClick={handleStartCoaching} size="lg">
+                <Mic className="h-4 w-4 mr-2" />
+                Start Voice Coaching
               </Button>
+            ) : (
+              <Button onClick={handleStopCall} variant="destructive" size="lg">
+                <PhoneOff className="h-4 w-4 mr-2" />
+                End Coaching
+              </Button>
+            )}
 
-              {/* Audio Level Indicators */}
-              {isListening && (audioSource === 'microphone' || audioSource === 'both') && (
-                <div className="flex items-center gap-1">
-                  <Mic className="h-3 w-3 text-blue-500" />
-                  <div className="w-12 h-2 bg-gray-200 rounded">
-                    <div 
-                      className="h-full bg-blue-500 rounded transition-all duration-100"
-                      style={{ width: `${Math.min(micLevel * 2, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500">{Math.round(micLevel)}</span>
-                </div>
-              )}
+            {isListening && sessionStartTime && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Duration: {formatDuration(Date.now() - sessionStartTime)}</span>
+              </div>
+            )}
 
-              {isListening && (audioSource === 'tab' || audioSource === 'both') && (
-                <div className="flex items-center gap-1">
-                  <PhoneCall className="h-3 w-3 text-green-500" />
-                  <div className="w-12 h-2 bg-gray-200 rounded">
-                    <div 
-                      className="h-full bg-green-500 rounded transition-all duration-100"
-                      style={{ width: `${Math.min(tabLevel * 2, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500">{Math.round(tabLevel)}</span>
-                </div>
-              )}
-              
-              <Button 
-                onClick={saveTranscript} 
-                variant="outline" 
-                size="sm"
-                disabled={transcription.length === 0}
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Save Transcript
-              </Button>
-              
-               <Button 
-                onClick={() => setShowDemoScenarios(true)} 
-                variant="outline" 
-                size="sm"
-              >
-                <Target className="h-4 w-4 mr-1" />
-                Demo Scenarios
-              </Button>
-
-              <Button onClick={clearSession} variant="outline" size="sm">
-                Clear Session
-              </Button>
-              
-              <Button 
-                onClick={emergencyReset} 
-                variant="destructive" 
-                size="sm"
-                className="ml-auto"
-              >
-                🚨 Emergency Reset
-              </Button>
-            </div>
+            {isProcessing && (
+              <Badge variant="outline">
+                <Brain className="h-3 w-3 mr-1 animate-pulse" />
+                Processing...
+              </Badge>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Simple Agent Status */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-        <span>Agent: {selectedAgentId ? 'Specialized' : 'Generic'} Coaching</span>
-        
-        {/* Duplicate Warning */}
-        {transcription.length > 50 && sessionDuration < 30000 && (
-          <Badge variant="destructive" className="animate-pulse">
-            ⚠️ High Activity Detected - {transcription.length} transcripts in {Math.round(sessionDuration/1000)}s
-          </Badge>
-        )}
-        
-        {/* Environment indicator */}
-        {environmentInfo.isPreview && (
-          <span className="flex items-center gap-1">
-            Environment: <Badge variant="outline" className="text-xs flex items-center gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-              <Cloud className="h-3 w-3" />
-              Preview Mode - Browser Speech Only
-            </Badge>
-          </span>
-        )}
-        
-        <span className="flex items-center gap-1">
-          Mode: <Badge variant={coachingMode === 'live' ? 'default' : 'secondary'} className="text-xs">
-            {coachingMode === 'live' ? '🔄 Live' : '👆 Manual'}
-          </Badge>
-          {coachingMode === 'live' && isListening && (
-            <span className="text-green-600 animate-pulse">● Auto-suggestions enabled</span>
-          )}
-        </span>
-        <span className="flex items-center gap-1">
-          Transcription: <Badge variant={isUsingWhisper ? 'default' : 'secondary'} className="text-xs flex items-center gap-1">
-            {isUsingWhisper ? (
-              <>
-                <Wifi className="h-3 w-3" />
-                Whisper AI
-              </>
-            ) : (
-              <>
-                <Monitor className="h-3 w-3" />
-                Browser
-              </>
-            )}
-          </Badge>
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowFeedbackAnalytics(true)}
-          className="text-xs"
-        >
-          <TrendingUp className="h-3 w-3 mr-1" />
-          AI Analytics
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowDuplicateMonitor(true)}
-          className="text-xs"
-        >
-          <Activity className="h-3 w-3 mr-1" />
-          Duplicates
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowPerformanceDashboard(true)}
-          className="text-xs"
-        >
-          <Clock className="h-3 w-3 mr-1" />
-          Performance
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowDebugger(true)}
-          className="text-xs"
-        >
-          <Settings className="h-3 w-3 mr-1" />
-          Debug
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowEnvironmentDebug(true)}
-          className="text-xs"
-        >
-          <Monitor className="h-3 w-3 mr-1" />
-          Environment
-        </Button>
-      </div>
-
-      {/* Safe Mode Card - Always Visible */}
-      <SafeModeToggle
-        isEnabled={safeModeEnabled}
-        onToggle={() => {
-          setSafeModeEnabled(!safeModeEnabled);
-          if (!safeModeEnabled) {
-            toast({
-              title: "Safe Mode Enabled",
-              description: "Aggressive duplicate protection is now active.",
-            });
-          } else {
-            toast({
-              title: "Safe Mode Disabled",
-              description: "Normal speech recognition resumed.",
-            });
-          }
-        }}
-        transcriptCount={transcription.length}
-        sessionDuration={sessionDuration}
-      />
-
-      {/* Main Dashboard */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Live Transcription */}
-        <Card className="h-[600px]">
+        {/* Transcription Panel */}
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mic className="h-4 w-4" />
-              Live Conversation
-              {isDemoMode && (
-                <Badge variant="outline" className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300 animate-pulse">🎯 DEMO MODE</Badge>
+            <CardTitle className="text-base flex items-center gap-2">
+              <PhoneCall className="h-4 w-4" />
+              Live Transcription
+              {transcription.length > 0 && (
+                <Badge variant="secondary" className="ml-auto">
+                  {transcription.length} segments
+                </Badge>
               )}
             </CardTitle>
-            <div className="flex items-center gap-2 pt-2">
-              <Button 
-                onClick={exportTranscriptData} 
-                variant="ghost" 
-                size="sm"
-                disabled={transcription.length === 0}
-                className="text-xs"
-              >
-                <FileText className="h-3 w-3 mr-1" />
-                Export JSON
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {transcription.length} exchanges
-              </span>
-            </div>
           </CardHeader>
-          <CardContent className="h-[500px]">
-            {transcription.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <div className="text-center">
-                  <PhoneCall className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-base">Start coaching to see live transcription</p>
+          <CardContent>
+            <ScrollArea className="h-[500px]">
+              {transcription.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <PhoneCall className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Start coaching to see live transcription</p>
                 </div>
-              </div>
-            ) : (
-              <EnhancedTranscriptDisplay
-                segments={transcription}
-                interimText={interimTranscript}
-                transcriptQuality={transcriptQuality}
-                sessionDuration={sessionDuration}
-                onExportTranscript={exportTranscriptData}
-                onEditSegment={(segmentId, newText) => {
-                  // Handle transcript editing if needed in the future
-                  console.log('Edit segment:', segmentId, newText);
-                }}
-              />
-            )}
+              ) : (
+                <EnhancedTranscriptDisplay
+                  segments={transcription.map(t => ({
+                    ...t,
+                    speaker: t.speaker === 'assistant' ? 'customer' : 'user'
+                  }))}
+                  interimText=""
+                  transcriptQuality={0.9}
+                  sessionDuration={sessionStartTime ? Date.now() - sessionStartTime : 0}
+                  onExportTranscript={() => {
+                    const text = transcription.map(t => `${t.speaker}: ${t.text}`).join('\n');
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'transcript.txt';
+                    a.click();
+                  }}
+                />
+              )}
+            </ScrollArea>
           </CardContent>
         </Card>
 
-        {/* AI Suggestions */}
-        <Card className="h-[600px]">
+        {/* Suggestions Panel */}
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
               <Brain className="h-4 w-4" />
               AI Coaching Suggestions
-              <Badge variant="secondary" className="text-xs">
-                {suggestions.length}/2 active
-              </Badge>
-              {isProcessing && (
-                <div className="flex items-center gap-1 text-sm text-amber-600">
-                  <Clock className="h-3 w-3 animate-spin" />
-                  Analyzing...
-                </div>
+              {suggestions.length > 0 && (
+                <Badge variant="secondary" className="ml-auto">
+                  {suggestions.length} tips
+                </Badge>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-[500px]">
-            <ScrollArea className="h-full">
+          <CardContent>
+            <ScrollArea className="h-[500px]">
               {suggestions.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <div className="text-center">
-                    <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-base mb-2">Intelligent coaching suggestions</p>
-                    <p className="text-sm">Will appear when specific triggers are detected</p>
-                  </div>
+                <div className="text-center py-8 text-muted-foreground">
+                  <Brain className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Coaching suggestions will appear here</p>
                 </div>
               ) : (
-                 <div className="space-y-4">
-                  {suggestions.slice().reverse().slice(0, 2).map((suggestion, index) => (
-                    <AnimatedSuggestionCard
+                <div className="space-y-3">
+                  {suggestions.map((suggestion) => (
+                    <SuggestionCard
                       key={suggestion.id}
                       suggestion={suggestion}
-                      onCopy={(sug) => handleCopySuggestion(sug.suggestion, sug.id)}
-                      onDismiss={dismissSuggestion}
-                      onRate={rateSuggestion}
-                      copiedId={copiedSuggestionId}
-                      isNew={index === 0 && suggestions.length > 0}
+                      onCopy={(s) => {
+                        navigator.clipboard.writeText(s.suggestion);
+                        toast({
+                          title: "Copied",
+                          description: "Suggestion copied to clipboard"
+                        });
+                      }}
+                      onDismiss={(id) => dismissSuggestion(id)}
+                      onRate={(id, rating) =>
+                        rateSuggestion(id, rating)
+                      }
                     />
                   ))}
                 </div>
@@ -727,135 +307,52 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
             </ScrollArea>
           </CardContent>
         </Card>
-
       </div>
 
-      {/* Session Stats */}
-      {transcription.length > 0 && (
+      {/* Session Actions */}
+      {isListening && (
         <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-primary">
-                  {transcription.length}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Total Exchanges
-                </div>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle className="h-4 w-4" />
+                <span>Session active - coaching in progress</span>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-green-600">
-                  {suggestions.length}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Suggestions Given
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-blue-600">
-                  {suggestions.filter(s => s.type === 'objection').length}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Objections Detected
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-purple-600">
-                  {Math.round((suggestions.reduce((acc, s) => acc + s.confidence, 0) / suggestions.length) * 100) || 0}%
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Avg Confidence
-                </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    clearSession();
+                    toast({
+                      title: "Session Cleared",
+                      description: "Transcription and suggestions cleared."
+                    });
+                  }}
+                >
+                  Clear Session
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const text = transcription.map(t => `${t.speaker}: ${t.text}`).join('\n');
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `coaching-session-${Date.now()}.txt`;
+                    a.click();
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
-
-
-      {/* Google Meet Testing Instructions */}
-      {(selectedAudioSource === 'tab' || selectedAudioSource === 'both') && (
-        <GoogleMeetInstructions
-          audioSource={selectedAudioSource}
-          isListening={isListening}
-          tabLevel={tabLevel}
-          micLevel={micLevel}
-          isTabAudioAvailable={isTabAudioAvailable}
-        />
-      )}
-
-      {/* Post-Call Summary Modal */}
-      {showPostCallSummary && (
-        <PostCallSummary
-          callSummary={generateCallSummary()}
-          onClose={() => {
-            console.log('❌ Closing post-call summary modal');
-            setShowPostCallSummary(false);
-          }}
-          onSaveToHistory={(summary) => {
-            console.log('💾 Saving call summary from modal:', summary);
-            handleSaveToHistory(summary);
-            setShowPostCallSummary(false);
-          }}
-        />
-      )}
-
-      {/* Demo Scenarios Inline */}
-      {showDemoScenarios && (
-        <div className="mt-6 animate-fade-in">
-          <EnhancedDemoScenarios 
-            onSelectScenario={(scenario) => {
-              handleStartCoaching();
-              setShowDemoScenarios(false);
-              toast({
-                title: "Demo Started",
-                description: `Started "${scenario.title}" scenario. Follow the customer lines to test coaching.`
-              });
-            }}
-            isListening={isListening} 
-          />
-        </div>
-      )}
-
-      {/* Performance Dashboard Modal */}
-      {showPerformanceDashboard && (
-        <PerformanceDashboard
-          isVisible={showPerformanceDashboard}
-          onClose={() => setShowPerformanceDashboard(false)}
-        />
-      )}
-
-      {/* Transcript Debugger Modal */}
-      {showDebugger && (
-        <TranscriptDebugger
-          isVisible={showDebugger}
-          onClose={() => setShowDebugger(false)}
-        />
-      )}
-
-      {/* Feedback Analytics Dashboard */}
-      {showFeedbackAnalytics && (
-        <FeedbackAnalyticsDashboard
-          isVisible={showFeedbackAnalytics}
-          onClose={() => setShowFeedbackAnalytics(false)}
-        />
-      )}
-
-      {/* Duplicate Detection Monitor */}
-      {showDuplicateMonitor && (
-        <DuplicateDetectionMonitor
-          isVisible={showDuplicateMonitor}
-          onClose={() => setShowDuplicateMonitor(false)}
-        />
-      )}
-
-      {/* Environment Debug Panel */}
-      <EnvironmentDebugPanel
-        isVisible={showEnvironmentDebug}
-        onClose={() => setShowEnvironmentDebug(false)}
-        isListening={isListening}
-        isUsingWhisper={isUsingWhisper}
-      />
     </div>
   );
 }

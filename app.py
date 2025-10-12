@@ -1,8 +1,10 @@
-
 import gradio as gr
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 from core.config import AUDIO_DIR, CACHE_DIR
 from core.utils import cleanup_old_audio_files
 from services.project_service import load_existing_projects
+from services.elevenlabs_voice_service import elevenlabs_service
 from ui.interface import create_interface
 from mcp.integration import (
     initialize_mcp_server, 
@@ -14,6 +16,43 @@ from mcp.integration import (
     get_workflow_list,
     start_workflow
 )
+
+# Initialize Flask app for API endpoints
+flask_app = Flask(__name__)
+CORS(flask_app)
+
+@flask_app.route('/api/voice/signed-url', methods=['GET'])
+def get_voice_signed_url():
+    """Get signed URL for ElevenLabs voice agent"""
+    try:
+        signed_url = elevenlabs_service.get_signed_url()
+        return jsonify({'signedUrl': signed_url})
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to initialize voice agent',
+            'message': str(e)
+        }), 500
+
+@flask_app.route('/api/voice/agent-id', methods=['GET'])
+def get_voice_agent_id():
+    """Get agent ID"""
+    try:
+        agent_id = elevenlabs_service.get_agent_id()
+        return jsonify({'agentId': agent_id})
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to get agent ID',
+            'message': str(e)
+        }), 500
+
+@flask_app.route('/api/voice/health', methods=['GET'])
+def voice_health_check():
+    """Health check for voice service"""
+    try:
+        health = elevenlabs_service.health_check()
+        return jsonify(health)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def main():
     """Main entry point for Wolf AI application with enhanced MCP context and autonomous agent"""
