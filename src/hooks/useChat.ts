@@ -5,6 +5,8 @@ import { ionosAI } from '@/services/ionosAI';
 import { agentTrainingService } from '@/services/agentTrainingService';
 import { AgentConfig } from '@/types/agent';
 import { toast } from 'sonner';
+import { getIonosKnowledgeContext } from '@/data/ionosKnowledge';
+import { productParser } from '@/services/productParser';
 
 export const useChat = () => {
   const [chatState, setChatState] = useState<ChatState>({
@@ -41,6 +43,13 @@ export const useChat = () => {
       let systemPrompt = '';
       if (agent) {
         systemPrompt = agentTrainingService.getEnhancedSystemPrompt(agent);
+        
+        // Add IONOS website knowledge (auto-updated or fallback)
+        systemPrompt += `\n\n${getIonosKnowledgeContext()}`;
+        
+        // Add product catalog summary
+        await productParser.loadProducts();
+        systemPrompt += `\n\n${productParser.getProductSummary()}`;
       }
       
       // Build enhanced message with contexts (all optional now)

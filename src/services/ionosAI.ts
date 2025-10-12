@@ -1,4 +1,5 @@
 import { IONOSAIRequest, IONOSAIResponse, IONOSImageRequest, IONOSImageResponse } from '@/types/chat';
+import { getIonosKnowledgeContext } from '@/data/ionosKnowledge';
 
 const TEXT_ENDPOINT = "https://openai.inference.de-txl.ionos.com/v1/chat/completions";
 const IMAGE_ENDPOINT = "https://openai.inference.de-txl.ionos.com/v1/images/generations";
@@ -67,12 +68,23 @@ export class IONOSAIService {
       throw new Error('API token not set');
     }
 
+    // Get IONOS knowledge context
+    const ionosContext = getIonosKnowledgeContext();
+
     // Regular chat - free-form responses without forced formatting
     const systemPrompt = agentName && agentName !== "AI Assistant" 
-      ? `You are ${agentName}, a specialized AI assistant. Maintain your role identity throughout the conversation and respond in a way that's consistent with your expertise.
+      ? `You are ${agentName}, a specialized AI assistant for IONOS.
+
+${ionosContext}
+
+You have access to comprehensive IONOS product information and company knowledge.
+When users ask about IONOS services, reference this knowledge accurately.
+Maintain your role identity throughout the conversation and respond in a way that's consistent with your expertise.
 
 Provide clear, natural, conversational responses based on your specialization.`
-      : `You are a helpful AI assistant capable of helping with a wide range of business and professional tasks. You are knowledgeable, professional, and adaptable to any topic or industry.
+      : `You are a helpful AI assistant with deep knowledge of IONOS products and services.
+
+${ionosContext}
 
 You can assist with:
 - Business strategy and planning
@@ -80,7 +92,9 @@ You can assist with:
 - Analysis and research
 - Problem-solving and recommendations
 - General professional guidance
+- IONOS product recommendations and support
 
+Provide accurate, helpful information about IONOS offerings when asked.
 Provide clear, natural, conversational responses tailored to the user's specific needs.`;
 
     const request: IONOSAIRequest = {
@@ -124,8 +138,13 @@ Provide clear, natural, conversational responses tailored to the user's specific
       throw new Error('API token not set');
     }
 
+    // Get IONOS knowledge context
+    const ionosContext = getIonosKnowledgeContext();
+
     // Coaching-specific - structured "Summary & Analysis / Suggestion" format
     const systemPrompt = `You are ${agentName || 'an expert sales coach'}, providing real-time coaching during live customer conversations.
+
+${ionosContext}
 
 CRITICAL: Always provide your response in this EXACT format:
 

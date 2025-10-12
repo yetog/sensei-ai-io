@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { HelpCircle, Users, MessageSquare, Settings as SettingsIcon, Bot, FileText, Zap } from "lucide-react";
 import { ModelSelector } from "@/components/ModelSelector";
 import { HybridAIStatus } from "@/components/HybridAIStatus";
+import { IonosKnowledgeManager } from "@/components/IonosKnowledgeManager";
 
 export default function Settings() {
   const [token, setToken] = useState(ionosAI.getApiToken() || "");
@@ -68,6 +69,7 @@ export default function Settings() {
           <div className="space-y-6">
             <ModelSelector />
             <HybridAIStatus />
+            <IonosKnowledgeManager />
           </div>
         </TabsContent>
 
