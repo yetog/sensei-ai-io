@@ -17,7 +17,7 @@ export const useElevenLabsVoiceAgent = (options: VoiceAgentOptions = {}) => {
   const [error, setError] = useState<string | null>(null);
   const conversationRef = useRef<any>(null);
 
-  const agentId = import.meta.env.VITE_ELEVEN_LABS_AGENT_ID;
+  const agentId = 'agent_0501k7bc2n30fw7v2b71p1rym317'; // Your ElevenLabs Agent ID (safe to expose - public agent)
 
   const requestMicrophonePermission = async (): Promise<boolean> => {
     try {
