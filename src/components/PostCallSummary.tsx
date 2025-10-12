@@ -344,14 +344,14 @@ Generate a personalized follow-up email using the user-edited template fields. U
     
     const customerName = conversationData.customerName || callSummary.customerName || '[Customer Name]';
     const companyName = conversationData.companyName || '[Company Name]';
+    const callId = `CALL-${Date.now().toString().slice(-8)}`;
     
     return `CASE NOTES - ${currentDate}
 
 Customer: ${customerName}
 Company: ${companyName}
 Call Type: ${callSummary.callType}
-Duration: ${callSummary.duration}
-Outcome: ${callSummary.outcome.replace(/_/g, ' ').toUpperCase()}
+Call ID: ${callId}
 
 KEY DISCUSSION POINTS:
 ${callSummary.keyPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')}
