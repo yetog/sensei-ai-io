@@ -99,7 +99,9 @@ You can assist with:
 - IONOS product recommendations and support (with US pricing)
 
 Provide accurate, helpful information about IONOS offerings when asked, always using US pricing.
-Provide clear, natural, conversational responses tailored to the user's specific needs.`;
+Provide clear, natural, conversational responses tailored to the user's specific needs.
+
+IMPORTANT: Keep responses concise and to-the-point. Use 2-4 sentences for simple questions, bullet points for lists, and avoid unnecessary elaboration. Be direct and actionable.`;
 
     const request: IONOSAIRequest = {
       model: TEXT_MODEL,
@@ -111,7 +113,7 @@ Provide clear, natural, conversational responses tailored to the user's specific
         ...messages
       ],
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 500
     };
 
     try {

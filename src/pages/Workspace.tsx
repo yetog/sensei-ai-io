@@ -266,6 +266,40 @@ export default function Workspace() {
     handlePlay(text);
   };
 
+  // Handle expand answer button - auto-send request for detailed explanation
+  const handleExpandAnswer = async (messageId: string) => {
+    const targetMessage = messages.find(m => m.id === messageId);
+    if (!targetMessage || targetMessage.isExpanded) return;
+
+    // Get context
+    let context = '';
+    let usedFiles: string[] = [];
+    
+    if (selectedFileIds && selectedFileIds.length > 0) {
+      const res = getContextForFiles(selectedFileIds);
+      context = res.context;
+      usedFiles = res.files.map(f => f.name);
+    } else {
+      const detail = getRelevantFileContextDetailed("expand answer");
+      context = detail.context;
+      usedFiles = detail.files.map(f => f.name);
+    }
+
+    const agentContext = activeAgent?.systemPrompt || '';
+    const agentName = activeAgent?.name || undefined;
+    
+    // Auto-send expansion request
+    await sendMessage(
+      "Please explain the previous answer in more detail with examples, additional context, and step-by-step guidance where applicable.",
+      agentContext,
+      context,
+      usedFiles,
+      [],
+      agentName,
+      activeAgent
+    );
+  };
+
   // Voice input toggle
   const handleVoiceToggle = () => {
     if (isRecording) {
@@ -300,28 +334,6 @@ export default function Workspace() {
 
           {/* Sources Tab */}
           <TabsContent value="sources" className="space-y-6">
-            {/* Knowledge Graph Visualization */}
-            <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
-              <h3 className="text-lg font-semibold mb-2">Knowledge Graph</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Visual representation of sources connected to your AI agent
-              </p>
-              <MindMap
-                root={activeAgent?.name || "AI Agent"}
-                childrenLabels={selectedFileIds.map(id => {
-                  const file = allFiles.find(f => f.id === id);
-                  return file?.name || "Unknown";
-                })}
-                width={800}
-                height={250}
-              />
-              {selectedFileIds.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  {selectedFileIds.length} source{selectedFileIds.length !== 1 ? 's' : ''} selected
-                </p>
-              )}
-            </Card>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Sources Management */}
               <div className="lg:col-span-2 space-y-4">
@@ -447,11 +459,33 @@ export default function Workspace() {
                 </Card>
               </div>
             </div>
+
+            {/* Knowledge Graph Visualization - Moved Below Sources */}
+            <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+              <h3 className="text-lg font-semibold mb-2">Knowledge Graph</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Visual representation of sources connected to your AI agent
+              </p>
+              <MindMap
+                root={activeAgent?.name || "AI Agent"}
+                childrenLabels={selectedFileIds.map(id => {
+                  const file = allFiles.find(f => f.id === id);
+                  return file?.name || "Unknown";
+                })}
+                width={800}
+                height={250}
+              />
+              {selectedFileIds.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {selectedFileIds.length} source{selectedFileIds.length !== 1 ? 's' : ''} selected
+                </p>
+              )}
+            </Card>
           </TabsContent>
 
           {/* Chat Tab */}
           <TabsContent value="chat" className="space-y-4">
-            <Card className="h-[600px] flex flex-col bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+            <Card className="min-h-[700px] flex flex-col bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
               {/* Chat Header */}
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-3">
@@ -563,7 +597,7 @@ export default function Workspace() {
                 )}
                 
                 {messages.map((message) => (
-                  <ChatMessage key={message.id} message={message} onSpeak={handleSpeakFromChat} />
+                  <ChatMessage key={message.id} message={message} onSpeak={handleSpeakFromChat} onExpandAnswer={handleExpandAnswer} />
                 ))}
                 
                 {isLoading && (

@@ -8,6 +8,7 @@ export interface ChatMessage {
   imagePrompt?: string;
   usedFiles?: string[]; // filenames used as context
   suggestions?: string[]; // suggested filenames when none matched
+  isExpanded?: boolean; // prevents infinite expansion loops
 }
 
 export interface ChatState {

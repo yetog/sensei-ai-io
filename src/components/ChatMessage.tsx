@@ -3,14 +3,15 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatMessage as ChatMessageType } from '@/types/chat';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, Bot, User } from 'lucide-react';
+import { Download, FileText, Bot, User, MessageSquarePlus } from 'lucide-react';
 
 interface ChatMessageProps {
   message: ChatMessageType;
   onSpeak?: (text: string) => void;
+  onExpandAnswer?: (messageId: string) => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak, onExpandAnswer }) => {
   const isUser = message.role === 'user';
   
   // Extract file citations from assistant messages
@@ -80,11 +81,24 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak }) =>
                 </div>
               )}
             </div>
-            {!isUser && onSpeak && (
-              <div className="mt-2">
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => onSpeak(cleanContent)}>
-                  Send to TTS
-                </Button>
+            {!isUser && (
+              <div className="mt-2 flex gap-2">
+                {onSpeak && (
+                  <Button size="sm" variant="outline" className="text-xs" onClick={() => onSpeak(cleanContent)}>
+                    Send to TTS
+                  </Button>
+                )}
+                {onExpandAnswer && !message.isExpanded && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="text-xs"
+                    onClick={() => onExpandAnswer(message.id)}
+                  >
+                    <MessageSquarePlus className="w-3 h-3 mr-1" />
+                    Expand Answer
+                  </Button>
+                )}
               </div>
             )}
             
