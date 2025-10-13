@@ -358,19 +358,17 @@ const handleQuickAction = (action: string) => {
             disabled={!ionosAI.getApiToken() || isLoading}
             className={`flex-1 ${isFullscreen ? 'h-12 text-base' : ''} ${isRecording ? 'border-primary' : ''}`}
           />
-          {isVoiceSupported && (
-            <Button
-              type="button"
-              size="icon"
-              variant={isRecording ? "default" : "outline"}
-              onClick={handleVoiceToggle}
-              disabled={!ionosAI.getApiToken() || isLoading}
-              className={`${isFullscreen ? 'h-12 w-12' : ''} ${isRecording ? 'bg-primary pulse-gold' : ''}`}
-              title={isRecording ? "Stop recording" : "Start voice input"}
-            >
-              {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </Button>
-          )}
+          <Button
+            type="button"
+            size="icon"
+            variant={isRecording ? "default" : "outline"}
+            onClick={handleVoiceToggle}
+            disabled={!ionosAI.getApiToken() || isLoading || !isVoiceSupported}
+            className={`${isFullscreen ? 'h-12 w-12' : ''} ${isRecording ? 'bg-primary pulse-gold' : ''}`}
+            title={!isVoiceSupported ? "Voice input not supported in this browser" : isRecording ? "Stop recording" : "Start voice input"}
+          >
+            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </Button>
           <Button
             type="submit"
             size="icon"
