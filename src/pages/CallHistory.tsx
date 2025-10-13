@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PostCallSummary } from '@/components/PostCallSummary';
 import { ionosAI } from '@/services/ionosAI';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useRealTimeCoaching } from '@/hooks/useRealTimeCoaching';
+import { useFollowUpAnalysis } from '@/hooks/useFollowUpAnalysis';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
 import { SuggestionCard } from '@/components/SuggestionCard';
 import { CallTypeSelector } from '@/components/CallTypeSelector';
@@ -33,10 +33,20 @@ export function CallHistory() {
     suggestions,
     startListening,
     stopListening,
-    sessionDuration,
+    sessionStartTime,
     error,
-    transcriptQuality
-  } = useRealTimeCoaching();
+    isAvailable
+  } = useFollowUpAnalysis();
+
+  // Calculate session duration
+  const [sessionDuration, setSessionDuration] = useState(0);
+  useEffect(() => {
+    if (!isListening || !sessionStartTime) return;
+    const interval = setInterval(() => {
+      setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isListening, sessionStartTime]);
   useEffect(() => {
     loadSummaries();
   }, []);
@@ -121,8 +131,8 @@ ${summary.followUpEmail || 'No email generated'}
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString();
   };
-  const handleStartAnalysis = async () => {
-    await startListening(selectedCallType, 'microphone');
+  const handleStartAnalysis = () => {
+    startListening();
   };
   const handleStopAnalysis = async () => {
     stopListening();
@@ -433,7 +443,7 @@ Be specific and extract actual conversation details, not generic placeholders.
                 {transcription.length === 0 ? <div className="text-center py-12 text-muted-foreground">
                     <Mic className="h-12 w-12 mx-auto mb-3 opacity-50" />
                     <p>Click "Start Analysis" to begin transcribing</p>
-                  </div> : <EnhancedTranscriptDisplay segments={transcription} transcriptQuality={transcriptQuality} sessionDuration={sessionDuration} />}
+                  </div> : <EnhancedTranscriptDisplay segments={transcription} sessionDuration={sessionDuration} />}
               </CardContent>
             </Card>
 

@@ -31,7 +31,7 @@ interface ConversationBlock {
 interface EnhancedTranscriptDisplayProps {
   segments: TranscriptionSegment[];
   interimText?: string;
-  transcriptQuality: number;
+  transcriptQuality?: number;
   onEditSegment?: (segmentId: string, newText: string) => void;
   onExportTranscript?: () => void;
   sessionDuration: number;
