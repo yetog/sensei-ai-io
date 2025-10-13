@@ -45,7 +45,7 @@ export const useChat = () => {
         systemPrompt = agentTrainingService.getEnhancedSystemPrompt(agent);
         
         // Add IONOS website knowledge (auto-updated or fallback)
-        systemPrompt += `\n\n${getIonosKnowledgeContext()}`;
+        systemPrompt += `\n\nIMPORTANT: Always provide US pricing in USD ($), never European pricing in EUR (€). Focus on US-based IONOS offerings and data centers.\n\n${getIonosKnowledgeContext()}`;
         
         // Add product catalog summary
         await productParser.loadProducts();

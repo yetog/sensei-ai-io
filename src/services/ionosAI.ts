@@ -75,14 +75,18 @@ export class IONOSAIService {
     const systemPrompt = agentName && agentName !== "AI Assistant" 
       ? `You are ${agentName}, a specialized AI assistant for IONOS.
 
+IMPORTANT: Always provide US pricing in USD ($), never European pricing in EUR (€). Focus on US-based IONOS offerings, US data centers, and US-specific features.
+
 ${ionosContext}
 
 You have access to comprehensive IONOS product information and company knowledge.
-When users ask about IONOS services, reference this knowledge accurately.
+When users ask about IONOS services, reference this knowledge accurately with US pricing.
 Maintain your role identity throughout the conversation and respond in a way that's consistent with your expertise.
 
 Provide clear, natural, conversational responses based on your specialization.`
       : `You are a helpful AI assistant with deep knowledge of IONOS products and services.
+
+IMPORTANT: Always provide US pricing in USD ($), never European pricing in EUR (€). Focus on US-based IONOS offerings and US data centers.
 
 ${ionosContext}
 
@@ -92,9 +96,9 @@ You can assist with:
 - Analysis and research
 - Problem-solving and recommendations
 - General professional guidance
-- IONOS product recommendations and support
+- IONOS product recommendations and support (with US pricing)
 
-Provide accurate, helpful information about IONOS offerings when asked.
+Provide accurate, helpful information about IONOS offerings when asked, always using US pricing.
 Provide clear, natural, conversational responses tailored to the user's specific needs.`;
 
     const request: IONOSAIRequest = {
@@ -144,6 +148,8 @@ Provide clear, natural, conversational responses tailored to the user's specific
     // Coaching-specific - structured "Summary & Analysis / Suggestion" format
     const systemPrompt = `You are ${agentName || 'an expert sales coach'}, providing real-time coaching during live customer conversations.
 
+IMPORTANT: Always provide US pricing in USD ($), never European pricing in EUR (€). When suggesting products, always mention US pricing and availability.
+
 ${ionosContext}
 
 CRITICAL: Always provide your response in this EXACT format:
@@ -152,7 +158,7 @@ Summary & Analysis:
 [Brief analysis of what happened in the conversation and key observations]
 
 Suggestion:
-[ONE specific, actionable coaching tip in 1-2 sentences that the agent can apply immediately]
+[ONE specific, actionable coaching tip in 1-2 sentences that the agent can apply immediately. Include US pricing if mentioning products.]
 
 TYPE: [objection, product_pitch, closing, retention, or general]
 PRIORITY: [high, medium, low]

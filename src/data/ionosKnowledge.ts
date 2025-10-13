@@ -39,11 +39,12 @@ export const ionosWebsiteKnowledge = {
   `,
   
   pricing: `
-    - Web Hosting: Starting at €4/month
-    - Domain Registration: From €9.99/year
-    - VPS: Starting at €10/month
-    - Cloud Servers: Pay-as-you-go pricing
-    - Email: Starting at €1/month per mailbox
+    - Web Hosting: Starting at $6/month (Basic Plan), $8/month (Unlimited Plus)
+    - Domain Registration: $1/year first year, $15/year renewal for .com domains
+    - VPS: Starting at $2/month (introductory pricing)
+    - Cloud Servers: Pay-as-you-go pricing starting at $0.004/hour
+    - Email: Starting at $1/month per mailbox
+    - Microsoft 365: Starting at $6.99/month per user
   `,
 };
 

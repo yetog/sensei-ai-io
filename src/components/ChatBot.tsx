@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Settings, Send, FileText, Maximize, Minimize } from 'lucide-react';
+import { MessageCircle, X, Settings, Send, FileText, Maximize, Minimize, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChat } from '@/hooks/useChat';
 import { useFileContext } from '@/contexts/FileContext';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { ChatMessage } from '@/components/ChatMessage';
 import { AgentIntroduction } from '@/components/AgentIntroduction';
 import { TypingIndicator } from '@/components/TypingIndicator';
@@ -35,6 +36,19 @@ export const ChatBot: React.FC<ChatBotProps> = ({ script = '', projectId, select
   const [showAgentIntro, setShowAgentIntro] = useState(false);
   const [apiToken, setApiToken] = useState(ionosAI.getApiToken() || '');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Voice input hook
+  const { isSupported: isVoiceSupported, isRecording, transcript, startRecording, stopRecording } = useVoiceInput({
+    onTranscript: (text, isFinal) => {
+      if (isFinal) {
+        setInputValue(text);
+        stopRecording();
+      } else {
+        // Show interim results
+        setInputValue(text);
+      }
+    },
+  });
 
   // Initialize agent when provided
   useEffect(() => {
@@ -107,6 +121,14 @@ const handleQuickAction = (action: string) => {
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
+  };
+
+  const handleVoiceToggle = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const scriptWordCount = script.trim().split(/\s+/).filter(word => word.length > 0).length;
@@ -327,13 +349,28 @@ const handleQuickAction = (action: string) => {
             placeholder={
               !ionosAI.getApiToken() 
                 ? "Set API token in settings" 
-                : hasScript || files.length > 0
-                  ? "Ask a question or request assistance..." 
-                  : "How can I help you today?"
+                : isRecording
+                  ? "Listening..."
+                  : hasScript || files.length > 0
+                    ? "Ask a question or request assistance..." 
+                    : "How can I help you today?"
             }
             disabled={!ionosAI.getApiToken() || isLoading}
-            className={`flex-1 ${isFullscreen ? 'h-12 text-base' : ''}`}
+            className={`flex-1 ${isFullscreen ? 'h-12 text-base' : ''} ${isRecording ? 'border-primary' : ''}`}
           />
+          {isVoiceSupported && (
+            <Button
+              type="button"
+              size="icon"
+              variant={isRecording ? "default" : "outline"}
+              onClick={handleVoiceToggle}
+              disabled={!ionosAI.getApiToken() || isLoading}
+              className={`${isFullscreen ? 'h-12 w-12' : ''} ${isRecording ? 'bg-primary pulse-gold' : ''}`}
+              title={isRecording ? "Stop recording" : "Start voice input"}
+            >
+              {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
+          )}
           <Button
             type="submit"
             size="icon"
@@ -343,6 +380,12 @@ const handleQuickAction = (action: string) => {
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {isRecording && (
+          <div className="mt-2 text-xs text-muted-foreground flex items-center space-x-2">
+            <div className="w-2 h-2 bg-primary rounded-full pulse-gold"></div>
+            <span>Recording... Click the microphone again to stop</span>
+          </div>
+        )}
       </form>
     </Card>
   );
