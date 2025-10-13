@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot } from "lucide-react";
+import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot, Mic, MicOff, Send } from "lucide-react";
 import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
 import { agentTrainingService } from "@/services/agentTrainingService";
@@ -21,6 +21,7 @@ import { ChatMessage } from "@/components/ChatMessage";
 import { AgentIntroduction } from "@/components/AgentIntroduction";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { LiveCoachingDashboard } from "@/components/LiveCoachingDashboard";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 
 import { toast } from "sonner";
 
@@ -69,6 +70,19 @@ export default function Workspace() {
   const { messages, isLoading, sendMessage, sendQuickAction, clearChat } = useChat();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Voice input hook
+  const { isSupported: isVoiceSupported, isRecording, transcript, startRecording, stopRecording } = useVoiceInput({
+    onTranscript: (text, isFinal) => {
+      if (isFinal) {
+        setInputValue(text);
+        stopRecording();
+      } else {
+        // Show interim results
+        setInputValue(text);
+      }
+    },
+  });
 
   // Combine uploaded + project files
   const allFiles = useMemo(() => {
@@ -249,6 +263,15 @@ export default function Workspace() {
   const handleSpeakFromChat = (text: string) => {
     setTtsText(text);
     handlePlay(text);
+  };
+
+  // Voice input toggle
+  const handleVoiceToggle = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   return (
@@ -535,17 +558,41 @@ export default function Workspace() {
                   <Input
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={selectedFileIds.length > 0 ? "Ask about your sources..." : "Select sources first..."}
+                    placeholder={
+                      isRecording
+                        ? "Listening..."
+                        : selectedFileIds.length > 0 
+                          ? "Ask about your sources..." 
+                          : "Select sources first..."
+                    }
                     disabled={isLoading}
-                    className="flex-1"
+                    className={`flex-1 ${isRecording ? 'border-primary' : ''}`}
                   />
                   <Button
+                    type="button"
+                    size="icon"
+                    variant={isRecording ? "default" : "outline"}
+                    onClick={handleVoiceToggle}
+                    disabled={isLoading || !isVoiceSupported}
+                    className={isRecording ? 'bg-primary pulse-gold' : ''}
+                    title={!isVoiceSupported ? "Voice input not supported in this browser" : isRecording ? "Stop recording" : "Start voice input"}
+                  >
+                    {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </Button>
+                  <Button
                     type="submit"
+                    size="icon"
                     disabled={!inputValue.trim() || isLoading}
                   >
-                    Send
+                    <Send className="w-4 h-4" />
                   </Button>
                 </div>
+                {isRecording && (
+                  <div className="mt-2 text-xs text-muted-foreground flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-primary rounded-full pulse-gold"></div>
+                    <span>Recording... Click the microphone again to stop</span>
+                  </div>
+                )}
               </form>
             </Card>
           </TabsContent>
