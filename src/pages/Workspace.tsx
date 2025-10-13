@@ -299,6 +299,28 @@ export default function Workspace() {
 
           {/* Sources Tab */}
           <TabsContent value="sources" className="space-y-6">
+            {/* Knowledge Graph Visualization */}
+            <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
+              <h3 className="text-lg font-semibold mb-2">Knowledge Graph</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Visual representation of sources connected to your AI agent
+              </p>
+              <MindMap
+                root={activeAgent?.name || "AI Agent"}
+                childrenLabels={selectedFileIds.map(id => {
+                  const file = allFiles.find(f => f.id === id);
+                  return file?.name || "Unknown";
+                })}
+                width={800}
+                height={250}
+              />
+              {selectedFileIds.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {selectedFileIds.length} source{selectedFileIds.length !== 1 ? 's' : ''} selected
+                </p>
+              )}
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Sources Management */}
               <div className="lg:col-span-2 space-y-4">
