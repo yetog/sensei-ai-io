@@ -7,7 +7,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Mic, 
-  PhoneOff, 
+  PhoneOff,
+  Lightbulb,
   X, 
   Trash2, 
   Download,
@@ -276,9 +277,10 @@ export function LiveCoachingDashboard({ onClose }: LiveCoachingDashboardProps) {
         {/* Coaching Suggestions Panel */}
         <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              💡 AI Coaching Suggestions
-            </CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="w-5 h-5" />
+                AI Coaching Suggestions
+              </CardTitle>
             <CardDescription>
               Real-time coaching powered by IONOS AI
             </CardDescription>

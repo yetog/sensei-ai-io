@@ -203,8 +203,9 @@ export function EnhancedDemoScenarios({ onSelectScenario, isListening }: DemoSce
             </div>
 
             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <p className="text-sm text-green-700 mb-2">
-                <strong>🎯 Now you respond:</strong> Practice your sales response while the AI analyzes and provides coaching suggestions.
+              <p className="text-sm text-green-700 mb-2 flex items-start gap-2">
+                <Target className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span><strong>Now you respond:</strong> Practice your sales response while the AI analyzes and provides coaching suggestions.</span>
               </p>
               <p className="text-xs text-green-600">
                 Expected coaching: {selectedScenario.expectedCoaching[Math.min(currentStep, selectedScenario.expectedCoaching.length - 1)]}
@@ -310,8 +311,9 @@ export function EnhancedDemoScenarios({ onSelectScenario, isListening }: DemoSce
 
       {isListening && !isPlaying && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in">
-          <p className="text-sm text-amber-700">
-            🎯 <strong>AI Coaching Active:</strong> Start a practice scenario to receive step-by-step guidance and real-time coaching suggestions.
+          <p className="text-sm text-amber-700 flex items-start gap-2">
+            <Target className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span><strong>AI Coaching Active:</strong> Start a practice scenario to receive step-by-step guidance and real-time coaching suggestions.</span>
           </p>
         </div>
       )}

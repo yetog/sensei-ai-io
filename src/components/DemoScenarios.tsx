@@ -189,9 +189,9 @@ export function DemoScenarios({ onSelectScenario, isListening }: DemoScenariosPr
 
       {isListening && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-700">
-            🎯 <strong>Demo Mode Active:</strong> Simulate customer responses by speaking the provided lines, 
-            then respond as yourself to test the AI coaching suggestions.
+          <p className="text-sm text-amber-700 flex items-start gap-2">
+            <Target className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span><strong>Demo Mode Active:</strong> Simulate customer responses by speaking the provided lines, then respond as yourself to test the AI coaching suggestions.</span>
           </p>
         </div>
       )}

@@ -19,7 +19,8 @@ import {
   Square,
   FileText,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  Lightbulb
 } from 'lucide-react';
 import { callSummaryStorage, type StoredCallSummary } from '@/services/callSummaryStorage';
 import { useToast } from '@/hooks/use-toast';
@@ -529,7 +530,8 @@ Be specific and extract actual conversation details, not generic placeholders.
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  💡 AI Coaching Suggestions
+                  <Lightbulb className="w-5 h-5" />
+                  AI Coaching Suggestions
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">

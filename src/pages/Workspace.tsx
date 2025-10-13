@@ -6,13 +6,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileUpload } from "@/components/FileUpload";
 import { useFileContext } from "@/contexts/FileContext";
 import { getProjectFiles } from "@/services/projectFiles";
-import { MindMap } from "@/components/MindMap";
+
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot, Mic, MicOff, Send } from "lucide-react";
+import { Play, Pause, Square, FileText, MessageSquare, Wrench, Database, Save, Trash2, Bot, Mic, MicOff, Send, FileDown, Lightbulb, FileEdit, Music } from "lucide-react";
 import { agentService } from "@/services/agentService";
 import { datasetService } from "@/services/datasetService";
 import { agentTrainingService } from "@/services/agentTrainingService";
@@ -460,27 +460,6 @@ export default function Workspace() {
               </div>
             </div>
 
-            {/* Knowledge Graph Visualization - Moved Below Sources */}
-            <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
-              <h3 className="text-lg font-semibold mb-2">Knowledge Graph</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Visual representation of sources connected to your AI agent
-              </p>
-              <MindMap
-                root={activeAgent?.name || "AI Agent"}
-                childrenLabels={selectedFileIds.map(id => {
-                  const file = allFiles.find(f => f.id === id);
-                  return file?.name || "Unknown";
-                })}
-                width={800}
-                height={250}
-              />
-              {selectedFileIds.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  {selectedFileIds.length} source{selectedFileIds.length !== 1 ? 's' : ''} selected
-                </p>
-              )}
-            </Card>
           </TabsContent>
 
           {/* Chat Tab */}
@@ -671,7 +650,8 @@ export default function Workspace() {
                     }}
                     disabled={selectedFileIds.length === 0}
                   >
-                    📋 Generate Summary
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Generate Summary
                   </Button>
                   <Button 
                     variant="outline"
@@ -682,7 +662,8 @@ export default function Workspace() {
                     }}
                     disabled={selectedFileIds.length === 0}
                   >
-                    💡 Extract Insights
+                    <Lightbulb className="w-4 h-4 mr-2" />
+                    Extract Insights
                   </Button>
                   <Button 
                     variant="outline"
@@ -693,22 +674,19 @@ export default function Workspace() {
                     }}
                     disabled={selectedFileIds.length === 0}
                   >
-                    📝 Create Outline
+                    <FileEdit className="w-4 h-4 mr-2" />
+                    Create Outline
                   </Button>
                 </div>
               </Card>
 
-              {/* Mind Map */}
-              <Card className="p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
-                <h3 className="text-lg font-semibold text-foreground mb-4">🧠 Mind Map</h3>
-                <div className="bg-muted/10 rounded-lg p-4 border border-border/30">
-                  <MindMap root="Selected Sources" childrenLabels={selectedFileIds.map(id => allFiles.find(f => f.id === id)?.name || id)} />
-                </div>
-              </Card>
 
               {/* Text-to-Speech */}
               <Card className="lg:col-span-2 p-6 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
-                <h3 className="text-lg font-semibold text-foreground mb-4">🎵 Text-to-Speech</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Music className="w-5 h-5" />
+                  Text-to-Speech
+                </h3>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <textarea
