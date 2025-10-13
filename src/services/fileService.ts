@@ -19,7 +19,8 @@ export class FileService {
       size: file.size,
       content: '',
       uploadDate: new Date(),
-      projectId
+      projectId,
+      sourceType: 'upload'
     };
 
     let extractedText = '';

@@ -17,6 +17,8 @@ export interface UploadedFile {
   projectId?: string;
   products?: ProductData[];
   categories?: string[];
+  sourceType?: 'upload' | 'url' | 'project';
+  sourceUrl?: string;
 }
 
 export interface FileChunk {

@@ -22,6 +22,7 @@ import { AgentIntroduction } from "@/components/AgentIntroduction";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { LiveCoachingDashboard } from "@/components/LiveCoachingDashboard";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { CustomUrlScraper } from "@/components/CustomUrlScraper";
 
 import { toast } from "sonner";
 
@@ -429,6 +430,8 @@ export default function Workspace() {
               {/* File Upload & Summary */}
               <div className="space-y-4">
                 <FileUpload onFilesUploaded={addFiles} projectId="default" />
+                
+                <CustomUrlScraper onUrlScraped={(file) => addFiles([file])} />
                 
                 <Card className="p-4 bg-gradient-to-br from-card to-card/80 border-border/50 shadow-lg">
                   <h4 className="text-sm font-semibold mb-3">Selection Summary</h4>
