@@ -15,7 +15,7 @@ import { useFollowUpAnalysis } from '@/hooks/useFollowUpAnalysis';
 import { EnhancedTranscriptDisplay } from '@/components/EnhancedTranscriptDisplay';
 import { SuggestionCard } from '@/components/SuggestionCard';
 import { CallTypeSelector } from '@/components/CallTypeSelector';
-type CallType = 'cold_call' | 'demo' | 'follow_up' | 'closing' | 'discovery' | 'incoming_sales' | 'retention' | 'outbound' | 'general';
+type CallType = 'cold_call' | 'demo' | 'follow_up' | 'closing' | 'discovery' | 'incoming_sales' | 'retention' | 'outbound' | 'general' | 'quick_notes';
 export function CallHistory() {
   const [summaries, setSummaries] = useState<StoredCallSummary[]>([]);
   const [filteredSummaries, setFilteredSummaries] = useState<StoredCallSummary[]>([]);
@@ -24,6 +24,7 @@ export function CallHistory() {
   const [generatedSummary, setGeneratedSummary] = useState<any>(null);
   const [showPostCallSummary, setShowPostCallSummary] = useState(false);
   const [selectedCallType, setSelectedCallType] = useState<CallType>('follow_up');
+  const [isQuickNotesMode, setIsQuickNotesMode] = useState(false);
   const {
     toast
   } = useToast();
@@ -132,34 +133,108 @@ ${summary.followUpEmail || 'No email generated'}
     return new Date(timestamp).toLocaleString();
   };
   const handleStartAnalysis = () => {
+    setIsQuickNotesMode(false);
     startListening();
   };
+
+  const handleStartQuickNotes = () => {
+    setIsQuickNotesMode(true);
+    startListening();
+  };
+
   const handleStopAnalysis = async () => {
     stopListening();
-    // Auto-show post-call summary when stopping
-    if (transcription.length > 0) {
-      // Generate AI-powered summary
+
+    if (transcription.length === 0) {
       toast({
-        title: "Analyzing Call...",
-        description: "AI is analyzing your conversation to generate insights."
+        title: "No Transcription",
+        description: "No speech was detected during this session."
       });
-      try {
-        const summary = await generateCallSummary();
-        setGeneratedSummary(summary);
-        setShowPostCallSummary(true);
-      } catch (error) {
-        console.error('Failed to generate summary:', error);
-        toast({
-          title: "Analysis Error",
-          description: "Failed to analyze call. Please try again.",
-          variant: "destructive"
-        });
-      }
+      setIsQuickNotesMode(false);
+      return;
+    }
+
+    // Quick Notes Mode: Save transcript without opening PostCallSummary
+    if (isQuickNotesMode) {
+      const formatDuration = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      };
+
+      // Save quick notes directly
+      callSummaryStorage.saveCallSummary({
+        customerName: '',
+        companyName: '',
+        keyPain: '',
+        desiredOutcome: '',
+        callType: 'quick_notes',
+        duration: formatDuration(sessionDuration),
+        keyPoints: transcription.map(t => t.text),
+        objections: [],
+        nextSteps: ['Review notes'],
+        outcome: 'follow_up',
+        transcriptHighlights: transcription.map(t => t.text),
+        followUpEmail: ''
+      });
+
+      toast({
+        title: "Quick Notes Saved",
+        description: `Captured ${transcription.length} notes in ${formatDuration(sessionDuration)}.`
+      });
+
+      setIsQuickNotesMode(false);
+      loadSummaries(); // Refresh table
+      return;
+    }
+
+    // Full Analysis Mode: Generate AI summary and open PostCallSummary
+    toast({
+      title: "Analyzing Call...",
+      description: "AI is analyzing your conversation to generate insights."
+    });
+
+    try {
+      const summary = await generateCallSummary();
+      setGeneratedSummary(summary);
+      setShowPostCallSummary(true);
+    } catch (error) {
+      console.error('Failed to generate summary:', error);
+      toast({
+        title: "Analysis Error",
+        description: "Failed to analyze call. Please try again.",
+        variant: "destructive"
+      });
     }
   };
+
   const handleSaveToHistory = (summary: any, email?: string) => {
     console.log('Saving to history:', summary, email);
+
+    // Properly save to localStorage using callSummaryStorage
+    const savedId = callSummaryStorage.saveCallSummary({
+      customerName: summary.customerName || '',
+      companyName: summary.companyName || '',
+      keyPain: summary.keyPain || '',
+      desiredOutcome: summary.desiredOutcome || '',
+      callType: summary.callType,
+      duration: summary.duration,
+      keyPoints: summary.keyPoints,
+      objections: summary.objections,
+      nextSteps: summary.nextSteps,
+      outcome: summary.outcome,
+      transcriptHighlights: summary.transcriptHighlights,
+      followUpEmail: email || ''
+    });
+
+    console.log('Call saved with ID:', savedId);
+
     loadSummaries(); // Reload to show new summary
+
+    toast({
+      title: "Call Saved",
+      description: "Call summary has been saved to history."
+    });
   };
   const generateCallSummary = async () => {
     const formatDuration = (seconds: number) => {
@@ -397,14 +472,32 @@ Be specific and extract actual conversation details, not generic placeholders.
 
               {/* Control Buttons */}
               <div className="flex gap-3">
-                {!isListening ? <Button onClick={handleStartAnalysis} className="gap-2">
-                    <Mic className="h-4 w-4" />
-                    Start Analysis
-                  </Button> : <Button onClick={handleStopAnalysis} variant="destructive" className="gap-2">
+                {!isListening ? (
+                  <>
+                    <Button onClick={handleStartAnalysis} className="flex-1 gap-2">
+                      <Mic className="h-4 w-4" />
+                      Start Analysis
+                    </Button>
+                    <Button onClick={handleStartQuickNotes} variant="outline" className="flex-1 gap-2">
+                      <FileText className="h-4 w-4" />
+                      Quick Notes
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={handleStopAnalysis} variant="destructive" className="w-full gap-2">
                     <Square className="h-4 w-4" />
-                    Stop & Generate Summary
-                  </Button>}
+                    Stop {isQuickNotesMode ? 'Notes' : '& Generate Summary'}
+                  </Button>
+                )}
               </div>
+
+              {/* Quick Notes Mode Indicator */}
+              {isListening && isQuickNotesMode && (
+                <Badge variant="outline" className="animate-pulse">
+                  <FileText className="h-3 w-3 mr-1" />
+                  Quick Notes Mode
+                </Badge>
+              )}
 
               {/* Status Bar */}
               <div className="flex items-center gap-4 pt-2">
