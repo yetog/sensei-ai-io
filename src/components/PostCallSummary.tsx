@@ -56,9 +56,12 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
     subject: 'Thank you for your time today',
     body: `Hi {{customerName}},
 
-Thank you for taking the time to speak with me today about {{companyName}}'s solutions.
+Thank you for taking the time to speak with me today about {{companyName}} solutions.
 
-Based on our conversation, I understand that you're looking to {{keyPain}}. I believe our solution can help you achieve {{desiredOutcome}}.
+Based on our conversation, I understand that you're looking to {{keyPain}}. I believe our IONOS solutions can help you achieve {{desiredOutcome}}.
+
+Key discussion points from our call:
+{{keyPoints}}
 
 Next steps:
 {{nextSteps}}
@@ -150,6 +153,64 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const { toast } = useToast();
 
+  // Helper function to infer pain points from call type
+  const inferKeyPainFromCallType = (callType: string, keyPoints: string[]): string => {
+    // Infer pain points from actual discussion points
+    if (keyPoints.length > 0) {
+      return `Discussed: ${keyPoints.slice(0, 2).join(', ')}`;
+    }
+    
+    // Context-based inference
+    const contextMap: Record<string, string> = {
+      'cold_call': 'Initial outreach to explore potential solutions',
+      'demo': 'Evaluating solutions for their specific use case',
+      'follow_up': 'Continuing discussion on previously identified needs',
+      'closing': 'Finalizing solution implementation details',
+      'discovery': 'Identifying specific business challenges and requirements',
+      'retention': 'Addressing ongoing service needs and optimization',
+      'quick_notes': 'Quick capture of conversation highlights'
+    };
+    
+    return contextMap[callType] || 'Exploring potential partnership opportunities';
+  };
+
+  const inferDesiredOutcomeFromCallType = (callType: string, nextSteps: string[]): string => {
+    // Infer from actual next steps
+    if (nextSteps.length > 0) {
+      return `Customer wants to: ${nextSteps[0]}`;
+    }
+    
+    // Context-based inference
+    const contextMap: Record<string, string> = {
+      'cold_call': 'Explore IONOS services and determine fit',
+      'demo': 'Evaluate IONOS solutions for their business needs',
+      'follow_up': 'Continue evaluation and move toward partnership',
+      'closing': 'Implement agreed-upon IONOS solutions',
+      'discovery': 'Identify the right IONOS products for their requirements',
+      'retention': 'Optimize current IONOS services and expand usage',
+      'quick_notes': 'Document conversation for next steps'
+    };
+    
+    return contextMap[callType] || 'Partner with IONOS for their business needs';
+  };
+
+  // Utility to check if text is a generic placeholder
+  const isGenericPlaceholder = (text: string): boolean => {
+    if (!text || text.trim() === '') return true;
+    
+    const genericPatterns = [
+      /not mentioned/i,
+      /\[.*?\]/,  // [Customer Name], [Company Name], etc.
+      /^general business/i,
+      /^business optimization/i,
+      /^improved efficiency/i,
+      /^customer$/i,
+      /^company$/i
+    ];
+    
+    return genericPatterns.some(pattern => pattern.test(text));
+  };
+
   // Auto-analyze conversation data on mount
   useEffect(() => {
     if (callSummary.transcriptHighlights?.length > 0) {
@@ -159,8 +220,8 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
       setConversationData({
         customerName: callSummary.customerName || '',
         companyName: '',
-        keyPain: 'General business challenges',
-        desiredOutcome: 'Improved efficiency and growth'
+        keyPain: inferKeyPainFromCallType(callSummary.callType, callSummary.keyPoints),
+        desiredOutcome: inferDesiredOutcomeFromCallType(callSummary.callType, callSummary.nextSteps)
       });
     }
   }, [callSummary]);
@@ -171,43 +232,56 @@ export function PostCallSummary({ callSummary, onClose, onSaveToHistory }: PostC
       
       // Don't analyze if transcript is too short
       if (transcriptText.length < 50) {
-        console.log('Transcript too short for analysis, using fallback data');
+        console.log('Transcript too short for analysis, using context-based fallback');
         setConversationData({
           customerName: callSummary.customerName || '',
           companyName: '',
-          keyPain: 'Business optimization needs',
-          desiredOutcome: 'Improved efficiency and growth'
+          keyPain: inferKeyPainFromCallType(callSummary.callType, callSummary.keyPoints),
+          desiredOutcome: inferDesiredOutcomeFromCallType(callSummary.callType, callSummary.nextSteps)
         });
         return;
       }
       
       const analysisPrompt = `
-Analyze this sales conversation and extract detailed information for personalized follow-up:
+You are analyzing a sales conversation. Extract ONLY explicitly mentioned information.
 
 TRANSCRIPT:
 "${transcriptText}"
 
 CALL TYPE: ${callSummary.callType}
 KEY POINTS: ${callSummary.keyPoints.join(', ')}
-OBJECTIONS: ${callSummary.objections.join(', ')}
 
-Extract and return ONLY a valid JSON object with:
+CRITICAL RULES:
+1. Extract customer first name ONLY if clearly mentioned (e.g., "Hi, I'm Sarah" → "Sarah")
+2. Extract company name ONLY if mentioned (e.g., "from Tech Solutions Inc" → "Tech Solutions Inc")
+3. If NOT mentioned, return empty string "" (NEVER use "Not mentioned" or placeholders)
+4. For pain points: Extract SPECIFIC challenges customer discussed (use their exact words when possible)
+5. For desired outcomes: Extract SPECIFIC goals customer wants to achieve
+6. If pain/outcomes unclear, infer intelligently from call context and key points discussed
+
+EXAMPLE (based on actual call):
+Input: "David from Rapid Response Integration mainly focuses on AV and Datacenter hardware. Interested in IONOS services."
+Output:
 {
-  "customerName": "First name only if clearly mentioned",
-  "companyName": "Company name if mentioned",
-  "keyPain": "Specific problems/challenges customer mentioned (be detailed, not generic)",
-  "desiredOutcome": "Specific outcomes customer wants to achieve",
-  "productNeeds": ["List of IONOS products/services customer needs based on conversation"]
+  "customerName": "David",
+  "companyName": "Rapid Response Integration",
+  "keyPain": "Needs reliable AV and Datacenter hardware solutions for their integration projects",
+  "desiredOutcome": "Partner with IONOS to provide scalable datacenter infrastructure for their clients"
 }
 
-Be specific and extract actual details from the conversation. Use exact phrases when possible.
-If something is not mentioned, use context-appropriate fallback based on call type and discussion.
-      `;
+Return ONLY valid JSON:
+{
+  "customerName": "string or empty",
+  "companyName": "string or empty",
+  "keyPain": "specific challenges (NOT generic)",
+  "desiredOutcome": "specific goals (NOT generic)"
+}
+`;
 
       const response = await ionosAI.sendMessage([
         {
           role: 'system',
-          content: 'You are an expert at extracting key information from sales conversations. Return ONLY valid JSON with detailed, specific information from the conversation.'
+          content: 'You are an expert at extracting precise information from sales conversations. Return ONLY valid JSON. Never use placeholder text like "Not mentioned" - use empty strings instead. Be specific and detailed based on actual conversation content.'
         },
         {
           role: 'user',
@@ -219,33 +293,39 @@ If something is not mentioned, use context-appropriate fallback based on call ty
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const extracted = JSON.parse(jsonMatch[0]);
+          
+          // Validate extracted data quality
           setConversationData({
             customerName: extracted.customerName || callSummary.customerName || '',
             companyName: extracted.companyName || '',
-            keyPain: extracted.keyPain || 'Business optimization needs',
-            desiredOutcome: extracted.desiredOutcome || 'Improved efficiency and growth'
+            keyPain: !isGenericPlaceholder(extracted.keyPain || '') 
+              ? extracted.keyPain 
+              : inferKeyPainFromCallType(callSummary.callType, callSummary.keyPoints),
+            desiredOutcome: !isGenericPlaceholder(extracted.desiredOutcome || '') 
+              ? extracted.desiredOutcome 
+              : inferDesiredOutcomeFromCallType(callSummary.callType, callSummary.nextSteps)
           });
           
           console.log('Enhanced conversation analysis:', extracted);
         }
       } catch (parseError) {
         console.error('Failed to parse conversation analysis:', parseError);
-        // Use fallback data
+        // Use intelligent fallback
         setConversationData({
           customerName: callSummary.customerName || '',
           companyName: '',
-          keyPain: 'Business optimization needs',
-          desiredOutcome: 'Improved efficiency and growth'
+          keyPain: inferKeyPainFromCallType(callSummary.callType, callSummary.keyPoints),
+          desiredOutcome: inferDesiredOutcomeFromCallType(callSummary.callType, callSummary.nextSteps)
         });
       }
     } catch (error) {
       console.error('Failed to analyze conversation:', error);
-      // Use fallback data
+      // Use intelligent fallback
       setConversationData({
         customerName: callSummary.customerName || '',
         companyName: '',
-        keyPain: 'Business optimization needs',
-        desiredOutcome: 'Improved efficiency and growth'
+        keyPain: inferKeyPainFromCallType(callSummary.callType, callSummary.keyPoints),
+        desiredOutcome: inferDesiredOutcomeFromCallType(callSummary.callType, callSummary.nextSteps)
       });
     }
   };
@@ -342,45 +422,80 @@ Generate a personalized follow-up email using the user-edited template fields. U
       day: 'numeric'
     });
     
-    const customerName = conversationData.customerName || callSummary.customerName || '[Customer Name]';
-    const companyName = conversationData.companyName || '[Company Name]';
+    const customerName = conversationData.customerName || callSummary.customerName;
+    const companyName = conversationData.companyName;
     const callId = `CALL-${Date.now().toString().slice(-8)}`;
     
-    return `CASE NOTES - ${currentDate}
-
-Customer: ${customerName}
-Company: ${companyName}
-Call Type: ${callSummary.callType}
-Call ID: ${callId}
-
-KEY DISCUSSION POINTS:
-${callSummary.keyPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')}
-
-OBJECTIONS ADDRESSED:
-${callSummary.objections.length > 0 
-  ? callSummary.objections.map((obj, index) => `${index + 1}. ${obj}`).join('\n')
-  : 'None'}
-
-NEXT STEPS:
-${callSummary.nextSteps.map((step, index) => `${index + 1}. ${step}`).join('\n')}
-
-PAIN POINTS IDENTIFIED:
-- ${conversationData.keyPain || 'General business challenges'}
-
-DESIRED OUTCOMES:
-- ${conversationData.desiredOutcome || 'Improved efficiency and growth'}`;
+    let notes = `CASE NOTES - ${currentDate}\n\n`;
+    
+    // Only add customer info if available
+    if (customerName || companyName) {
+      if (customerName) notes += `Customer: ${customerName}\n`;
+      if (companyName) notes += `Company: ${companyName}\n`;
+    }
+    
+    notes += `Call Type: ${callSummary.callType}\n`;
+    notes += `Call ID: ${callId}\n\n`;
+    
+    notes += `KEY DISCUSSION POINTS:\n`;
+    notes += callSummary.keyPoints.map((point, index) => `${index + 1}. ${point}`).join('\n');
+    notes += `\n\n`;
+    
+    if (callSummary.objections.length > 0) {
+      notes += `OBJECTIONS ADDRESSED:\n`;
+      notes += callSummary.objections.map((obj, index) => `${index + 1}. ${obj}`).join('\n');
+      notes += `\n\n`;
+    }
+    
+    notes += `NEXT STEPS:\n`;
+    notes += callSummary.nextSteps.map((step, index) => `${index + 1}. ${step}`).join('\n');
+    notes += `\n\n`;
+    
+    // Only add pain points/outcomes if meaningful
+    if (conversationData.keyPain && !isGenericPlaceholder(conversationData.keyPain)) {
+      notes += `PAIN POINTS IDENTIFIED:\n- ${conversationData.keyPain}\n\n`;
+    }
+    
+    if (conversationData.desiredOutcome && !isGenericPlaceholder(conversationData.desiredOutcome)) {
+      notes += `DESIRED OUTCOMES:\n- ${conversationData.desiredOutcome}`;
+    }
+    
+    return notes;
   };
 
   const fillTemplate = (template: string) => {
+    const customerName = conversationData.customerName || callSummary.customerName;
+    const companyName = conversationData.companyName;
+    
+    // Smart greeting: Use name if available, otherwise professional greeting
+    const greeting = customerName ? `Hi ${customerName}` : 'Hello';
+    
+    // Smart company reference
+    const companyRef = companyName 
+      ? `${companyName}'s` 
+      : 'your organization\'s';
+    
+    // Smart pain point description
+    const painDescription = conversationData.keyPain && !isGenericPlaceholder(conversationData.keyPain)
+      ? conversationData.keyPain 
+      : `the challenges we discussed regarding ${callSummary.callType.replace(/_/g, ' ')}`;
+    
+    // Smart outcome description
+    const outcomeDescription = conversationData.desiredOutcome && !isGenericPlaceholder(conversationData.desiredOutcome)
+      ? conversationData.desiredOutcome
+      : `the goals we outlined for ${companyName || 'your business'}`;
+    
     return template
-      .replace(/{{customerName}}/g, conversationData.customerName || callSummary.customerName || '[Customer Name]')
-      .replace(/{{companyName}}/g, conversationData.companyName || '[Company Name]')
-      .replace(/{{keyPain}}/g, conversationData.keyPain || 'business challenges')
-      .replace(/{{desiredOutcome}}/g, conversationData.desiredOutcome || 'improved efficiency')
+      .replace(/Hi {{customerName}}/g, greeting)
+      .replace(/{{customerName}}/g, customerName || 'there')
+      .replace(/{{companyName}}/g, companyRef)
+      .replace(/{{keyPain}}/g, painDescription)
+      .replace(/{{desiredOutcome}}/g, outcomeDescription)
       .replace(/{{keyPoints}}/g, callSummary.keyPoints.map(point => `• ${point}`).join('\n'))
       .replace(/{{nextSteps}}/g, callSummary.nextSteps.map(step => `• ${step}`).join('\n'))
-      .replace(/{{timeline}}/g, '[Timeline]')
-      .replace(/{{yourName}}/g, '[Your Name]');
+      .replace(/{{timeline}}/g, 'early next week')
+      .replace(/{{yourName}}/g, '[Your Name]')
+      .replace(/{{topic}}/g, callSummary.callType.replace(/_/g, ' '));
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {

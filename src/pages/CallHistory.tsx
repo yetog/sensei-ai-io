@@ -259,34 +259,69 @@ ${summary.followUpEmail || 'No email generated'}
       };
     }
 
-    // Use AI to analyze the conversation
+    // Use AI to analyze the conversation with improved prompts
     try {
       const analysisPrompt = `
-Analyze this sales call transcript and extract actionable intelligence:
+You are analyzing a sales call transcript. Extract ONLY information that is EXPLICITLY mentioned in the conversation.
 
 TRANSCRIPT:
-${fullTranscript}
+"${fullTranscript}"
 
 CALL TYPE: ${selectedCallType}
 
-Extract and return ONLY a valid JSON object with this exact structure:
+CRITICAL RULES:
+1. If a customer name is mentioned (e.g., "Hi, I'm John"), extract first name only → "John"
+2. If NO name is mentioned, return empty string "" (NOT "Not mentioned" or "Customer")
+3. If a company is mentioned (e.g., "from Acme Corp"), extract it → "Acme Corp"
+4. If NO company mentioned, return empty string "" (NOT "Not mentioned")
+5. For pain points, extract SPECIFIC challenges customer mentioned (NOT generic phrases like "business challenges")
+6. For desired outcomes, extract SPECIFIC goals customer stated (NOT generic phrases like "improved efficiency")
+7. If pain points or outcomes are NOT mentioned, describe what you can infer from call type and discussion
+
+EXAMPLE GOOD OUTPUT:
 {
-  "customerName": "First name if mentioned, otherwise empty string",
-  "companyName": "Company name if mentioned, otherwise empty string",
-  "keyPoints": ["3-5 specific discussion points from actual conversation"],
-  "objections": ["Any concerns or objections raised by customer"],
-  "nextSteps": ["3-4 specific, actionable next steps based on conversation"],
-  "productRecommendations": ["Specific IONOS products/services mentioned or needed"],
-  "painPoints": ["Customer's key challenges mentioned"],
-  "desiredOutcomes": ["What customer wants to achieve"],
-  "outcome": "follow_up or quote_needed or closed or no_interest or demo_scheduled"
+  "customerName": "David",
+  "companyName": "Rapid Response Integration",
+  "keyPoints": [
+    "David from Rapid Response Integration mainly focuses on AV and Datacenter hardware",
+    "Interested in exploring IONOS services for their infrastructure needs",
+    "Requested follow-up call to discuss specific solutions"
+  ],
+  "painPoints": ["Need reliable AV and Datacenter hardware solutions", "Looking for scalable infrastructure"],
+  "desiredOutcomes": ["Implement robust datacenter infrastructure", "Partner with reliable hardware provider"],
+  "objections": [],
+  "nextSteps": [
+    "Schedule follow-up call next week to discuss referral agreement",
+    "Provide detailed product information on IONOS datacenter solutions",
+    "Prepare demo of relevant IONOS hardware offerings"
+  ],
+  "outcome": "follow_up"
 }
 
-Be specific and extract actual conversation details, not generic placeholders.
+EXAMPLE BAD OUTPUT (DO NOT DO THIS):
+{
+  "customerName": "Not mentioned",
+  "companyName": "Not mentioned",
+  "painPoints": ["General business challenges"],
+  "desiredOutcomes": ["Improved efficiency and growth"]
+}
+
+Return ONLY valid JSON with specific, extracted information:
+{
+  "customerName": "string or empty",
+  "companyName": "string or empty",
+  "keyPoints": ["array of 3-5 specific discussion points"],
+  "objections": ["array of concerns raised"],
+  "nextSteps": ["array of specific action items"],
+  "painPoints": ["array of specific challenges"],
+  "desiredOutcomes": ["array of specific goals"],
+  "outcome": "follow_up|quote_needed|demo_scheduled|closed|no_interest"
+}
       `;
+      
       const response = await ionosAI.sendMessage([{
         role: 'system',
-        content: 'You are a sales analysis expert. Extract structured insights from conversations. Return ONLY valid JSON, no additional text.'
+        content: 'You are an expert at extracting precise information from sales conversations. Return ONLY valid JSON. Never use placeholder text like "Not mentioned" - use empty strings instead. Be specific and detailed based on actual conversation content.'
       }, {
         role: 'user',
         content: analysisPrompt
@@ -307,8 +342,12 @@ Be specific and extract actual conversation details, not generic placeholders.
           nextSteps: analyzed.nextSteps?.length > 0 ? analyzed.nextSteps : ['Review call transcript', 'Send follow-up email', 'Schedule next meeting'],
           outcome: outcome as 'follow_up' | 'quote_needed' | 'closed' | 'no_interest' | 'demo_scheduled',
           transcriptHighlights: transcription.slice(-10).map(t => t.text),
-          keyPain: analyzed.painPoints?.join(', ') || '',
-          desiredOutcome: analyzed.desiredOutcomes?.join(', ') || ''
+          keyPain: (analyzed.painPoints && analyzed.painPoints.length > 0) 
+            ? analyzed.painPoints.join(', ') 
+            : '',
+          desiredOutcome: (analyzed.desiredOutcomes && analyzed.desiredOutcomes.length > 0)
+            ? analyzed.desiredOutcomes.join(', ')
+            : ''
         };
       }
     } catch (error) {
