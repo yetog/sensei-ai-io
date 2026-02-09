@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { VoiceInput } from '@/utils/voiceInput';
 import { ionosAI } from '@/services/ionosAI';
+import { knowledgeBase } from '@/services/knowledgeBase';
 import { toast } from 'sonner';
 
 export interface TranscriptionSegment {
@@ -48,10 +49,17 @@ export const useFollowUpAnalysis = () => {
     lastSuggestionTime.current = now;
 
     try {
+      const playbookResults = knowledgeBase.search(transcript, 3);
+      const playbookContext = playbookResults.length > 0 
+        ? `\n\nRELEVANT PLAYBOOK GUIDANCE:\n${playbookResults.map(r => 
+            `- ${r.document.title}: ${r.matchedContent.substring(0, 150)}...`
+          ).join('\n')}`
+        : '';
+
       const response = await ionosAI.sendCoachingMessage([
         {
           role: 'system',
-          content: 'You are an AI sales coach. Provide a concise, actionable coaching suggestion (2-3 sentences max).',
+          content: `You are an AI sales coach. Provide a concise, actionable coaching suggestion (2-3 sentences max).${playbookContext}`,
         },
         {
           role: 'user',

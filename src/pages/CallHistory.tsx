@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Phone, Search, Eye, Trash2, Download, Calendar, User, Clock, Filter, Mic, Square, FileText, AlertCircle, MessageSquare, Lightbulb } from 'lucide-react';
+import { Phone, Search, Eye, Trash2, Download, Calendar, User, Clock, Filter, Mic, Square, FileText, AlertCircle, MessageSquare, Lightbulb, RefreshCw } from 'lucide-react';
+import { knowledgeBase } from '@/services/knowledgeBase';
 import { callSummaryStorage, type StoredCallSummary } from '@/services/callSummaryStorage';
 import { useToast } from '@/hooks/use-toast';
 import { PostCallSummary } from '@/components/PostCallSummary';
@@ -34,6 +35,7 @@ export function CallHistory() {
     suggestions,
     startListening,
     stopListening,
+    clearSession,
     sessionStartTime,
     error,
     isAvailable
@@ -261,6 +263,14 @@ ${summary.followUpEmail || 'No email generated'}
 
     // Use AI to analyze the conversation with improved prompts
     try {
+      // Search playbook for relevant context
+      const playbookResults = knowledgeBase.search(fullTranscript, 5);
+      const playbookContext = playbookResults.length > 0
+        ? `\n\nRELEVANT PLAYBOOK SECTIONS:\n${playbookResults.map(r => 
+            `- ${r.document.title} (${r.document.type})`
+          ).join('\n')}`
+        : '';
+
       const analysisPrompt = `
 You are analyzing a sales call transcript. Extract ONLY information that is EXPLICITLY mentioned in the conversation.
 
@@ -268,6 +278,7 @@ TRANSCRIPT:
 "${fullTranscript}"
 
 CALL TYPE: ${selectedCallType}
+${playbookContext}
 
 CRITICAL RULES:
 1. If a customer name is mentioned (e.g., "Hi, I'm John"), extract first name only → "John"
@@ -552,6 +563,24 @@ Return ONLY valid JSON with specific, extracted information:
                   <span>{suggestions.length} suggestions</span>
                 </div>
               </div>
+
+              {/* Clear & Start Over Button */}
+              {(transcription.length > 0 || suggestions.length > 0) && !isListening && (
+                <Button 
+                  onClick={() => {
+                    clearSession();
+                    toast({
+                      title: "Session Cleared",
+                      description: "Ready to start a new analysis"
+                    });
+                  }}
+                  variant="outline" 
+                  className="w-full gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Clear & Start Over
+                </Button>
+              )}
 
               {/* Error Display */}
               {error && <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
