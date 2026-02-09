@@ -22,6 +22,7 @@ import {
   Zap
 } from 'lucide-react';
 import { knowledgeBase, KnowledgeDocument } from '@/services/knowledgeBase';
+import { importIONOSPlaybook } from '@/services/playbookImport';
 import { cn } from '@/lib/utils';
 
 export function KnowledgeBaseManager() {
@@ -169,6 +170,22 @@ export function KnowledgeBaseManager() {
               Import
             </Button>
           </label>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              const imported = importIONOSPlaybook();
+              refreshDocuments();
+              if (imported > 0) {
+                alert(`Successfully imported ${imported} playbook sections into Knowledge Base!`);
+              } else {
+                alert('IONOS Playbook is already imported.');
+              }
+            }}
+          >
+            <BookOpen className="h-4 w-4 mr-1" />
+            Import Playbook
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-1" />
             Export

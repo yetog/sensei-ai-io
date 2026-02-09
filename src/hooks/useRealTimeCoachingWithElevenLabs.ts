@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useElevenLabsVoiceAgent } from './useElevenLabsVoiceAgent';
 import { ionosAI } from '@/services/ionosAI';
+import { knowledgeBase } from '@/services/knowledgeBase';
 import { toast } from 'sonner';
 
 // Types
@@ -49,11 +50,19 @@ export const useRealTimeCoachingWithElevenLabs = () => {
 
     setIsProcessing(true);
     try {
+      // Search playbook for relevant context
+      const playbookResults = knowledgeBase.search(transcript, 3);
+      const playbookContext = playbookResults.length > 0 
+        ? `\n\nRELEVANT PLAYBOOK GUIDANCE:\n${playbookResults.map(r => 
+            `- ${r.document.title}: ${r.matchedContent.substring(0, 150)}...`
+          ).join('\n')}`
+        : '';
+
       // Use IONOS AI to generate coaching suggestions
       const response = await ionosAI.sendCoachingMessage([
         {
           role: 'system',
-          content: 'You are an AI sales coach. Provide concise, actionable coaching suggestions based on the conversation.',
+          content: `You are an AI sales coach. Provide concise, actionable coaching suggestions based on the conversation and IONOS playbook guidance.${playbookContext}`,
         },
         {
           role: 'user',
